@@ -5,6 +5,6 @@ Plug-in for Neo4j containing user-defined procedures for similarity graph, Lapla
 
 ## Data
 
-#### Dataset 1 - Iris
+[Dataset 1 - Iris ](https://www.kaggle.com/datasets/uciml/iris)
 
-[#### Dataset 2 - Harth ](https://github.com/ntnu-ai-lab/harth-ml-experiments)
+[Dataset 2 - Harth ](https://github.com/ntnu-ai-lab/harth-ml-experiments)
