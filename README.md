@@ -4,3 +4,8 @@ Plug-in for Neo4j containing user-defined procedures for similarity graph, Lapla
 ## Features 
 
 ## Data
+
+#### Dataset 1 - Iris
+
+#### Dataset 2 - Harth 
+[Link to description.](https://github.com/ntnu-ai-lab/harth-ml-experiments)
