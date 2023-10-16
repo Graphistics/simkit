@@ -1,14 +1,17 @@
 package graph;
 
 import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 
 public class ReadCsvTestData {
     public String dataPath;
@@ -18,6 +21,37 @@ public class ReadCsvTestData {
     }
 
     String[] HEADERS = { "points","x_coordinate","y_coordinate","class"};
+
+    public ArrayList<String> readCSVHeader(String dataPath) throws IOException {
+        Reader in = new FileReader(dataPath);
+
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder().build();
+        Iterable<CSVRecord> records = csvFormat.parse(in);
+        ArrayList<String> headers = new ArrayList<>();
+        for (CSVRecord record : records) {
+            for (int i = 0; i < record.size(); i++) {
+                headers.add(record.get(i));
+            }
+            break;
+        }
+        return headers;
+    }
+    public ArrayList<String> readCSVFirstLine(String dataPath) throws IOException {
+        Reader in = new FileReader(dataPath);
+
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setSkipHeaderRecord(true).build();
+        CSVParser records = csvFormat.parse(in);
+        ArrayList<String> First = new ArrayList<>();
+        records.iterator().next();
+        for (CSVRecord record : records) {
+            for (int i = 0; i < record.size(); i++) {
+                First.add(record.get(i));
+            }
+            break;
+        }
+        return First;
+    }
+
 
     public ArrayList<TestData> readCsvFile(String dataPath) throws IOException {
         ArrayList<TestData> TestDataArrayList = new ArrayList<>();

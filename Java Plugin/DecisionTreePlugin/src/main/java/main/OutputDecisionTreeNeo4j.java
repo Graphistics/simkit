@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.function.DoubleUnaryOperator;
+import java.util.regex.Pattern;
 
 import org.neo4j.driver.AuthTokens;
 import org.neo4j.driver.Driver;
@@ -275,6 +276,75 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			} );
 		}
 	}
+	@UserFunction
+	public String loadCsvGraph(@Name("dataPath") String dataPath,@Name("Name") String Name)  throws Exception{
+
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		{
+			if(dataPath == null && Name == null) {
+				return "Missing dataPath or distance measure type";
+			}else {
+				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
+				ArrayList<String> arrayListHeaders = readCsvTestData.readCSVHeader(dataPath);
+				ArrayList<String> arrayListFirst = readCsvTestData.readCSVFirstLine(dataPath);
+
+				connector.loadCsvConnector(dataPath, Name ,arrayListHeaders,arrayListFirst);
+			}
+		}catch(Exception e) {
+			throw new RuntimeException(e);
+		}
+		return dataPath;
+	}
+	private void loadCsvConnector(String dataPath, String Name,ArrayList<String> arrayListHeaders,ArrayList<String> arrayListFirst) throws Exception {
+
+		// LOAD CSV with headers FROM 'file:///test.csv' AS row
+		//merge (:csvdata8 {points: row.points,x_cordinate: toFloat(row.x_coordinate),y_cordinate: toFloat(row.y_coordinate),class: toFloat(row.class)})
+		String proerties = OutputDecisionTreeNeo4j.getHeadersList(arrayListHeaders,arrayListFirst);
+
+		String FileName = Name.substring(0,Name.indexOf("."));
+		try ( Session session = driver.session() )
+		{
+			String greeting = session.writeTransaction( new TransactionWork<String>()
+			{
+				@Override
+				public String execute( Transaction tx )
+				{
+					Result result = tx.run( "LOAD CSV WITH HEADERS FROM 'file:///"+Name+"' AS row "+"merge (:"+FileName+"{"+ proerties+"})", parameters( "name", Name ) );
+					return Name;
+				}
+			} );
+		}
+
+	}
+
+	private static String getHeadersList(ArrayList<String> arrayListHeaders,ArrayList<String> arrayListFirst) {
+
+		StringBuilder stringBuilder = new StringBuilder();
+		Pattern pattern = Pattern.compile("-?\\d+(\\.\\d+)?");
+
+
+		for (int i = 0; i < arrayListHeaders.size(); i++) {
+
+			if(i == arrayListHeaders.size()-1) {
+
+				if (pattern.matcher(arrayListFirst.get(i)).matches()) {
+					stringBuilder.append(arrayListHeaders.get(i) + ": toFloat(row." + arrayListHeaders.get(i) + ")");
+				} else
+					stringBuilder.append(arrayListHeaders.get(i) + ": row." + arrayListHeaders.get(i));
+			}else {
+				if (pattern.matcher(arrayListFirst.get(i)).matches()) {
+					stringBuilder.append(arrayListHeaders.get(i) + ": toFloat(row." + arrayListHeaders.get(i) + "),");
+				} else
+					stringBuilder.append(arrayListHeaders.get(i) + ": row." + arrayListHeaders.get(i) + ",");
+			}
+
+
+		}
+
+		return stringBuilder.toString();
+	}
+
+
 	@UserFunction
 	public String createConnectedGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure)  throws Exception {
 
@@ -1243,7 +1313,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public static void main(String[] args) throws Exception {
 		OutputDecisionTreeNeo4j outputDecisionTreeNeo4j = new OutputDecisionTreeNeo4j();
 		String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
-		outputDecisionTreeNeo4j.createConnectedGraph(dataPath,"target");
+		String Filename = "test.csv";
+		outputDecisionTreeNeo4j.loadCsvGraph(dataPath,"target.csv");
 
 	}
 
