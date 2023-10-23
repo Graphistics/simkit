@@ -202,7 +202,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	{
 		final long bid = edgeListDetail.getTarget();
 		final String bindex = "Index" + bid;
-		final String weight = "_" + Double.toString(edgeListDetail.getWeight()).replace(".","_") + "_";
+		double weightValue = (double)Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
+		final String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "}" ;
+		//final String weight = "_" + Double.toString(edgeListDetail.getWeight()).replace(".","_") + "_";
 		try ( Session session = driver.session() )
 		{
 			String greeting = session.writeTransaction( new TransactionWork<String>()
@@ -375,8 +377,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				//for (EdgeList edgeListDetail : edgeList) {
 				for (int i = 0; i < edgeList.size()-1; i++) {
 					EdgeList edgeListDetail = edgeList.get(i);
-
-
 //					ArrayList<String> relationshipDetail = new ArrayList<>();
 //					relationshipDetail.add(String.valueOf(edgeListDetail.getSource()));
 //					relationshipDetail.add(String.valueOf(edgeListDetail.getTarget()));
@@ -1312,9 +1312,32 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	public static void main(String[] args) throws Exception {
 		OutputDecisionTreeNeo4j outputDecisionTreeNeo4j = new OutputDecisionTreeNeo4j();
-		String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
+		//String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
 		String Filename = "test.csv";
-		outputDecisionTreeNeo4j.loadCsvGraph(dataPath,"target.csv");
+		String testDataPath = "C:/Users/u501027/Documents/GitHub/sciki4j/dataset_0_test/test.csv";
+		//test
+		ReadCsvTestData readCsvTestData = new ReadCsvTestData(testDataPath);
+		ArrayList<TestData> testData = readCsvTestData.readCsvFile(testDataPath);
+		Double[][] DistanceMatrix = readCsvTestData.euclidianDistance(testData);
+		Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
+		Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
+
+		ArrayList<Nodelist> nodeList = ReadCsvTestData.getNodeList(testData);
+		ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
+		for (int i = 0; i < edgeList.size()-1; i++) {
+			EdgeList edgeListDetail = edgeList.get(i);
+			System.out.println("edgeListDetail " + edgeList.get(i));
+			
+			long bid = edgeListDetail.getTarget();
+			String dtType = "connected";
+			String bindex = "Index" + bid;
+			double weightValue = (double)Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
+			String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "`}" ;
+			String finalString = "MATCH (a:" + dtType + ")S, (b:" + dtType + ") " +
+					"WHERE a.id = "+"\"" +"Index"+edgeListDetail.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
+					"CREATE (a)-[r:" + weight +  "]->(b)";
+			System.out.println("--" + finalString);
+		}
 
 	}
 
