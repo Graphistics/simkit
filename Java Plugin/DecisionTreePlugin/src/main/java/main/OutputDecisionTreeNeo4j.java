@@ -401,74 +401,64 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
 
 	}
+
+    private static ArrayList<EdgeList> retrieveEdgeListFromNeo4j(final String nodeType) {
+        ArrayList<EdgeList> edgeList = new ArrayList<>();
+
+        try (Session session = driver.session()) {
+	        String cypherQuery = "MATCH (n:" + nodeType + ")-[r]->(m:" + nodeType + ") RETURN toFloat(split(n.id, 'Index')[1]) AS source, toFloat(split(m.id, 'Index')[1]) AS target, toFloat(type(r)) AS weight, id(r) AS index";
+	        Result result = session.run(cypherQuery);
 	
-	public double[][] getGraphDataFromNeo4j(final String nodeType) {
-		double[][] weightedAdjacencyMatrix;
-	    try (Session session = driver.session()) {
-	    	String cypherQuery = "MATCH (n:" + nodeType + ")-[r]->(m:" + nodeType + ") RETURN id(n) as source, type(r) AS weight, id(m) as target";
-	    	Result result = session.run(cypherQuery);
-	        // Determine the size of the adjacency matrix based on the number of nodes
-	        int size = session.run("MATCH (n:" + nodeType + ") RETURN count(n) as nodeCount")
-	                        .single()
-	                        .get("nodeCount")
-	                        .asInt();
-
-	        weightedAdjacencyMatrix = new double[size][size];
-
 	        while (result.hasNext()) {
 	            Record record = result.next();
-	            double sourceNodeId = record.get("source").asDouble();
-	            double targetNodeId = record.get("target").asDouble();
-	            String relationship = record.get("weight").asString();
-	            double weight;
-                try {
-                    weight = Double.parseDouble(relationship);
-                } catch (NumberFormatException e) {
-                    
-                    e.printStackTrace();
-                    weight = 0.0;
-                }
-
-	            weightedAdjacencyMatrix[(int) sourceNodeId][(int) targetNodeId] = weight;
+	            long source = record.get("source").asLong();
+	            long target = record.get("target").asLong();
+	            double weight = record.get("weight").asDouble();
+	            int index = record.get("index").asInt();
+	
+	            EdgeList edge = new EdgeList(source, target, weight, index);
+	            edgeList.add(edge);
 	        }
 	    } catch (Neo4jException e) {
-	        throw new RuntimeException("Error retrieving graph data from Neo4j: " + e.getMessage());
-	    }
-	    
-		return weightedAdjacencyMatrix;
-
+	    	throw new RuntimeException("Error retrieving graph data from Neo4j: " + e.getMessage());
+	    }    
+		return edgeList;
 	}
 
-		@UserFunction
-		public String createLaplacianGraph(@Name("nodeType") String nodeType, @Name("threshold") double threshold) throws Exception {
-			
-			try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
-		        if (nodeType == null) {
-		            return "Missing nodeType";
-		        } else {
-			        double[][] newAdjMat = getGraphDataFromNeo4j(nodeType);
-			        RealMatrix degreeMatrix = MatrixCalculation.calculateDegreeMatrix(newAdjMat);
-			        RealMatrix adjacencyMatrix = new BlockRealMatrix(newAdjMat);
-			        RealMatrix laplacianMatrix = MatrixCalculation.calculateSymmetricLaplacianMatrix(degreeMatrix, adjacencyMatrix);
-					
-					
-		        	EigenCalculation.EigenResult eigenResult = EigenCalculation.calculateEigen(laplacianMatrix);
-		        	ArrayList<EdgeList> edgeListEigen = EigenCalculation.createEdgeList(eigenResult.eigenvectors, threshold);
+	@UserFunction
+	public String createLaplacianGraph(@Name("nodeType") String nodeType, @Name("threshold") double threshold) throws Exception {
+		
+		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+	        if (nodeType == null) {
+	            return "Missing nodeType";
+	        } else {
+	        	
+	        	ArrayList<EdgeList> edgeList = retrieveEdgeListFromNeo4j(nodeType);
+	        	
+	            double[][] adjacencyMatrixData = MatrixCalculation.convertToAdjacencyMatrix(edgeList);
+	            RealMatrix adjacencyMatrix = new BlockRealMatrix(adjacencyMatrixData);
+	            RealMatrix degreeMatrix = MatrixCalculation.calculateDegreeMatrix(adjacencyMatrixData);
+	            RealMatrix laplacianMatrix = MatrixCalculation.calculateSymmetricLaplacianMatrix(degreeMatrix, adjacencyMatrix);
+	            					
+				
+	        	EigenCalculation.EigenResult eigenResult = EigenCalculation.calculateEigen(laplacianMatrix);
+	        	double[] eigenvalues = eigenResult.eigenvalues;
+	        	RealMatrix eigenvectors = eigenResult.eigenvectors;
+	        	ArrayList<EdgeList> edgeListEigen = EigenCalculation.createEdgeList(eigenvectors, threshold);
 
-		            
-//		            for (EdgeList edge : edgeListEigen) {
-					for (int i = 0; i < edgeListEigen.size()-1; i++) {
-						EdgeList edgeListDetail = edgeListEigen.get(i);
-						connector.createRelationshipConnectedGraph("eigendecomposedIndex", "created relationship in neo4j \n", edgeListDetail);
-		            }
-		            
-		        }
-		        return "Create fully connected graph successful!";
-		    } catch (Neo4jException e) {
-		        throw new RuntimeException("Error retrieving graph data from Neo4j: " + e.getMessage());
-		    }
-		}
+	            
+	            for (EdgeList edge : edgeListEigen) {
+	                connector.createRelationshipConnectedGraph("eigendecomposedIndex", "created relationship in neo4j \n", edge);
+	            }
 
+	            
+	        }
+	        return "Create fully connected graph successful!";
+	    } catch (Neo4jException e) {
+	        throw new RuntimeException("Error creating laplacian graph in Neo4j: " + e.getMessage());
+	    }
+	}
+	
 
 	/**
 	 * This function is used to split the nodes from database based on training ratio given

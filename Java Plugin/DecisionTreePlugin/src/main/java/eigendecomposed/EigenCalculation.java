@@ -160,14 +160,12 @@ public class EigenCalculation {
 
         int numRows = eigenvectors.getRowDimension();
 
-        // Iterate through the eigenvector matrix to identify connected nodes
         for (int i = 0; i < numRows; i++) {
             for (int j = i + 1; j < numRows; j++) {
                 double value = eigenvectors.getEntry(i, j);
 
-                // Check if the absolute value of the eigenvector value exceeds the threshold
+               
                 if (Math.abs(value) >= threshold) {
-                    // Add the edge to the edge list
                     edgeList.add(new EdgeList(i, j, value, i));
                 }
             }
@@ -175,5 +173,5 @@ public class EigenCalculation {
 
         return edgeList;
     }
-        
+                
 }
