@@ -424,7 +424,35 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	    }    
 		return edgeList;
 	}
-
+    
+    @UserFunction
+	public String displayEdgeList(@Name("nodeType") String nodeType) throws Exception {
+		
+    	String outputString = "";
+		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+	        if (nodeType == null) {
+	            return "Missing nodeType";
+	        } else {
+	        	ArrayList<EdgeList> edgeList = new ArrayList<>();
+	        	edgeList = retrieveEdgeListFromNeo4j(nodeType);
+	        	if(edgeList.size()>0)
+	        	{
+	        		for(int i = 0; i < edgeList.size(); i++) {   
+		        		outputString = outputString + " | " + edgeList.get(i).toString(); 
+	        		}
+	        	}
+        		else
+        		{
+        			outputString = "could not retrieve edge list";
+        		}
+        	}
+	        return "Edge List Data:  " + outputString;
+        }
+	     catch (Neo4jException e) {
+	        throw new RuntimeException("Error creating laplacian graph in Neo4j: " + e.getMessage());
+	    }
+	}
+    
 	@UserFunction
 	public String createLaplacianGraph(@Name("nodeType") String nodeType, @Name("threshold") double threshold) throws Exception {
 		
