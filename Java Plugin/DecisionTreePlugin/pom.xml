@@ -53,7 +53,7 @@
       <!-- Used to send cypher statements to our procedure. -->
       <groupId>org.neo4j.driver</groupId>
       <artifactId>neo4j-java-driver</artifactId>
-      <version>${neo4j-java-driver.version}</version>
+      <version>4.3.0</version>
       <scope>test</scope>
     </dependency>
     
@@ -80,6 +80,11 @@
       <artifactId>assertj-core</artifactId>
       <version>${assertj.version}</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-csv</artifactId>
+      <version>1.10.0</version>
     </dependency>
 
   </dependencies>
