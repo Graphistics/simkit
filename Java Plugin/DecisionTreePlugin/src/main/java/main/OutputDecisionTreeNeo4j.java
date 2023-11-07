@@ -57,6 +57,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	private static ArrayList<String> trainDataList =  new ArrayList<String>();
 	private static ArrayList<String> autoSplitDataList =  new ArrayList<String>();
 	private static ArrayList<String> classificationDataList = new ArrayList<String>();
+	private static ArrayList<String> mapNodeList =  new ArrayList<String>();
 
 	/**
 	 * Creation of driver object using bolt protocol
@@ -153,7 +154,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	}
 	public void createNodeConnectedGraph(final String GraphType, final String message, final Nodelist nodeDetail)
 	{
-		final String name = "Index" + nodeDetail.getIndex().toString();
+		final String name = "Node" + nodeDetail.getIndex().toString();
 		try ( Session session = driver.session() )
 		{
 			String greeting = session.writeTransaction( new TransactionWork<String>()
@@ -164,8 +165,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 					//CREATE (p:fullyConnected {id:"p2", a1: 2, a2: 8,a3: 2})
 					//a is present for the node
 					Result result = tx.run( "CREATE (connectedGraph:Index" +
-							"{id:" +"\""+name+"\""+
-							",x_cordinate: " + nodeDetail.getX_cordinate()
+//							"{id:" +"\""+name+"\""+
+//							",x_cordinate: " + nodeDetail.getX_cordinate()
+							"{x_cordinate: " + nodeDetail.getX_cordinate()
 							+ ",y_cordinate: " + nodeDetail.getY_cordinate()
 							+ ",class_attrribute: " + nodeDetail.getClass_attrribute()
 							+ "})", parameters( "name", name ) );
@@ -1494,7 +1496,140 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
         }
 		
 	}
+	
+	public void connectNodes(final String nodeType, final String message, final String nodeCentroid, final String nodeCluster)
+    {
+    	final String name = "kmean";
+        try ( Session session = driver.session() )
+        {
+            String greeting = session.writeTransaction( new TransactionWork<String>()
+            {
+                @Override
+                public String execute( Transaction tx )
+                {
+                	//a is present for the node
+            		Result result = tx.run( "MERGE (a"+":NodeType" +" {" + nodeCentroid +"}) " +
+            				"MERGE (b "+":NodeType" + " {" + nodeCluster +"}) " +
+            				"MERGE (a)-[:link]->(b) "
+            				+ "RETURN a.message");
+				    return result.single().get( 0 ).asString();
+                }
+            } );
+        }
+    }
+	
+	@UserFunction
+    public String mapNodes(@Name("nodeType") String nodeType) throws Exception
+   	{
+       	String listOfData = "";
+       	mapNodeList.clear();
+       	try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+           {
+       		queryData(nodeType);
+       		for (Record key : dataKey) {
+       			List<Pair<String,Value>> values = key.fields();
+       			for (Pair<String,Value> nodeValues: values) {
+       				String valueOfNode = "";
+       				if ("n".equals(nodeValues.key())) { 
+       			        Value value = nodeValues.value();
+       			        for (String nodeKey : value.keys())
+       			        {
+       			        	if(value.get(nodeKey).getClass().equals(String.class))
+       			        	{
+       			        		if(valueOfNode != "")
+       			        		{
+       			        			valueOfNode = valueOfNode + ", " + nodeKey + ":" + value.get(nodeKey);
+       			        		}
+       			        		else
+       			        		{
+       			        			valueOfNode = nodeKey + ":" + value.get(nodeKey);
+       			        		}
+       			   
+       			        	}
+       			        	else
+       			        	{
+       			        		if(valueOfNode != "")
+       			        		{
+       			        			String converValueToString = String.valueOf(value.get(nodeKey));
+               			        	valueOfNode = valueOfNode + ", " + nodeKey + ":" + converValueToString;
+       			        		}
+       			        		else
+       			        		{
+       			        			String converValueToString = String.valueOf(value.get(nodeKey));
+               			        	valueOfNode =  nodeKey + ":" + converValueToString;
+       			        		}   			        		
+       			        	}
+       			        }
+       			        mapNodeList.add(valueOfNode);
+       			    }
+       				listOfData = listOfData + valueOfNode + " | ";
+       			}
+       		}
+           }
+       	return "Map all node data: " + listOfData;
+   	}
+	
+	 /**
+     * Procedure for k-means clustering and visualization in neo4j
+     * @param nodeType type of node
+     * @param numberOfCentroid 
+     * @param numberOfInteration
+     * @return cluster result and visualize
+     * @throws Exception
+     */
+    @UserFunction
+    @Description("Kmean clustering function")
+	public String kmean(@Name("nodeType") String nodeType, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
+	{
+    	try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+        {
+			String kMeanAfterClustering = "";
+			HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
+			int numberOfCentroidInt = Integer.parseInt(numberOfCentroid);
+			int numberOfInterationInt = Integer.parseInt(numberOfInteration);
+			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure);
+			for (String centroid: kmeanAssign.keySet()) {
+        		ArrayList<String> clusterNode = kmeanAssign.get(centroid);
+        		for (String node : clusterNode)
+        		{
+        			connector.connectNodes(nodeType, "create relationship in kmean node",centroid,node);
+        		}
+    		    
+    		}
+	        return kMeanAfterClustering ;
+		}
+	}
 
+	/**
+	 * Procedure for dbscan clustering and visualization in neo4j
+	 * @param nodeType type of node
+	 * @param
+	 * @param
+	 * @return cluster result and visualize
+	 * @throws Exception
+	 */
+	@UserFunction
+	@Description("DBSCAN clustering function")
+	public String dbscan(@Name("nodeType") String nodeType, @Name("epsilon") String epsilon, @Name("minimumPoints") String minimumPoints, @Name("distanceMeasure") String distanceMeasure) throws Exception
+	{
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		{
+			String dbscanAfterClustering = "";
+			HashMap<String,ArrayList<String>> dbAssign = new HashMap<String,ArrayList<String>>();
+			double eps = Double.parseDouble(epsilon);
+			int minPts = Integer.parseInt(minimumPoints);
+			dbAssign = Unsupervised.DbClust(mapNodeList, eps, minPts, distanceMeasure);
+			for (String centroid: dbAssign.keySet()) {
+        		ArrayList<String> clusterNode = dbAssign.get(centroid);
+        		for (String node : clusterNode)
+        		{
+        			connector.connectNodes(nodeType, "create relationship in dbscan node",centroid,node);
+        		}
+    		    
+    		}
+			return dbscanAfterClustering ;
+		}
+	}
 
 
 }
