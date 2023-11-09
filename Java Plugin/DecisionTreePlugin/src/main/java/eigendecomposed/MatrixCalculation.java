@@ -10,15 +10,15 @@ import graph.EdgeList;
 
 public class MatrixCalculation {
 
-    public enum LaplacianAlgorithm {
-        NJW, RANDOM_WALK
-    }
-
-    private static LaplacianAlgorithm algorithm;
-
-    public MatrixCalculation(LaplacianAlgorithm algorithm) {
-        MatrixCalculation.algorithm = algorithm;
-    }
+//    public enum LaplacianAlgorithm {
+//        SYMMETRIC, RANDOM_WALK
+//    }
+//
+//    private static LaplacianAlgorithm algorithm;
+//
+//    public MatrixCalculation(LaplacianAlgorithm algorithm) {
+//        MatrixCalculation.algorithm = algorithm;
+//    }
 
     public static class MatrixResult {
         private static RealMatrix adjacencyMatrix;
@@ -43,12 +43,20 @@ public class MatrixCalculation {
             return laplacianMatrix;
         }
     }
-   
-
+    
     public static double[][] convertToAdjacencyMatrix(ArrayList<EdgeList> edgeList) {
-        int dimension = edgeList.size();
+        // Find the maximum index value to determine the dimension of the adjacency matrix
+        int maxIndex = 0;
+        for (EdgeList edge : edgeList) {
+            maxIndex = Math.max(maxIndex, (int) edge.getSource());
+            maxIndex = Math.max(maxIndex, (int) edge.getTarget());
+        }
+
+        // Dimension of the adjacency matrix
+        int dimension = maxIndex + 1;
         double[][] adjacencyMatrixData = new double[dimension][dimension];
 
+        // Initialize adjacency matrix with appropriate weights
         for (EdgeList edge : edgeList) {
             int i = (int) edge.getSource();
             int j = (int) edge.getTarget();
@@ -58,6 +66,41 @@ public class MatrixCalculation {
         }
 
         return adjacencyMatrixData;
+    }
+
+   
+
+//    public static double[][] convertToAdjacencyMatrix(ArrayList<EdgeList> edgeList) {
+//        int dimension = edgeList.size();
+//        System.out.println(dimension);
+//        double[][] adjacencyMatrixData = new double[dimension][dimension];
+//
+//        for (EdgeList edge : edgeList) {
+//            int i = (int) edge.getSource();
+//            int j = (int) edge.getTarget();
+//            double weight = edge.getWeight();
+//            adjacencyMatrixData[i][j] = weight;
+//            adjacencyMatrixData[j][i] = weight;
+//        }
+//
+//        return adjacencyMatrixData;
+//    }
+    
+    public static RealMatrix calculateLaplacianMatrix(RealMatrix degreeMatrix, RealMatrix adjacencyMatrix, String algorithm) {
+        RealMatrix laplacianMatrix;
+
+        switch (algorithm) {
+            case "SYMMETRIC":
+                laplacianMatrix = calculateSymmetricLaplacianMatrix(degreeMatrix, adjacencyMatrix);
+                break;
+            case "RANDOM_WALK":
+                laplacianMatrix = calculateRandomWalkLaplacianMatrix(degreeMatrix, adjacencyMatrix);
+                break;
+            default:
+                throw new IllegalArgumentException("Invalid Laplacian algorithm choice.");
+        }
+
+        return laplacianMatrix;
     }
     
     public static RealMatrix calculateDegreeMatrix(double[][] adj_mat) {

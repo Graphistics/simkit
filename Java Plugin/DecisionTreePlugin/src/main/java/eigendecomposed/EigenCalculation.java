@@ -23,6 +23,8 @@ import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
 import graph.EdgeList;
+import graph.NodeList2;
+import graph.Nodelist;
 
 public class EigenCalculation {
 	
@@ -173,5 +175,24 @@ public class EigenCalculation {
 
         return edgeList;
     }
+    
+    public static ArrayList<NodeList2> createNodeList(RealMatrix eigenvectors, double threshold) {
+        ArrayList<NodeList2> nodeList = new ArrayList<>();
+
+        int numRows = eigenvectors.getRowDimension();
+
+        for (int i = 0; i < numRows; i++) {
+            double value = eigenvectors.getEntry(i, i);
+
+            if (Math.abs(value) >= threshold) {
+            	NodeList2 node = new NodeList2(i);
+                node.setIndex(i);
+                nodeList.add(node);
+            }
+        }
+
+        return nodeList;
+    }
+
                 
 }
