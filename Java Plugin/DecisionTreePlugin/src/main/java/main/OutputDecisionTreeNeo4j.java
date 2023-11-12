@@ -144,9 +144,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 		return output;
 	}
-	public void createNodeConnectedGraph(final String GraphType, final String message, final Nodelist nodeDetail)
+	public void createNodeConnectedGraph(final String GraphType, final String message, final String nodeDetail)
 	{
-		final String name = "Index" + nodeDetail.getIndex().toString();
+		final String name = "Index" + nodeDetail;
 		try ( Session session = driver.session() )
 		{
 			String greeting = session.writeTransaction( new TransactionWork<String>()
@@ -158,9 +158,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 					//a is present for the node
 					Result result = tx.run( "CREATE (connectedGraph:Index" +
 							"{id:" +"\""+name+"\""+
-							",x_cordinate: " + nodeDetail.getX_cordinate()
-							+ ",y_cordinate: " + nodeDetail.getY_cordinate()
-							+ ",class_attrribute: " + nodeDetail.getClass_attrribute()
+							",nodeid:" + "\""+name+"\""
 							+ "})", parameters( "name", name ) );
 					return message;
 				}
@@ -289,7 +287,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
 				ArrayList<String> arrayListHeaders = readCsvTestData.readCSVHeader(dataPath);
 				ArrayList<String> arrayListFirst = readCsvTestData.readCSVFirstLine(dataPath);
-
 				connector.loadCsvConnector(dataPath, Name ,arrayListHeaders,arrayListFirst);
 			}
 		}catch(Exception e) {
@@ -348,7 +345,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 
 	@UserFunction
-	public String createConnectedGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure)  throws Exception {
+	public String createConnectedGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn) throws Exception {
 
 		String confusionMatrix = "";
 		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
@@ -359,17 +356,18 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				return "Missing dataPath or distance measure type";
 			}else {
 				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
-				ArrayList<TestData> testData = readCsvTestData.readCsvFile(dataPath);
-				Double[][] DistanceMatrix = readCsvTestData.euclidianDistance(testData);
+				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
+
+				Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
 				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
 				Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
 
-				ArrayList<Nodelist> nodeList = ReadCsvTestData.getNodeList(testData);
+				ArrayList<String> nodeList = ReadCsvTestData.getNodeList(testData);
 				ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
 
 
 
-				for (Nodelist nodeDetail : nodeList) {
+				for (String nodeDetail : nodeList) {
 
 					connector.createNodeConnectedGraph("connectedGraph", "created nodes in neo4j", nodeDetail);
 				}
@@ -1314,33 +1312,35 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		OutputDecisionTreeNeo4j outputDecisionTreeNeo4j = new OutputDecisionTreeNeo4j();
 		//String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
 		String Filename = "test.csv";
-		String testDataPath = "C:/Users/u501027/Documents/GitHub/sciki4j/dataset_0_test/test.csv";
-		//test
-		ReadCsvTestData readCsvTestData = new ReadCsvTestData(testDataPath);
-		ArrayList<TestData> testData = readCsvTestData.readCsvFile(testDataPath);
-		Double[][] DistanceMatrix = readCsvTestData.euclidianDistance(testData);
-		Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
-		Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
+		String testDataPath = "C:/Users/abhiv/.Neo4jDesktop/relate-data/dbmss/dbms-7ff4399d-8f4a-48ed-ba21-c30aa62e37b7/import/test.csv";
+		//outputDecisionTreeNeo4j.createConnectedGraph(testDataPath, "fully-conncted");
 
-		ArrayList<Nodelist> nodeList = ReadCsvTestData.getNodeList(testData);
-		ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
-		for (int i = 0; i < edgeList.size()-1; i++) {
-			EdgeList edgeListDetail = edgeList.get(i);
-			System.out.println("edgeListDetail " + edgeList.get(i));
-			
-			long bid = edgeListDetail.getTarget();
-			String dtType = "connected";
-			String bindex = "Index" + bid;
-			double weightValue = (double)Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
-			String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "`}" ;
-			String finalString = "MATCH (a:" + dtType + ")S, (b:" + dtType + ") " +
-					"WHERE a.id = "+"\"" +"Index"+edgeListDetail.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
-					"CREATE (a)-[r:" + weight +  "]->(b)";
-			System.out.println("--" + finalString);
+		//test
+//		ReadCsvTestData readCsvTestData = new ReadCsvTestData(testDataPath);
+//		ArrayList<TestData> testData = readCsvTestData.readCsvFile(testDataPath);
+//		Double[][] DistanceMatrix = readCsvTestData.euclidianDistance(testData);
+//		Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
+//		Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
+//
+//		ArrayList<Nodelist> nodeList = ReadCsvTestData.getNodeList(testData);
+//		ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
+//		for (int i = 0; i < edgeList.size()-1; i++) {
+//			EdgeList edgeListDetail = edgeList.get(i);
+//			System.out.println("edgeListDetail " + edgeList.get(i));
+//
+//			long bid = edgeListDetail.getTarget();
+//			String dtType = "connected";
+//			String bindex = "Index" + bid;
+//			double weightValue = (double)Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
+//			String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "`}" ;
+//			String finalString = "MATCH (a:" + dtType + ")S, (b:" + dtType + ") " +
+//					"WHERE a.id = "+"\"" +"Index"+edgeListDetail.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
+//					"CREATE (a)-[r:" + weight +  "]->(b)";
+//			System.out.println("--" + finalString);
 		}
 
 	}
 
 
 
-}
+
