@@ -134,13 +134,9 @@ public class Unsupervised {
         int index = 0;
         while (inputValues.size() > index) {
             String p = inputValues.get(index);
-            System.out.println(p);
-            System.out.println("------------------------------------");
             if (!visitedPoints.contains(p)) {
                 visitedPoints.add(p);
                 neighbours = getNeighbours(p , distanceMetric);
-                System.out.println("*********************************************");
-                System.out.println(neighbours.size());
                 if (neighbours.size() >= minPts) {
                     int ind = 0;
                     while (neighbours.size() > ind) {
@@ -198,8 +194,6 @@ public class Unsupervised {
 		kmeanAssign = kmeanInteration(hashClusterAssign,numberOfInteration,inputData);
 		for (String name: kmeanAssign.keySet()) {
 		    ArrayList<String> something = kmeanAssign.get(name);
-		    System.out.println(name);
-		    System.out.println(something);
 		}
 		return kmeanAssign;
 	}

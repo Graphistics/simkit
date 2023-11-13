@@ -1508,8 +1508,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
                 public String execute( Transaction tx )
                 {
                 	//a is present for the node
-            		Result result = tx.run( "MERGE (a"+":NodeType" +" {" + nodeCentroid +"}) " +
-            				"MERGE (b "+":NodeType" + " {" + nodeCluster +"}) " +
+            		Result result = tx.run( "MERGE (a"+":ClusteringNodeType" +" {" + nodeCentroid +"}) " +
+            				"MERGE (b "+":ClusteringNodeType" + " {" + nodeCluster +"}) " +
             				"MERGE (a)-[:link]->(b) "
             				+ "RETURN a.message");
 				    return result.single().get( 0 ).asString();
@@ -1534,30 +1534,37 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
        			        Value value = nodeValues.value();
        			        for (String nodeKey : value.keys())
        			        {
-       			        	if(value.get(nodeKey).getClass().equals(String.class))
-       			        	{
-       			        		if(valueOfNode != "")
-       			        		{
-       			        			valueOfNode = valueOfNode + ", " + nodeKey + ":" + value.get(nodeKey);
-       			        		}
-       			        		else
-       			        		{
-       			        			valueOfNode = nodeKey + ":" + value.get(nodeKey);
-       			        		}
-       			   
-       			        	}
-       			        	else
-       			        	{
-       			        		if(valueOfNode != "")
-       			        		{
-       			        			String converValueToString = String.valueOf(value.get(nodeKey));
-               			        	valueOfNode = valueOfNode + ", " + nodeKey + ":" + converValueToString;
-       			        		}
-       			        		else
-       			        		{
-       			        			String converValueToString = String.valueOf(value.get(nodeKey));
-               			        	valueOfNode =  nodeKey + ":" + converValueToString;
-       			        		}   			        		
+	   			        	try {
+	   			             // Attempt to parse the string as a number
+	   			             double num = Double.parseDouble(String.valueOf(value.get(nodeKey)));
+	       			          if(value.get(nodeKey).getClass().equals(String.class))
+	     			        	{
+	     			        		if(valueOfNode != "")
+	     			        		{
+	     			        			valueOfNode = valueOfNode + ", " + nodeKey + ":" + value.get(nodeKey);
+	     			        		}
+	     			        		else
+	     			        		{
+	     			        			valueOfNode = nodeKey + ":" + value.get(nodeKey);
+	     			        		}
+	     			   
+	     			        	}
+	     			        	else
+	     			        	{
+	     			        		if(valueOfNode != "")
+	     			        		{
+	     			        			String converValueToString = String.valueOf(value.get(nodeKey));
+	             			        	valueOfNode = valueOfNode + ", " + nodeKey + ":" + converValueToString;
+	     			        		}
+	     			        		else
+	     			        		{
+	     			        			String converValueToString = String.valueOf(value.get(nodeKey));
+	             			        	valueOfNode =  nodeKey + ":" + converValueToString;
+	     			        		}   			        		
+	     			        	}
+       			        	} catch (NumberFormatException e) {
+	       			             // Handle the case when the string is not a number
+	       			             System.out.println(value.get(nodeKey) + " is not a number.");
        			        	}
        			        }
        			        mapNodeList.add(valueOfNode);
