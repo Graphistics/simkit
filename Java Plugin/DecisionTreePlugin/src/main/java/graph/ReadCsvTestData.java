@@ -146,7 +146,7 @@ public class ReadCsvTestData {
         return doubleArray;
     }
     public static Double[] calculateKNN(Double[][] pdist) {
-        Double[] sigmas = new Double[5];
+        Double[] sigmas = new Double[pdist.length];
 
         for (int i = 0; i < pdist.length; i++) {
             Double[] sortedDistances = Arrays.copyOf(pdist[i], pdist[i].length);
@@ -193,6 +193,7 @@ public class ReadCsvTestData {
         }
             return edgeList;
     }
+
     public static ArrayList<String> getNodeList(ArrayList<ArrayList<String>> TestDataArrayList) {
         ArrayList<String> nodeList = new ArrayList<>();
         // add all the nodes to the nodeList all entries
@@ -240,6 +241,29 @@ public class ReadCsvTestData {
 
         return adj;
     }
+    public static Double[][] calculateMutualKNNGraph(Double[][] dist_,Double [] knn){
+
+        Double[][] adj = new Double[dist_.length][dist_[0].length];
+        //calculateMutualKNNGraph
+        for (int i = 0; i < dist_.length; i++) {
+            for (int j = 0; j < dist_[i].length; j++) {
+                if (i == j) {
+                    adj[i][j] = 0.0;
+                    continue;
+                }
+                if (Objects.equals(dist_[i][j], knn[i]) && dist_[j][i] == knn[j]){
+                    adj[i][j] = 1.0;
+                }
+                else {
+                    adj[i][j] = 0.0;
+                }
+            }
+        }
+
+
+
+        return adj;
+    }
 
 
 
@@ -251,8 +275,12 @@ public class ReadCsvTestData {
         ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
         ArrayList<ArrayList<String>> arrayLists = readCsvTestData.readCsvFileNew(dataPath,true);
         Double[][] dist_array = euclidianDistance(arrayLists);
-        Double[] sigmas = calculateLocalSigmas(dist_array);
-        calculateAdjacencyMatrix(dist_array,sigmas);
+//        Double[] sigmas = calculateLocalSigmas(dist_array);
+//        Double[][] adj_mat = calculateAdjacencyMatrix(dist_array,sigmas);
+//        Double[][] adj_mat_eps = calculateEpsilonNeighbourhoodGraph(dist_array,5.0);
+        Double[] knn = calculateKNN(dist_array);
+        calculateMutualKNNGraph(dist_array,knn);
+
 
 
 
