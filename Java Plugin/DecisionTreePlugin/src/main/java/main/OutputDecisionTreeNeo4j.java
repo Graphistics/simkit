@@ -31,10 +31,10 @@ import evaluate.EvaluateTree;
 import gainratio.EvaluateTreeGR;
 import gini.EvaluateTreeGI;
 import graph.EdgeList;
+import graph.EdgeList2;
+import graph.Neo4jGraphHandler;
 import graph.NodeList2;
-import graph.Nodelist;
 import graph.ReadCsvTestData;
-import graph.TestData;
 import input.ProcessInputData;
 import output.PrintTree;
 
@@ -149,9 +149,10 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 		return output;
 	}
-	public void createNodeConnectedGraph(final String GraphType, final String message, final Nodelist nodeDetail)
+	
+	public void createNodeConnectedGraph(final String GraphType, final String message, final String nodeDetail)
 	{
-		final String name = "Index" + nodeDetail.getIndex().toString();
+		final String name = "Index" + nodeDetail;
 		try ( Session session = driver.session() )
 		{
 			String greeting = session.writeTransaction( new TransactionWork<String>()
@@ -163,9 +164,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 					//a is present for the node
 					Result result = tx.run( "CREATE (connectedGraph:Index" +
 							"{id:" +"\""+name+"\""+
-							",x_cordinate: " + nodeDetail.getX_cordinate()
-							+ ",y_cordinate: " + nodeDetail.getY_cordinate()
-							+ ",class_attrribute: " + nodeDetail.getClass_attrribute()
+							",nodeid:" + "\""+name+"\""
 							+ "})", parameters( "name", name ) );
 					return message;
 				}
@@ -210,6 +209,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		final String bindex = "Index" + bid;
 		double weightValue = (double)Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
 		final String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "}" ;
+		//final String weight = "_" + Double.toString(edgeListDetail.getWeight()).replace(".","_") + "_";
 		try ( Session session = driver.session() )
 		{
 			String greeting = session.writeTransaction( new TransactionWork<String>()
@@ -226,39 +226,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
 	}
 	
-	public void createNodeEigenGraph(final String GraphType, final String message, final NodeList2 nodeDetail) {
-	    final String name = "Index" + nodeDetail.getIndex().toString();
-	    try (Session session = driver.session()) {
-	        String greeting = session.writeTransaction(new TransactionWork<String>() {
-	            @Override
-	            public String execute(Transaction tx) {
-	                Result result = tx.run("CREATE (:" + GraphType + " {id: $name})", parameters("name", name));
-	                return message;
-	            }
-	        });
-	    }
-	}
-	
-	public void createRelationshipEigenGraph(final String dtType, final String message, final EdgeList edgeListDetail) {
-	    final long source = edgeListDetail.getSource();
-	    final long target = edgeListDetail.getTarget();
-		double weightValue = (double)Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
-		String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "}" ;
-
-	    try (Session session = driver.session()) {
-	        String greeting = session.writeTransaction(new TransactionWork<String>() {
-	            @Override
-	            public String execute(Transaction tx) {
-	                Result result = tx.run("MATCH (a:" + dtType + "), (b:" + dtType + ") " + 
-	    					"WHERE a.id = "+"\"" +"Index"+ source +  "\""+" AND "+ "b.id = "+"\"" +"Index"+ target +  "\""+
-	    					" CREATE (a)-[r:" + weight +  "]->(b)");
-	                return message;
-	            }
-	        });
-	    }
-	}
-
-
 
 	/**
 	 * Create relationship between nodes in Java
@@ -314,6 +281,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			} );
 		}
 	}
+
+
+	
 	@UserFunction
 	public String loadCsvGraph(@Name("dataPath") String dataPath,@Name("Name") String Name)  throws Exception{
 
@@ -325,7 +295,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
 				ArrayList<String> arrayListHeaders = readCsvTestData.readCSVHeader(dataPath);
 				ArrayList<String> arrayListFirst = readCsvTestData.readCSVFirstLine(dataPath);
-
 				connector.loadCsvConnector(dataPath, Name ,arrayListHeaders,arrayListFirst);
 			}
 		}catch(Exception e) {
@@ -383,8 +352,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	}
 
 
+
 	@UserFunction
-	public String createConnectedGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure)  throws Exception {
+	public String createConnectedGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn) throws Exception {
 
 		String confusionMatrix = "";
 		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
@@ -395,17 +365,18 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				return "Missing dataPath or distance measure type";
 			}else {
 				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
-				ArrayList<TestData> testData = readCsvTestData.readCsvFile(dataPath);
-				Double[][] DistanceMatrix = readCsvTestData.euclidianDistance(testData);
+				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
+
+				Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
 				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
 				Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
 
-				ArrayList<Nodelist> nodeList = ReadCsvTestData.getNodeList(testData);
+				ArrayList<String> nodeList = ReadCsvTestData.getNodeList(testData);
 				ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
 
 
 
-				for (Nodelist nodeDetail : nodeList) {
+				for (String nodeDetail : nodeList) {
 
 					connector.createNodeConnectedGraph("connectedGraph", "created nodes in neo4j", nodeDetail);
 				}
@@ -430,69 +401,214 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
 
 	}
+
+	@UserFunction
+	public String createEpsilonGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn,@Name("epsilon") Double epsilon) throws Exception {
+
+		String confusionMatrix = "";
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		{
+
+
+			if(dataPath == null && distanceMeasure == null) {
+				return "Missing dataPath or distance measure type";
+			}else {
+				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
+				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
+
+				Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
+				//Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
+				//Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
+				Double[][] adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,epsilon);
+
+				ArrayList<String> nodeList = ReadCsvTestData.getNodeList(testData);
+				ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
+
+
+
+				for (String nodeDetail : nodeList) {
+
+					connector.createNodeConnectedGraph("connectedGraph", "created nodes in neo4j", nodeDetail);
+				}
+
+				//for (EdgeList edgeListDetail : edgeList) {
+				for (int i = 0; i < edgeList.size()-1; i++) {
+					EdgeList edgeListDetail = edgeList.get(i);
+					if(edgeListDetail.getWeight()==0.0){
+						continue;
+					}
+					connector.createRelationshipConnectedGraph("Index", "created relationship in neo4j \n", edgeListDetail);
+				}
+
+			}
+			return "Create epsilon  graph successful, " + confusionMatrix;
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+
+	}
+	@UserFunction
+	public String createKnnGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn) throws Exception {
+
+		String confusionMatrix = "";
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		{
+
+
+			if(dataPath == null && distanceMeasure == null) {
+				return "Missing dataPath or distance measure type";
+			}else {
+				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
+				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
+
+				Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
+//				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
+//				Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
+				Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
+				Double[][] adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
+
+				ArrayList<String> nodeList = ReadCsvTestData.getNodeList(testData);
+				ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
+
+
+
+				for (String nodeDetail : nodeList) {
+
+					connector.createNodeConnectedGraph("connectedGraph", "created nodes in neo4j", nodeDetail);
+				}
+
+				//for (EdgeList edgeListDetail : edgeList) {
+				for (int i = 0; i < edgeList.size()-1; i++) {
+					EdgeList edgeListDetail = edgeList.get(i);
+					if(edgeListDetail.getWeight()==0.0){
+						continue;
+					}
+					connector.createRelationshipConnectedGraph("Index", "created relationship in neo4j \n", edgeListDetail);
+				}
+
+			}
+			return "Create fully connected graph successful, " + confusionMatrix;
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+
+	}
+
+	@UserFunction
+	public String createMutualKnnGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn) throws Exception {
+
+		String confusionMatrix = "";
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		{
+
+
+			if(dataPath == null && distanceMeasure == null) {
+				return "Missing dataPath or distance measure type";
+			}else {
+				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
+				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
+
+				Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
+//				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
+//				Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
+				Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
+				Double[][] adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
+
+				ArrayList<String> nodeList = ReadCsvTestData.getNodeList(testData);
+				ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
+
+
+
+				for (String nodeDetail : nodeList) {
+
+					connector.createNodeConnectedGraph("connectedGraph", "created nodes in neo4j", nodeDetail);
+				}
+
+				//for (EdgeList edgeListDetail : edgeList) {
+				for (int i = 0; i < edgeList.size()-1; i++) {
+					EdgeList edgeListDetail = edgeList.get(i);
+					if(edgeListDetail.getWeight()==0.0){
+						continue;
+					}
+					connector.createRelationshipConnectedGraph("Index", "created relationship in neo4j \n", edgeListDetail);
+				}
+
+			}
+			return "Create fully connected graph successful, " + confusionMatrix;
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+
+	}
+
 	
-	   
+
+	@UserFunction
+	public String createConnectedGraphFromNeo4j(@Name("label") String label, @Name("distanceMeasure") String distanceMeasure) throws Exception {
+		String outputString = "";
+
+	    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+	        if (label == null || distanceMeasure == null) {
+	            return "Missing label or distance measure type";
+	        } else {
+	            List<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label);
+	            Double[][] distanceMatrix = Neo4jGraphHandler.euclideanDistance(nodePropertiesList);
+	            Double[] sigmas = Neo4jGraphHandler.calculateLocalSigmas(distanceMatrix);
+	            Double[][] adjMatrix = Neo4jGraphHandler.calculateAdjacencyMatrix(distanceMatrix, sigmas);
+				ArrayList<EdgeList2> edgeList = Neo4jGraphHandler.calculateEdgeList(nodePropertiesList,adjMatrix);
+	                      
+	            for (NodeList2 node : nodePropertiesList) {
+	            	Neo4jGraphHandler.createNodeGraph("connectedGraph", "created nodes in neo4j", node);
+	            }
+	            
+	            for (EdgeList2 edgeListDetail : edgeList) {
+
+	            	Neo4jGraphHandler.createRelationshipGraph("connectedGraph", "created relationship in neo4j \n", edgeListDetail);
+
+				}
+				
+	        }
+	        return "Create fully connected graph successful, " + outputString;
+	    } catch (Neo4jException e) {
+	        throw new RuntimeException("Error creating connected graph in Neo4j: " + e.getMessage());
+	    }
+	}
+
 	@UserFunction
 	public String createLaplacianGraph(@Name("nodeType") String nodeType, @Name("threshold") double threshold, @Name("laplacianType") String laplacianType) throws Exception {
-		
-		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+	    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
 	        if (nodeType == null) {
 	            return "Missing nodeType";
 	        } else {
-	        	
-	        	ArrayList<EdgeList> edgeList = retrieveEdgeListFromNeo4j(nodeType);
-	        	
-	            double[][] adjacencyMatrixData = MatrixCalculation.convertToAdjacencyMatrix(edgeList);
+	            ArrayList<EdgeList2> edgeList = new ArrayList<>();
+	            edgeList = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(nodeType);
+
+	            double[][] adjacencyMatrixData = MatrixCalculation.convertToAdjacencyMatrix2(edgeList);
 	            RealMatrix adjacencyMatrix = new BlockRealMatrix(adjacencyMatrixData);
 	            RealMatrix degreeMatrix = MatrixCalculation.calculateDegreeMatrix(adjacencyMatrixData);
 	            RealMatrix laplacianMatrix = MatrixCalculation.calculateLaplacianMatrix(degreeMatrix, adjacencyMatrix, laplacianType);
-	            					
-				
-	        	EigenCalculation.EigenResult eigenResult = EigenCalculation.calculateEigen(laplacianMatrix);
-	        	ArrayList<EdgeList> edgeListEigen = EigenCalculation.createEdgeList(eigenResult.eigenvectors, threshold);
-	        	ArrayList<NodeList2> nodeListEigen = EigenCalculation.createNodeList(eigenResult.eigenvectors, threshold);
-	        	
-	        	for(NodeList2 node : nodeListEigen) {
-	        		connector.createNodeEigenGraph("eigendecomposedGraph", "created nodes in neo4j", node);
-	        	}
 
+	            EigenCalculation.EigenResult eigenResult = EigenCalculation.calculateEigen(laplacianMatrix);
+	            ArrayList<NodeList2> nodeListEigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(nodeType);
+	            ArrayList<EdgeList2> edgeListEigen = EigenCalculation.createEdgeList(nodeListEigen, eigenResult.eigenvectors, threshold);
 	            
-	            for (EdgeList edge : edgeListEigen) {
-	                connector.createRelationshipEigenGraph("eigendecomposedGraph", "created relationship in neo4j \n", edge);
+	            String graphName = "eigendecomposedGraph_" + laplacianType;
+	            
+	            for (NodeList2 node : nodeListEigen) {
+	            	Neo4jGraphHandler.createNodeGraph(graphName, "created nodes in neo4j", node);
 	            }
 
-	            
+	            for (EdgeList2 edge : edgeListEigen) {
+	            	Neo4jGraphHandler.createRelationshipGraph(graphName, "created relationship in neo4j \n", edge);
+	            }
 	        }
 	        return "Create eigendecomposed graph successful!";
 	    } catch (Neo4jException e) {
 	        throw new RuntimeException("Error creating laplacian graph in Neo4j: " + e.getMessage());
 	    }
 	}
-	
-	
-    private static ArrayList<EdgeList> retrieveEdgeListFromNeo4j(final String nodeType) {
-        ArrayList<EdgeList> edgeList = new ArrayList<>();
 
-        try (Session session = driver.session()) {
-	        String cypherQuery = "MATCH (n:" + nodeType + ")-[r]->(m:" + nodeType + ") RETURN toFloat(split(n.id, 'Index')[1]) AS source, toFloat(split(m.id, 'Index')[1]) AS target, toFloat(type(r)) AS weight, id(r) AS index";
-	        Result result = session.run(cypherQuery);
-	
-	        while (result.hasNext()) {
-	            Record record = result.next();
-	            long source = record.get("source").asLong();
-	            long target = record.get("target").asLong();
-	            double weight = record.get("weight").asDouble();
-	            int index = record.get("index").asInt();
-	
-	            EdgeList edge = new EdgeList(source, target, weight, index);
-	            edgeList.add(edge);
-	        }
-	    } catch (Neo4jException e) {
-	    	throw new RuntimeException("Error retrieving graph data from Neo4j: " + e.getMessage());
-	    }    
-		return edgeList;
-	}
-    
+
     @UserFunction
 	public String displayEdgeList(@Name("nodeType") String nodeType) throws Exception {
 		
@@ -501,8 +617,10 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	        if (nodeType == null) {
 	            return "Missing nodeType";
 	        } else {
-	        	ArrayList<EdgeList> edgeList = new ArrayList<>();
-	        	edgeList = retrieveEdgeListFromNeo4j(nodeType);
+	        	ArrayList<EdgeList2> edgeList = new ArrayList<>();
+//	        	ArrayList<NodeList2> nodeList = new ArrayList<>();
+	        	edgeList = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(nodeType);
+//	        	nodeList = neo4jGraphHandler.retrieveNodeListFromNeo4j(nodeType);
 	        	if(edgeList.size()>0)
 	        	{
 	        		for(int i = 0; i < edgeList.size(); i++) {   
@@ -514,13 +632,13 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
         			outputString = "could not retrieve edge list";
         		}
         	}
-	        return "Edge List Data:  " + outputString;
+	        return "Node List Data:  " + outputString;
         }
 	     catch (Neo4jException e) {
 	        throw new RuntimeException("Error creating laplacian graph in Neo4j: " + e.getMessage());
 	    }
 	}
-	
+
 
 	/**
 	 * This function is used to split the nodes from database based on training ratio given
@@ -1450,77 +1568,77 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
     }
 
 	public static void main(String[] args) throws Exception {
-		OutputDecisionTreeNeo4j outputDecisionTreeNeo4j = new OutputDecisionTreeNeo4j();
-		//String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
-		String Filename = "test.csv";
-		String testDataPath = "data\\test.csv";
-		//test
-		ReadCsvTestData readCsvTestData = new ReadCsvTestData(testDataPath);
-		ArrayList<TestData> testData = readCsvTestData.readCsvFile(testDataPath);
-		Double[][] DistanceMatrix = readCsvTestData.euclidianDistance(testData);
-		Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
-		Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-
-		ArrayList<Nodelist> nodeList = ReadCsvTestData.getNodeList(testData);
-		ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
-		for (int i = 0; i < edgeList.size()-1; i++) {
-			EdgeList edgeListDetail = edgeList.get(i);
-			System.out.println("edgeListDetail " + edgeList.get(i));
-			
-			long bid = edgeListDetail.getTarget();
-			String dtType = "connected";
-			String bindex = "Index" + bid;
-			double weightValue = (double)Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
-			String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "`}" ;
-			String finalString = "MATCH (a:" + dtType + ")S, (b:" + dtType + ") " +
-					"WHERE a.id = "+"\"" +"Index"+edgeListDetail.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
-					"CREATE (a)-[r:" + weight +  "]->(b)";
-			System.out.println("--" + finalString);
-		}
+//		OutputDecisionTreeNeo4j outputDecisionTreeNeo4j = new OutputDecisionTreeNeo4j();
+//		//String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
+//		String Filename = "test.csv";
+//		String testDataPath = "data\\test.csv";
+//		//test
+//		ReadCsvTestData readCsvTestData = new ReadCsvTestData(testDataPath);
+//		ArrayList<TestData> testData = readCsvTestData.readCsvFile(testDataPath);
+//		Double[][] DistanceMatrix = readCsvTestData.euclidianDistance(testData);
+//		Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
+//		Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
+//
+//		ArrayList<Nodelist> nodeList = ReadCsvTestData.getNodeList(testData);
+//		ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
+//		for (int i = 0; i < edgeList.size()-1; i++) {
+//			EdgeList edgeListDetail = edgeList.get(i);
+//			System.out.println("edgeListDetail " + edgeList.get(i));
+//			
+//			long bid = edgeListDetail.getTarget();
+//			String dtType = "connected";
+//			String bindex = "Index" + bid;
+//			double weightValue = (double)Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
+//			String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "`}" ;
+//			String finalString = "MATCH (a:" + dtType + ")S, (b:" + dtType + ") " +
+//					"WHERE a.id = "+"\"" +"Index"+edgeListDetail.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
+//					"CREATE (a)-[r:" + weight +  "]->(b)";
+//			System.out.println("--" + finalString);
+//		}
+//		
 		
-		
-		
-		int rows = adj_mat.length;
-		int cols = adj_mat[0].length;
-
-		double[][] newAdjMat = new double[rows][cols];
-	
-		for (int i = 0; i < rows; i++) {
-		    for (int j = 0; j < cols; j++) {
-		        newAdjMat[i][j] = adj_mat[i][j];
-		    }
-		}
-
-		double[][] adjmatrxiEigen = MatrixCalculation.convertToAdjacencyMatrix(edgeList);
-		RealMatrix degreeMatrix = MatrixCalculation.calculateDegreeMatrix(newAdjMat);
-		RealMatrix adjacencyMatrix = new BlockRealMatrix(adjmatrxiEigen);
-		RealMatrix laplacianMatrix = MatrixCalculation.calculateLaplacianMatrix(degreeMatrix, adjacencyMatrix,"SYMMETRIC");
-		displayMatrix(adjacencyMatrix,"adjacencyMatrix");
-		displayMatrix(degreeMatrix,"degreeMatrix");
-		displayMatrix(laplacianMatrix,"laplacianMatrix");
-
-        try {
-        	EigenCalculation.EigenResult eigenResult = EigenCalculation.calculateEigen(laplacianMatrix);
-            EigenCalculation.displayEigenResult(eigenResult);
-//            EigenCalculation.drawScatterPlot(eigenResult.eigenvalues);
-
-            double threshold = 0.01;
-            ArrayList<EdgeList> edgeListEigen = EigenCalculation.createEdgeList(eigenResult.eigenvectors, threshold);
-            
-    		for (EdgeList edge : edgeListEigen) {
-    			long bid = edge.getTarget();
-    			String bindex = "Index" + bid;
-    			String dtType = "eigendecomposedGraph";
-    			double weightValue = (double)Math.round(edge.getWeight() * 100000d) / 100000d;
-    			String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "}" ;
-    			String finalString = "MATCH (a:" + dtType + "), (b:" + dtType + ") " + 
-    					"WHERE a.id = "+"\"" +"Index"+ edge.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
-    					"CREATE (a)-[r:" + weight +  "]->(b)";
-    			System.out.println(finalString);
-    		}
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+//		
+//		int rows = adj_mat.length;
+//		int cols = adj_mat[0].length;
+//
+//		double[][] newAdjMat = new double[rows][cols];
+//	
+//		for (int i = 0; i < rows; i++) {
+//		    for (int j = 0; j < cols; j++) {
+//		        newAdjMat[i][j] = adj_mat[i][j];
+//		    }
+//		}
+//
+//		double[][] adjmatrxiEigen = MatrixCalculation.convertToAdjacencyMatrix(edgeList);
+//		RealMatrix degreeMatrix = MatrixCalculation.calculateDegreeMatrix(newAdjMat);
+//		RealMatrix adjacencyMatrix = new BlockRealMatrix(adjmatrxiEigen);
+//		RealMatrix laplacianMatrix = MatrixCalculation.calculateLaplacianMatrix(degreeMatrix, adjacencyMatrix,"SYMMETRIC");
+//		displayMatrix(adjacencyMatrix,"adjacencyMatrix");
+//		displayMatrix(degreeMatrix,"degreeMatrix");
+//		displayMatrix(laplacianMatrix,"laplacianMatrix");
+//
+//        try {
+//        	EigenCalculation.EigenResult eigenResult = EigenCalculation.calculateEigen(laplacianMatrix);
+//            EigenCalculation.displayEigenResult(eigenResult);
+////            EigenCalculation.drawScatterPlot(eigenResult.eigenvalues);
+//
+//            double threshold = 0.01;
+//            ArrayList<EdgeList> edgeListEigen = EigenCalculation.createEdgeList(eigenResult.eigenvectors, threshold);
+//            
+//    		for (EdgeList edge : edgeListEigen) {
+//    			long bid = edge.getTarget();
+//    			String bindex = "Index" + bid;
+//    			String dtType = "eigendecomposedGraph";
+//    			double weightValue = (double)Math.round(edge.getWeight() * 100000d) / 100000d;
+//    			String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "}" ;
+//    			String finalString = "MATCH (a:" + dtType + "), (b:" + dtType + ") " + 
+//    					"WHERE a.id = "+"\"" +"Index"+ edge.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
+//    					"CREATE (a)-[r:" + weight +  "]->(b)";
+//    			System.out.println(finalString);
+//    		}
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
 		
 	}
 
