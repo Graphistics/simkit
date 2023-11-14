@@ -66,15 +66,15 @@ public class Unsupervised {
         	
             String candidate = inputValues.get(i);
             
-            if(distanceMetric == "bray-curtis")
+            if(distanceMetric.equals("bray-curtis"))
             {
             	distance = calBrayCurtis(inputValue, candidate);
             }
-            else if(distanceMetric == "manhattan")
+            else if(distanceMetric.equals("manhattan"))
             {
             	distance = calManhattanDist(inputValue, candidate);
             }
-            else if(distanceMetric == "cosine")
+            else if(distanceMetric.equals("cosine"))
             {
             	distance = calCosineSimilarity(inputValue, candidate);
             }
@@ -183,7 +183,7 @@ public class Unsupervised {
 		// Initializing centroid by random choice
 		for(int i = 0; i < numberOfCentroids; i++)
 		{
-			Random rand = new Random();
+			java.util.Random rand = new java.util.Random();
 			int randomNum = rand.nextInt((listOfRemain.size()-1 - 0) + 1) + 0;
 			listOfCentroid.add(listOfRemain.get(randomNum));
 			listOfRemain.remove(randomNum);
@@ -191,7 +191,7 @@ public class Unsupervised {
 		// First clusters
 		HashMap<String, ArrayList<String>> hashClusterAssign = distanceAssign(listOfCentroid,listOfRemain, distanceMeasure);
 		// All iterations
-		kmeanAssign = kmeanInteration(hashClusterAssign,numberOfInteration,inputData);
+		kmeanAssign = kmeanInteration(hashClusterAssign,numberOfInteration,inputData, distanceMeasure);
 		for (String name: kmeanAssign.keySet()) {
 		    ArrayList<String> something = kmeanAssign.get(name);
 		}
@@ -205,30 +205,39 @@ public class Unsupervised {
 	 * @param inputData specified by user
 	 * @return
 	 */
-	public static HashMap<String, ArrayList<String>> kmeanInteration (HashMap<String, ArrayList<String>> clusterAssign, int numberOfInteration, ArrayList<String> inputData)
+	public static HashMap<String, ArrayList<String>> kmeanInteration (HashMap<String, ArrayList<String>> clusterAssign, int numberOfInteration, ArrayList<String> inputData, String distanceMeasure)
 	{
 		ArrayList<String> listOfCentroid = new ArrayList<String>();
 		ArrayList<String> listOfNewCentroid = new ArrayList<String>();
 		for(int i = 0; i < numberOfInteration; i++)
 		{
-			listOfCentroid.clear();
-			if(i == 0)
-			{
-				for (String key : clusterAssign.keySet()) 
-				{
-					clusterAssign.get(key).add(key);
-					String newCentroid = calculateNewCentroid(clusterAssign.get(key));
-					listOfCentroid.add(newCentroid);
-				}	
-			}
-			else
-			{
-				for (String key: clusterAssign.keySet())
-				{
-					String newCentroid = calculateNewCentroid(clusterAssign.get(key));
-					listOfCentroid.add(newCentroid);
-				}
-			}
+//			if(i>0)
+//			{
+//				listOfCentroid.clear();
+//			}
+//			if(i == 0)
+//			{
+//				for (String key : clusterAssign.keySet()) 
+//				{
+//					clusterAssign.get(key).add(key);
+//					String newCentroid = calculateNewCentroid(clusterAssign.get(key));
+//					listOfCentroid.add(newCentroid);
+//				}	
+//			}
+//			else
+//			{
+//				for (String key: clusterAssign.keySet())
+//				{
+//					String newCentroid = calculateNewCentroid(clusterAssign.get(key));
+//					listOfCentroid.add(newCentroid);
+//				}
+//			}
+			
+			// Calculate new centroids and update clusterAssign
+	        clusterAssign = calculateAndUpdateCentroids(clusterAssign);
+
+	        // Perform distance assignment again with the updated centroids
+	        clusterAssign = distanceAssign(new ArrayList<>(clusterAssign.keySet()), inputData, distanceMeasure);
 		}
 		return clusterAssign;
 	}
@@ -240,37 +249,87 @@ public class Unsupervised {
 	 */
 	public static String calculateNewCentroid (ArrayList<String> listOfNodesInCluster)
 	{
-		String[] atrributeName = new String[listOfNodesInCluster.get(0).split(",").length];
-		Double[] atrributeValue = new Double[listOfNodesInCluster.get(0).split(",").length];
-		for (String node : listOfNodesInCluster)
-		{
-			for (int i=0; i<atrributeValue.length;i++)
-			{
-				if(atrributeValue[i]==null)
-				{
-					atrributeValue[i] = Double.parseDouble(node.split(",")[i].split(":")[1]);
-					atrributeName[i] = node.split(",")[i].split(":")[0];
-				}
-				else
-				{
-					atrributeValue[i] = atrributeValue[i] + Double.parseDouble(node.split(",")[i].split(":")[1]);
-				}
-			}
-		}
-		String newCentroid = "";
-		for (int i = 0; i < atrributeValue.length; i++)
-		{
-			atrributeValue[i] = atrributeValue[i]/listOfNodesInCluster.size();
-			if (i == 0)
-			{
-				newCentroid = newCentroid + atrributeName[i] + ":" + atrributeValue[i];
-			}
-			else
-			{
-				newCentroid = newCentroid + "," +atrributeName[i] + ":" + atrributeValue[i] + ",";
-			}
-		}
-		return newCentroid;
+//		String[] atrributeName = new String[listOfNodesInCluster.get(0).split(",").length];
+//		Double[] atrributeValue = new Double[listOfNodesInCluster.get(0).split(",").length];
+//		for (String node : listOfNodesInCluster)
+//		{
+//			for (int i=0; i<atrributeValue.length;i++)
+//			{
+//				if(atrributeValue[i]==null)
+//				{
+//					atrributeValue[i] = Double.parseDouble(node.split(",")[i].split(":")[1]);
+//					atrributeName[i] = node.split(",")[i].split(":")[0];
+//				}
+//				else
+//				{
+//					atrributeValue[i] = atrributeValue[i] + Double.parseDouble(node.split(",")[i].split(":")[1]);
+//				}
+//			}
+//		}
+//		String newCentroid = "";
+//		for (int i = 0; i < atrributeValue.length; i++)
+//		{
+//			atrributeValue[i] = atrributeValue[i]/listOfNodesInCluster.size();
+//			if (i == 0)
+//			{
+//				newCentroid = newCentroid + atrributeName[i] + ":" + atrributeValue[i];
+//			}
+//			else
+//			{
+//				newCentroid = newCentroid + "," +atrributeName[i] + ":" + atrributeValue[i] + ",";
+//			}
+//		}
+//		return newCentroid;
+		
+		String[] attributeNames = new String[listOfNodesInCluster.get(0).split(",").length];
+	    Double[] attributeValues = new Double[listOfNodesInCluster.get(0).split(",").length];
+
+	    // Initialize arrays with null values
+	    for (int i = 0; i < attributeValues.length; i++) {
+	        attributeValues[i] = null;
+	    }
+
+	    for (String node : listOfNodesInCluster) {
+	        String[] attributes = node.split(",");
+	        for (int i = 0; i < attributeValues.length; i++) {
+	            if (attributeValues[i] == null) {
+	                attributeValues[i] = Double.parseDouble(attributes[i].split(":")[1]);
+	                attributeNames[i] = attributes[i].split(":")[0];
+	            } else {
+	                attributeValues[i] += Double.parseDouble(attributes[i].split(":")[1]);
+	            }
+	        }
+	    }
+
+	    StringBuilder newCentroid = new StringBuilder();
+	    for (int i = 0; i < attributeValues.length; i++) {
+	        attributeValues[i] = attributeValues[i] / listOfNodesInCluster.size();
+	        newCentroid.append(attributeNames[i]).append(":").append(attributeValues[i]);
+	        if (i < attributeValues.length - 1) {
+	            newCentroid.append(",");
+	        }
+	    }
+	    return newCentroid.toString();
+	}
+	
+	/**
+	 * Method to calculate and update centroids in the clusterAssign.
+	 *
+	 * @param clusterAssign The current cluster assignments
+	 * @return Updated cluster assignments with new centroids
+	 */
+	private static HashMap<String, ArrayList<String>> calculateAndUpdateCentroids(HashMap<String, ArrayList<String>> clusterAssign)
+	{
+	    HashMap<String, ArrayList<String>> updatedClusterAssign = new HashMap<>();
+
+	    for (String key : clusterAssign.keySet())
+	    {
+	        ArrayList<String> clusterNodes = clusterAssign.get(key);
+	        String newCentroid = calculateNewCentroid(clusterNodes);
+	        updatedClusterAssign.put(newCentroid, clusterNodes);
+	    }
+
+	    return updatedClusterAssign;
 	}
 	
 	/**
@@ -293,13 +352,13 @@ public class Unsupervised {
 				double distance = 0.0;
 				
 
-				if(distanceMeasure == "manhattan") {
+				if(distanceMeasure.equals("manhattan")) {
 					distance = calManhattanDist(listOfRemain.get(i),listOfCentroid.get(j));	
 				}
-				else if(distanceMeasure == "cosine") {
+				else if(distanceMeasure.equals("cosine")) {
 					distance = calCosineSimilarity(listOfRemain.get(i),listOfCentroid.get(j));
 				}
-				else if (distanceMeasure == "bray-curtis") {
+				else if (distanceMeasure.equals("bray-curtis")) {
 					distance = calBrayCurtis(listOfRemain.get(i),listOfCentroid.get(j));
 				}
 				else {

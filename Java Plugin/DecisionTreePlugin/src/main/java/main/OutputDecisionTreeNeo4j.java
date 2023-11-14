@@ -165,9 +165,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 					//CREATE (p:fullyConnected {id:"p2", a1: 2, a2: 8,a3: 2})
 					//a is present for the node
 					Result result = tx.run( "CREATE (connectedGraph:Index" +
-//							"{id:" +"\""+name+"\""+
-//							",x_cordinate: " + nodeDetail.getX_cordinate()
-							"{x_cordinate: " + nodeDetail.getX_cordinate()
+							"{id:" +"\""+name+"\""+
+							",x_cordinate: " + nodeDetail.getX_cordinate()
+//							"{x_cordinate: " + nodeDetail.getX_cordinate()
 							+ ",y_cordinate: " + nodeDetail.getY_cordinate()
 							+ ",class_attrribute: " + nodeDetail.getClass_attrribute()
 							+ "})", parameters( "name", name ) );
