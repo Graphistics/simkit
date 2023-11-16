@@ -12,7 +12,7 @@ import org.apache.commons.math4.legacy.linear.BlockRealMatrix;
 import org.apache.commons.math4.legacy.linear.MatrixUtils;
 import org.apache.commons.math4.legacy.linear.RealMatrix;
 
-import graph.EdgeList2;
+import definition.EdgeList2;
 
 public class MatrixCalculation {
 	

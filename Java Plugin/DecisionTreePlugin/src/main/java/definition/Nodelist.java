@@ -1,4 +1,4 @@
-package graph;
+package definition;
 
 public class Nodelist {
     private String points;

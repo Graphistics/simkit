@@ -10,8 +10,8 @@ import org.apache.commons.math4.legacy.linear.EigenDecomposition;
 import org.apache.commons.math4.legacy.linear.MatrixUtils;
 import org.apache.commons.math4.legacy.linear.RealMatrix;
 
-import graph.EdgeList2;
-import graph.NodeList2;
+import definition.EdgeList2;
+import definition.NodeList2;
 
 public class EigenCalculation {
 

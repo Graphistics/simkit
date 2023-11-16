@@ -1,6 +1,7 @@
 package main;
 import static org.neo4j.driver.Values.parameters;
 
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,16 +26,17 @@ import org.neo4j.procedure.Name;
 import org.neo4j.procedure.UserFunction;
 
 import cv.CrossValidation;
+import definition.EdgeList;
+import definition.EdgeList2;
+import definition.NodeList2;
 import eigendecomposed.EigenCalculation;
 import eigendecomposed.MatrixCalculation;
 import evaluate.EvaluateTree;
 import gainratio.EvaluateTreeGR;
 import gini.EvaluateTreeGI;
-import graph.EdgeList;
-import graph.EdgeList2;
-import graph.Neo4jGraphHandler;
-import graph.NodeList2;
-import graph.ReadCsvTestData;
+import global.Neo4jGraphHandler;
+import global.ReadCsvFile;
+import graph.GraphTransform;
 import input.ProcessInputData;
 import output.PrintTree;
 
@@ -75,6 +77,10 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	{
 		driver = null;
 	}
+	
+    public Driver getDriver() {
+        return driver;
+    }
 
 	/**
 	 * Close the driver object
@@ -292,23 +298,23 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			if(dataPath == null && Name == null) {
 				return "Missing dataPath or distance measure type";
 			}else {
-				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
+				ReadCsvFile readCsvTestData = new ReadCsvFile(dataPath);
 				ArrayList<String> arrayListHeaders = readCsvTestData.readCSVHeader(dataPath);
 				ArrayList<String> arrayListFirst = readCsvTestData.readCSVFirstLine(dataPath);
-				connector.loadCsvConnector(dataPath, Name ,arrayListHeaders,arrayListFirst);
+				connector.loadCsvConnector(dataPath, arrayListHeaders,arrayListFirst);
 			}
 		}catch(Exception e) {
 			throw new RuntimeException(e);
 		}
 		return dataPath;
 	}
-	private void loadCsvConnector(String dataPath, String Name,ArrayList<String> arrayListHeaders,ArrayList<String> arrayListFirst) throws Exception {
+	private void loadCsvConnector(String dataPath, ArrayList<String> arrayListHeaders,ArrayList<String> arrayListFirst) throws Exception {
 
 		// LOAD CSV with headers FROM 'file:///test.csv' AS row
 		//merge (:csvdata8 {points: row.points,x_cordinate: toFloat(row.x_coordinate),y_cordinate: toFloat(row.y_coordinate),class: toFloat(row.class)})
 		String proerties = OutputDecisionTreeNeo4j.getHeadersList(arrayListHeaders,arrayListFirst);
-
-		String FileName = Name.substring(0,Name.indexOf("."));
+		String fileName = Paths.get(dataPath).getFileName().toString();
+		String Name = fileName.substring(0,fileName.indexOf("."));
 		try ( Session session = driver.session() )
 		{
 			String greeting = session.writeTransaction( new TransactionWork<String>()
@@ -316,8 +322,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				@Override
 				public String execute( Transaction tx )
 				{
-					Result result = tx.run( "LOAD CSV WITH HEADERS FROM 'file:///"+Name+"' AS row "+"merge (:"+FileName+"{"+ proerties+"})", parameters( "name", Name ) );
-					return Name;
+					Result result = tx.run( "LOAD CSV WITH HEADERS FROM 'file:///"+fileName+"' AS row "+"merge (:"+Name+"{"+ proerties+"})", parameters( "name", fileName ) );
+					return fileName;
 				}
 			} );
 		}
@@ -364,15 +370,15 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			if(dataPath == null && distanceMeasure == null) {
 				return "Missing dataPath or distance measure type";
 			}else {
-				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
+				ReadCsvFile readCsvTestData = new ReadCsvFile(dataPath);
 				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
 
-				Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
-				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
-				Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
+				Double[][] DistanceMatrix = ReadCsvFile.euclidianDistance(testData);
+				Double[] sigmas = ReadCsvFile.calculateLocalSigmas(DistanceMatrix);
+				Double[][] adj_mat = ReadCsvFile.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
 
-				ArrayList<String> nodeList = ReadCsvTestData.getNodeList(testData);
-				ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
+				ArrayList<String> nodeList = ReadCsvFile.getNodeList(testData);
+				ArrayList<EdgeList> edgeList = ReadCsvFile.calulateEdgeList(adj_mat);
 
 
 
@@ -413,16 +419,16 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			if(dataPath == null && distanceMeasure == null) {
 				return "Missing dataPath or distance measure type";
 			}else {
-				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
+				ReadCsvFile readCsvTestData = new ReadCsvFile(dataPath);
 				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
 
-				Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
+				Double[][] DistanceMatrix = ReadCsvFile.euclidianDistance(testData);
 				//Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
 				//Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-				Double[][] adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,epsilon);
+				Double[][] adj_mat = ReadCsvFile.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,epsilon);
 
-				ArrayList<String> nodeList = ReadCsvTestData.getNodeList(testData);
-				ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
+				ArrayList<String> nodeList = ReadCsvFile.getNodeList(testData);
+				ArrayList<EdgeList> edgeList = ReadCsvFile.calulateEdgeList(adj_mat);
 
 
 
@@ -458,17 +464,17 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			if(dataPath == null && distanceMeasure == null) {
 				return "Missing dataPath or distance measure type";
 			}else {
-				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
+				ReadCsvFile readCsvTestData = new ReadCsvFile(dataPath);
 				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
 
-				Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
+				Double[][] DistanceMatrix = ReadCsvFile.euclidianDistance(testData);
 //				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
 //				Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-				Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
-				Double[][] adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
+				Double[] knn = ReadCsvFile.calculateKNN(DistanceMatrix);
+				Double[][] adj_mat = ReadCsvFile.calculateKNNGraph(DistanceMatrix,knn);
 
-				ArrayList<String> nodeList = ReadCsvTestData.getNodeList(testData);
-				ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
+				ArrayList<String> nodeList = ReadCsvFile.getNodeList(testData);
+				ArrayList<EdgeList> edgeList = ReadCsvFile.calulateEdgeList(adj_mat);
 
 
 
@@ -495,7 +501,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	}
 
 	@UserFunction
-	public String createMutualKnnGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn) throws Exception {
+	public String createMutualKnnGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean indexColumn) throws Exception {
 
 		String confusionMatrix = "";
 		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
@@ -505,17 +511,17 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			if(dataPath == null && distanceMeasure == null) {
 				return "Missing dataPath or distance measure type";
 			}else {
-				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
-				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
+				ReadCsvFile readCsvTestData = new ReadCsvFile(dataPath);
+				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,indexColumn);
 
-				Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
+				Double[][] DistanceMatrix = ReadCsvFile.euclidianDistance(testData);
 //				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
 //				Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-				Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
-				Double[][] adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
+				Double[] knn = ReadCsvFile.calculateKNN(DistanceMatrix);
+				Double[][] adj_mat = ReadCsvFile.calculateMutualKNNGraph(DistanceMatrix,knn);
 
-				ArrayList<String> nodeList = ReadCsvTestData.getNodeList(testData);
-				ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
+				ArrayList<String> nodeList = ReadCsvFile.getNodeList(testData);
+				ArrayList<EdgeList> edgeList = ReadCsvFile.calulateEdgeList(adj_mat);
 
 
 
@@ -540,39 +546,80 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
 
 	}
-
 	
+	@UserFunction
+	public String createGraphTransformFromCSV(@Name("dataPath") String dataPath, @Name("distanceMeasure") String distanceMeasure, @Name("method") String method, @Name("IndexBoolean") Boolean indexColumn, @Name("epsilon") Double epsilon) throws Exception {
+
+	    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+	        if (dataPath == null || distanceMeasure == null) {
+	            return "Missing label or distance measure type";
+	        } else {
+	        	
+//				ArrayList<String> arrayListHeaders = ReadCsvFile.readCSVHeader(dataPath);
+//				ArrayList<String> arrayListFirst = ReadCsvFile.readCSVFirstLine(dataPath);
+//				List<NodeList2> nodeList = ReadCsvFile.loadCsvConnector(dataPath, name ,arrayListHeaders,arrayListFirst, driver);
+	        	ArrayList<NodeList2> nodeList = ReadCsvFile.retrieveNodeListFromCSV(dataPath);
+	        	//nodeList doesnt have any properties - hence no id or proparties for euclidean distance
+	            Double[][] distanceMatrix = GraphTransform.euclideanDistance(nodeList);
+	            Double[][] adjMatrix = GraphTransform.calculateAdjMatrix(distanceMatrix, method, epsilon);
+				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodeList,adjMatrix);
+	            
+				String graphName = "transformedGraph_" + method;				
+				
+	            for (NodeList2 node : nodeList) {
+	            	Neo4jGraphHandler.createNodeGraph(graphName, "created nodes in neo4j", node, connector.getDriver());
+	            }
+	            
+				for (int i = 0; i < edgeList.size(); i++) {
+					EdgeList2 edgeListDetail = edgeList.get(i);
+					if(edgeListDetail.getWeight()==0.0){
+						continue;
+					}
+	            	Neo4jGraphHandler.createRelationshipGraph(graphName, "created relationship in neo4j \n", edgeListDetail, connector.getDriver());
+
+				}
+				
+	        }
+	        return "Create graph transform successful!";
+	    } catch (Neo4jException e) {
+	        throw new RuntimeException("Error creating connected graph in Neo4j: " + e.getMessage());
+	    }
+	}
 
 	@UserFunction
-	public String createConnectedGraphFromNeo4j(@Name("label") String label, @Name("distanceMeasure") String distanceMeasure) throws Exception {
-		String outputString = "";
+	public String createGraphTransformFromNeo4j(@Name("label") String label, @Name("distanceMeasure") String distanceMeasure, @Name("method") String method, @Name("epsilon") Double epsilon) throws Exception {
 
 	    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
 	        if (label == null || distanceMeasure == null) {
 	            return "Missing label or distance measure type";
 	        } else {
-	            List<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label);
-	            Double[][] distanceMatrix = Neo4jGraphHandler.euclideanDistance(nodePropertiesList);
-	            Double[] sigmas = Neo4jGraphHandler.calculateLocalSigmas(distanceMatrix);
-	            Double[][] adjMatrix = Neo4jGraphHandler.calculateAdjacencyMatrix(distanceMatrix, sigmas);
-				ArrayList<EdgeList2> edgeList = Neo4jGraphHandler.calculateEdgeList(nodePropertiesList,adjMatrix);
-	                      
+	        	ArrayList<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
+	            Double[][] distanceMatrix = GraphTransform.euclideanDistance(nodePropertiesList);
+	            Double[][] adjMatrix = GraphTransform.calculateAdjMatrix(distanceMatrix, method, epsilon);
+				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adjMatrix);
+	            
+				String graphName = "transformedGraph_" + method;				
+				
 	            for (NodeList2 node : nodePropertiesList) {
-	            	Neo4jGraphHandler.createNodeGraph("connectedGraph", "created nodes in neo4j", node);
+	            	Neo4jGraphHandler.createNodeGraph(graphName, "created nodes in neo4j", node, connector.getDriver());
 	            }
 	            
-	            for (EdgeList2 edgeListDetail : edgeList) {
-
-	            	Neo4jGraphHandler.createRelationshipGraph("connectedGraph", "created relationship in neo4j \n", edgeListDetail);
+				for (int i = 0; i < edgeList.size(); i++) {
+					EdgeList2 edgeListDetail = edgeList.get(i);
+					if(edgeListDetail.getWeight()==0.0){
+						continue;
+					}
+	            	Neo4jGraphHandler.createRelationshipGraph(graphName, "created relationship in neo4j \n", edgeListDetail, connector.getDriver());
 
 				}
 				
 	        }
-	        return "Create fully connected graph successful, " + outputString;
+	        return "Create graph transform successful!";
 	    } catch (Neo4jException e) {
 	        throw new RuntimeException("Error creating connected graph in Neo4j: " + e.getMessage());
 	    }
 	}
+
 
 	@UserFunction
 	public String createLaplacianGraph(@Name("nodeType") String nodeType, @Name("threshold") double threshold, @Name("laplacianType") String laplacianType) throws Exception {
@@ -581,7 +628,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            return "Missing nodeType";
 	        } else {
 	            ArrayList<EdgeList2> edgeList = new ArrayList<>();
-	            edgeList = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(nodeType);
+	            edgeList = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(nodeType, connector.getDriver());
 
 	            double[][] adjacencyMatrixData = MatrixCalculation.convertToAdjacencyMatrix2(edgeList);
 	            RealMatrix adjacencyMatrix = new BlockRealMatrix(adjacencyMatrixData);
@@ -589,17 +636,17 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            RealMatrix laplacianMatrix = MatrixCalculation.calculateLaplacianMatrix(degreeMatrix, adjacencyMatrix, laplacianType);
 
 	            EigenCalculation.EigenResult eigenResult = EigenCalculation.calculateEigen(laplacianMatrix);
-	            ArrayList<NodeList2> nodeListEigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(nodeType);
+	            ArrayList<NodeList2> nodeListEigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(nodeType, connector.getDriver());
 	            ArrayList<EdgeList2> edgeListEigen = EigenCalculation.createEdgeList(nodeListEigen, eigenResult.eigenvectors, threshold);
 	            
-	            String graphName = "eigendecomposedGraph_" + laplacianType;
+	            String graphName = "eigendecomposedGraph_" + laplacianType + "_" + nodeType;
 	            
 	            for (NodeList2 node : nodeListEigen) {
-	            	Neo4jGraphHandler.createNodeGraph(graphName, "created nodes in neo4j", node);
+	            	Neo4jGraphHandler.createNodeGraph(graphName, "created nodes in neo4j", node, connector.getDriver());
 	            }
 
 	            for (EdgeList2 edge : edgeListEigen) {
-	            	Neo4jGraphHandler.createRelationshipGraph(graphName, "created relationship in neo4j \n", edge);
+	            	Neo4jGraphHandler.createRelationshipGraph(graphName, "created relationship in neo4j \n", edge, connector.getDriver());
 	            }
 	        }
 	        return "Create eigendecomposed graph successful!";
@@ -610,7 +657,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 
     @UserFunction
-	public String displayEdgeList(@Name("nodeType") String nodeType) throws Exception {
+	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath,@Name("method") String method, @Name("epsilon") Double epsilon) throws Exception {
 		
     	String outputString = "";
 		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
@@ -618,9 +665,16 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            return "Missing nodeType";
 	        } else {
 	        	ArrayList<EdgeList2> edgeList = new ArrayList<>();
-//	        	ArrayList<NodeList2> nodeList = new ArrayList<>();
-	        	edgeList = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(nodeType);
-//	        	nodeList = neo4jGraphHandler.retrieveNodeListFromNeo4j(nodeType);
+	        	ArrayList<NodeList2> nodeList = new ArrayList<>();
+	        	List<NodeList2> nodelist2 = new ArrayList<>();
+	        	edgeList = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(nodeType, connector.getDriver());
+	        	nodeList = Neo4jGraphHandler.retrieveNodeListFromNeo4j(nodeType, connector.getDriver());
+	        	
+	            Double[][] distanceMatrix = GraphTransform.euclideanDistance(nodeList);
+	            Double[][] adjMatrix = GraphTransform.calculateAdjMatrix(distanceMatrix, method, epsilon);
+	            nodelist2 = ReadCsvFile.retrieveNodeListFromCSV(dataPath);
+				ArrayList<EdgeList2> edgeList2 = GraphTransform.calculateEdgeList(nodeList,adjMatrix);
+	        	
 	        	if(edgeList.size()>0)
 	        	{
 	        		for(int i = 0; i < edgeList.size(); i++) {   
