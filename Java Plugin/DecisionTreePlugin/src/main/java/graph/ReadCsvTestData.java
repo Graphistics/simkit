@@ -74,6 +74,34 @@ public class ReadCsvTestData {
 
         return csvFilerow;
     }
+    public ArrayList<ArrayList<String>> readCsvFileNewString(String dataPath,Boolean indexColumn,List<String> classTypes) throws IOException {
+        Reader in = new FileReader(dataPath);
+        ArrayList<String> header = readCSVHeader(dataPath);
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader(header.toString()).setSkipHeaderRecord(true).build();
+        Iterable<CSVRecord> records = csvFormat.parse(in);
+
+        ArrayList<ArrayList<String>>  csvFilerow =  new ArrayList<ArrayList<String>>();
+
+        // read csv file without header
+        for (CSVRecord record : records) {
+            ArrayList<String> TestDataArrayList = new ArrayList<>();
+            for(int i = 0; i < header.size(); i++){
+                if(indexColumn && i==0){
+                    continue;
+                }
+                if(i==header.size()-1){
+
+                }
+                if(record.get(i).matches(".*[a-zA-Z].*")){
+                    continue;
+                }
+                TestDataArrayList.add(record.get(i));
+            }
+            csvFilerow.add(TestDataArrayList);
+        }
+
+        return csvFilerow;
+    }
 
 
 
@@ -272,8 +300,8 @@ public class ReadCsvTestData {
         String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
         String dataPath1 = "D:/de/MASTER_THESIS/SimKit/simkit/dataset_1_iris_numeric/Iris_Mythica_Data_Set.csv";
 
-        ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
-        ArrayList<ArrayList<String>> arrayLists = readCsvTestData.readCsvFileNew(dataPath,true);
+        ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath1);
+        ArrayList<ArrayList<String>> arrayLists = readCsvTestData.readCsvFileNew(dataPath1,true);
         Double[][] dist_array = euclidianDistance(arrayLists);
 //        Double[] sigmas = calculateLocalSigmas(dist_array);
 //        Double[][] adj_mat = calculateAdjacencyMatrix(dist_array,sigmas);
