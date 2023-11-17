@@ -2,6 +2,7 @@ package main;
 import static org.neo4j.driver.Values.parameters;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Scanner;
@@ -1517,64 +1518,63 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
             } );
         }
     }
-	
+
 	@UserFunction
-    public String mapNodes(@Name("nodeType") String nodeType) throws Exception
-   	{
-       	String listOfData = "";
-       	mapNodeList.clear();
-       	try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
-           {
-       		queryData(nodeType);
-       		for (Record key : dataKey) {
-       			List<Pair<String,Value>> values = key.fields();
-       			for (Pair<String,Value> nodeValues: values) {
-       				String valueOfNode = "";
-       				if ("n".equals(nodeValues.key())) { 
-       			        Value value = nodeValues.value();
-       			        for (String nodeKey : value.keys())
-       			        {
-	   			        	try {
-	   			             // Attempt to parse the string as a number
-	   			             double num = Double.parseDouble(String.valueOf(value.get(nodeKey)));
-	       			          if(value.get(nodeKey).getClass().equals(String.class))
-	     			        	{
-	     			        		if(valueOfNode != "")
-	     			        		{
-	     			        			valueOfNode = valueOfNode + ", " + nodeKey + ":" + value.get(nodeKey);
-	     			        		}
-	     			        		else
-	     			        		{
-	     			        			valueOfNode = nodeKey + ":" + value.get(nodeKey);
-	     			        		}
-	     			   
-	     			        	}
-	     			        	else
-	     			        	{
-	     			        		if(valueOfNode != "")
-	     			        		{
-	     			        			String converValueToString = String.valueOf(value.get(nodeKey));
-	             			        	valueOfNode = valueOfNode + ", " + nodeKey + ":" + converValueToString;
-	     			        		}
-	     			        		else
-	     			        		{
-	     			        			String converValueToString = String.valueOf(value.get(nodeKey));
-	             			        	valueOfNode =  nodeKey + ":" + converValueToString;
-	     			        		}   			        		
-	     			        	}
-       			        	} catch (NumberFormatException e) {
-	       			             // Handle the case when the string is not a number
-	       			             System.out.println(value.get(nodeKey) + " is not a number.");
-       			        	}
-       			        }
-       			        mapNodeList.add(valueOfNode);
-       			    }
-       				listOfData = listOfData + valueOfNode + " | ";
-       			}
-       		}
-           }
-       	return "Map all node data: " + listOfData;
-   	}
+	public String mapNodes(@Name("nodeType") String nodeType, @Name("overlook") String overLook) throws Exception {
+	    String listOfData = "";
+	    String[] overLookArray = new String[0];
+
+	    mapNodeList.clear();
+
+	    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+	        if (!overLook.isEmpty()) {
+	            overLookArray = overLook.split(",");
+	        }
+
+	        queryData(nodeType);
+
+	        for (Record key : dataKey) {
+	            List<Pair<String, Value>> values = key.fields();
+	            for (Pair<String, Value> nodeValues : values) {
+	                if ("n".equals(nodeValues.key())) {
+	                    Value value = nodeValues.value();
+	                    String valueOfNode = getNodeValues(value, overLookArray);
+	                    mapNodeList.add(valueOfNode);
+//	                    listOfData = listOfData + valueOfNode + " | ";
+	                    listOfData = mapNodeList.toString();
+	                }
+	            }
+	        }
+	    }
+
+	    return "Map all node data: " + listOfData;
+	}
+
+	private String getNodeValues(Value value, String[] overLookArray) {
+	    StringBuilder valueOfNode = new StringBuilder();
+
+	    for (String nodeKey : value.keys()) {
+	        if (overLookArray.length > 0 && Arrays.asList(overLookArray).contains(nodeKey)) {
+	            continue;
+	        }
+
+	        try {
+	            double num = Double.parseDouble(String.valueOf(value.get(nodeKey)));
+	            if (value.get(nodeKey).getClass().equals(String.class)) {
+	                valueOfNode.append(getStringValue(valueOfNode)).append(nodeKey).append(":").append(value.get(nodeKey));
+	            } else {
+	                valueOfNode.append(getStringValue(valueOfNode)).append(nodeKey).append(":").append(value.get(nodeKey));
+	            }
+	        } catch (NumberFormatException e) {
+	            System.out.println(value.get(nodeKey) + " is not a number.");
+	        }
+	    }
+	    return valueOfNode.toString();
+	}
+
+	private String getStringValue(StringBuilder valueOfNode) {
+	    return valueOfNode.length() > 0 ? ", " : "";
+	}
 	
 	 /**
      * Procedure for k-means clustering and visualization in neo4j
@@ -1607,35 +1607,24 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
 	}
 
-	/**
-	 * Procedure for dbscan clustering and visualization in neo4j
-	 * @param nodeType type of node
-	 * @param
-	 * @param
-	 * @return cluster result and visualize
-	 * @throws Exception
-	 */
-	@UserFunction
-	@Description("DBSCAN clustering function")
-	public String dbscan(@Name("nodeType") String nodeType, @Name("epsilon") String epsilon, @Name("minimumPoints") String minimumPoints, @Name("distanceMeasure") String distanceMeasure) throws Exception
+    @UserFunction
+    @Description("Calculate the mean of the Silhouette Coefficients for all point")
+	public String averageSilhouetteCoefficient(@Name("nodeType") String nodeType, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
 	{
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
-		{
-			String dbscanAfterClustering = "";
-			HashMap<String,ArrayList<String>> dbAssign = new HashMap<String,ArrayList<String>>();
-			double eps = Double.parseDouble(epsilon);
-			int minPts = Integer.parseInt(minimumPoints);
-			dbAssign = Unsupervised.DbClust(mapNodeList, eps, minPts, distanceMeasure);
-			for (String centroid: dbAssign.keySet()) {
-        		ArrayList<String> clusterNode = dbAssign.get(centroid);
-        		for (String node : clusterNode)
-        		{
-        			connector.connectNodes(nodeType, "create relationship in dbscan node",centroid,node);
-        		}
-    		    
-    		}
-			return dbscanAfterClustering ;
+    	if(nodeType != null)
+    	{
+			String averageSilhouetteCoefficientString = "The average Silhouette Coefficient value is: ";
+			HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
+			int numberOfCentroidInt = Integer.parseInt(numberOfCentroid);
+			int numberOfInterationInt = Integer.parseInt(numberOfInteration);
+			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure);
+			double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
+	        return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue ;
 		}
+    	else
+    	{
+    		return null;
+    	}
 	}
 
 

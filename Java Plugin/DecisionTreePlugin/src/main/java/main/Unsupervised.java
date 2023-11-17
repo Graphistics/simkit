@@ -4,6 +4,8 @@ package main;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
 
 import scala.util.Random;
 
@@ -15,16 +17,16 @@ public class Unsupervised {
 	
 	public static ArrayList<String> dummyData(){
 		ArrayList<String> data = new ArrayList<String>();
-		String line1 ="anaemia:0,serum_creatinine:1.9,sex:1,ejection_fraction:20,creatinine_phosphokinase:582,platelets:265000.0,DEATH_EVENT:1,high_blood_pressure:1,smoking:0,time:4,serum_sodium:130,diabetes:0,age:75";
-		String line2 ="anaemia:0,serum_creatinine:1.1,sex:1,ejection_fraction:38,creatinine_phosphokinase:7861,platelets:263358.03,DEATH_EVENT:1,high_blood_pressure:0,smoking:0,time:6,serum_sodium:136,diabetes:0,age:55";
-		String line3 ="anaemia:0,serum_creatinine:1.3,sex:1,ejection_fraction:20,creatinine_phosphokinase:146,platelets:162000.0,DEATH_EVENT:1,high_blood_pressure:0,smoking:1,time:7,serum_sodium:129,diabetes:0,age:65";
-		String line4 ="anaemia:1,serum_creatinine:1.9,sex:1,ejection_fraction:20,creatinine_phosphokinase:111,platelets:210000.0,DEATH_EVENT:1,high_blood_pressure:0,smoking:0,time:7,serum_sodium:137,diabetes:0,age:50";
-		String line5 ="anaemia:1,serum_creatinine:2.7,sex:0,ejection_fraction:20,creatinine_phosphokinase:160,platelets:327000.0,DEATH_EVENT:1,high_blood_pressure:0,smoking:0,time:8,serum_sodium:116,diabetes:1,age:65";
-//		String line1 = "anaemia:0,serum_creatinine:1.9";
-//		String line2 = "anaemia:0,serum_creatinine:1.1";
-//		String line3 = "anaemia:0,serum_creatinine:1.3";
-//		String line4 = "anaemia:1,serum_creatinine:1.9";
-//		String line5 = "anaemia:1,serum_creatinine:2.7";
+		String line1 ="y_cordinate:7.0,x_cordinate:1.0";
+		String line2 ="y_cordinate:6.0,x_cordinate:1.0";
+		String line3 ="y_cordinate:2.0, x_cordinate:6.0";
+		String line4 ="y_cordinate:1.0, x_cordinate:8.0";
+		String line5 ="y_cordinate:2.0, x_cordinate:10.0";
+//		String line1 ="y_cordinate:0.536804,x_cordinate:0.449056";
+//		String line2 ="y_cordinate:0.533213,x_cordinate:0.454964";
+//		String line3 ="y_cordinate:-0.247063,x_cordinate:0.474114";
+//		String line4 ="y_cordinate:-0.448465,x_cordinate:0.444607";
+//		String line5 ="y_cordinate:-0.406650, x_cordinate:0.410971";
 		data.add(line1);
 		data.add(line2);
 		data.add(line3);
@@ -36,14 +38,16 @@ public class Unsupervised {
 	public static void main(String[] args)
 	{
 		  ArrayList<String> inputData = dummyData(); 
-		  HashMap<String, ArrayList<String>> dbAssign = DbClust(inputData, 20000, 2, "manhattan");		  
+		  HashMap<String, ArrayList<String>> dbAssign = KmeanClust(inputData, 2, 20, "Euclidean");		  
 		  for (String centroid: dbAssign.keySet()) {
 			  System.out.println("1");
       		ArrayList<String> clusterNode = dbAssign.get(centroid);
-      		System.out.println(centroid);
+      		System.out.println("number of centroid " +  centroid);
       		System.out.println(clusterNode.toString());
-  		    
-  		}
+  		  }
+		  
+		  Double silhouetteValue = averageSilhouetteCoefficient(dbAssign, "Euclidean");
+		  System.out.println(averageSilhouetteCoefficient(dbAssign, "Euclidean"));
 
 	}
 	
@@ -180,21 +184,31 @@ public class Unsupervised {
 		HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
 		ArrayList<String> listOfCentroid = new ArrayList<String>();
 		ArrayList<String> listOfRemain = new ArrayList<String>(inputData);
+		
 		// Initializing centroid by random choice
-		for(int i = 0; i < numberOfCentroids; i++)
-		{
-			java.util.Random rand = new java.util.Random();
-			int randomNum = rand.nextInt((listOfRemain.size()-1 - 0) + 1) + 0;
-			listOfCentroid.add(listOfRemain.get(randomNum));
-			listOfRemain.remove(randomNum);
-		}
+	    java.util.Random rand = new java.util.Random();
+
+	    while (listOfCentroid.size() < numberOfCentroids) {
+	        int randomIndex = rand.nextInt(inputData.size());
+	        String potentialCentroid = inputData.get(randomIndex);
+
+	        if (!listOfCentroid.contains(potentialCentroid)) {
+	        	listOfCentroid.add(potentialCentroid);
+	        }
+	    }
+	    for(int i = 0; i < listOfRemain.size(); i ++)
+	    {
+	    	if(listOfCentroid.contains(listOfRemain.get(i)));
+	    	{
+	    		listOfRemain.remove(i);
+	    	}
+	    }
+	    System.out.println("---------------- numberOfCentroids : " + listOfCentroid.size());
+	    
 		// First clusters
 		HashMap<String, ArrayList<String>> hashClusterAssign = distanceAssign(listOfCentroid,listOfRemain, distanceMeasure);
 		// All iterations
-		kmeanAssign = kmeanInteration(hashClusterAssign,numberOfInteration,inputData, distanceMeasure);
-		for (String name: kmeanAssign.keySet()) {
-		    ArrayList<String> something = kmeanAssign.get(name);
-		}
+		kmeanAssign = kmeanIteration(hashClusterAssign,numberOfInteration,inputData, distanceMeasure);
 		return kmeanAssign;
 	}
 	
@@ -205,41 +219,15 @@ public class Unsupervised {
 	 * @param inputData specified by user
 	 * @return
 	 */
-	public static HashMap<String, ArrayList<String>> kmeanInteration (HashMap<String, ArrayList<String>> clusterAssign, int numberOfInteration, ArrayList<String> inputData, String distanceMeasure)
-	{
-		ArrayList<String> listOfCentroid = new ArrayList<String>();
-		ArrayList<String> listOfNewCentroid = new ArrayList<String>();
-		for(int i = 0; i < numberOfInteration; i++)
-		{
-//			if(i>0)
-//			{
-//				listOfCentroid.clear();
-//			}
-//			if(i == 0)
-//			{
-//				for (String key : clusterAssign.keySet()) 
-//				{
-//					clusterAssign.get(key).add(key);
-//					String newCentroid = calculateNewCentroid(clusterAssign.get(key));
-//					listOfCentroid.add(newCentroid);
-//				}	
-//			}
-//			else
-//			{
-//				for (String key: clusterAssign.keySet())
-//				{
-//					String newCentroid = calculateNewCentroid(clusterAssign.get(key));
-//					listOfCentroid.add(newCentroid);
-//				}
-//			}
-			
-			// Calculate new centroids and update clusterAssign
+	public static HashMap<String, ArrayList<String>> kmeanIteration(HashMap<String, ArrayList<String>> clusterAssign, int numberOfInteration, ArrayList<String> inputData, String distanceMeasure) {
+	    for (int i = 0; i < numberOfInteration; i++) {
+	        // Calculate new centroids and update clusterAssign
 	        clusterAssign = calculateAndUpdateCentroids(clusterAssign);
 
 	        // Perform distance assignment again with the updated centroids
 	        clusterAssign = distanceAssign(new ArrayList<>(clusterAssign.keySet()), inputData, distanceMeasure);
-		}
-		return clusterAssign;
+	    }
+	    return clusterAssign;
 	}
 	
 	/**
@@ -247,65 +235,37 @@ public class Unsupervised {
 	 * @param listOfNodesInCluster nodes assigned to each cluster
 	 * @return returns new centroids after each iteration
 	 */
-	public static String calculateNewCentroid (ArrayList<String> listOfNodesInCluster)
-	{
-//		String[] atrributeName = new String[listOfNodesInCluster.get(0).split(",").length];
-//		Double[] atrributeValue = new Double[listOfNodesInCluster.get(0).split(",").length];
-//		for (String node : listOfNodesInCluster)
-//		{
-//			for (int i=0; i<atrributeValue.length;i++)
-//			{
-//				if(atrributeValue[i]==null)
-//				{
-//					atrributeValue[i] = Double.parseDouble(node.split(",")[i].split(":")[1]);
-//					atrributeName[i] = node.split(",")[i].split(":")[0];
-//				}
-//				else
-//				{
-//					atrributeValue[i] = atrributeValue[i] + Double.parseDouble(node.split(",")[i].split(":")[1]);
-//				}
-//			}
-//		}
-//		String newCentroid = "";
-//		for (int i = 0; i < atrributeValue.length; i++)
-//		{
-//			atrributeValue[i] = atrributeValue[i]/listOfNodesInCluster.size();
-//			if (i == 0)
-//			{
-//				newCentroid = newCentroid + atrributeName[i] + ":" + atrributeValue[i];
-//			}
-//			else
-//			{
-//				newCentroid = newCentroid + "," +atrributeName[i] + ":" + atrributeValue[i] + ",";
-//			}
-//		}
-//		return newCentroid;
-		
-		String[] attributeNames = new String[listOfNodesInCluster.get(0).split(",").length];
-	    Double[] attributeValues = new Double[listOfNodesInCluster.get(0).split(",").length];
-
-	    // Initialize arrays with null values
-	    for (int i = 0; i < attributeValues.length; i++) {
-	        attributeValues[i] = null;
+	public static String calculateNewCentroid(ArrayList<String> listOfNodesInCluster) {
+	    if (listOfNodesInCluster.isEmpty()) {
+	        return null; // Handle empty cluster case
 	    }
+
+	    // Extract attribute names from the first node
+	    String[] firstNodeAttributes = listOfNodesInCluster.get(0).split(",");
+	    String[] attributeNames = new String[firstNodeAttributes.length];
+	    for (int i = 0; i < firstNodeAttributes.length; i++) {
+	        attributeNames[i] = firstNodeAttributes[i].split(":")[0].trim();
+	    }
+
+	    double[] attributeSums = new double[attributeNames.length];
 
 	    for (String node : listOfNodesInCluster) {
 	        String[] attributes = node.split(",");
-	        for (int i = 0; i < attributeValues.length; i++) {
-	            if (attributeValues[i] == null) {
-	                attributeValues[i] = Double.parseDouble(attributes[i].split(":")[1]);
-	                attributeNames[i] = attributes[i].split(":")[0];
-	            } else {
-	                attributeValues[i] += Double.parseDouble(attributes[i].split(":")[1]);
+	        for (int i = 0; i < attributes.length; i++) {
+	            try {
+	                attributeSums[i] += Double.parseDouble(attributes[i].split(":")[1].trim());
+	            } catch (NumberFormatException e) {
+	                System.err.println("Error parsing number: " + attributes[i]);
+	                return null; // or handle the error appropriately
 	            }
 	        }
 	    }
 
 	    StringBuilder newCentroid = new StringBuilder();
-	    for (int i = 0; i < attributeValues.length; i++) {
-	        attributeValues[i] = attributeValues[i] / listOfNodesInCluster.size();
-	        newCentroid.append(attributeNames[i]).append(":").append(attributeValues[i]);
-	        if (i < attributeValues.length - 1) {
+	    for (int i = 0; i < attributeSums.length; i++) {
+	        double average = attributeSums[i] / listOfNodesInCluster.size();
+	        newCentroid.append(attributeNames[i]).append(":").append(average);
+	        if (i < attributeSums.length - 1) {
 	            newCentroid.append(",");
 	        }
 	    }
@@ -318,77 +278,55 @@ public class Unsupervised {
 	 * @param clusterAssign The current cluster assignments
 	 * @return Updated cluster assignments with new centroids
 	 */
-	private static HashMap<String, ArrayList<String>> calculateAndUpdateCentroids(HashMap<String, ArrayList<String>> clusterAssign)
-	{
+	private static HashMap<String, ArrayList<String>> calculateAndUpdateCentroids(HashMap<String, ArrayList<String>> clusterAssign) {
 	    HashMap<String, ArrayList<String>> updatedClusterAssign = new HashMap<>();
 
-	    for (String key : clusterAssign.keySet())
-	    {
+	    for (String key : clusterAssign.keySet()) {
 	        ArrayList<String> clusterNodes = clusterAssign.get(key);
 	        String newCentroid = calculateNewCentroid(clusterNodes);
-	        updatedClusterAssign.put(newCentroid, clusterNodes);
+	        if (newCentroid != null) { // Check for null to handle empty clusters
+	            updatedClusterAssign.put(newCentroid, clusterNodes);
+	        }
 	    }
-
 	    return updatedClusterAssign;
 	}
 	
-	/**
-	 * This is the first iteration of k-means clustering algorithm
-	 * @param listOfCentroid contains all the initial centroid points 
-	 * @param listOfRemain contains the points which have been initialized as centroids
-	 * @return
-	 */
-	public static HashMap<String, ArrayList<String>> distanceAssign (ArrayList<String> listOfCentroid, ArrayList<String> listOfRemain, String distanceMeasure)
-	{
-		HashMap<String, ArrayList<String>> hashClusterAssign = new HashMap<String, ArrayList<String>>();
-		// Calculate distance and assign points to clusters
-		for(int i = 0; i < listOfRemain.size(); i++)
-		{
-			double minDistance = 0;
-			ArrayList<String> cluster = new ArrayList<String>();
-			String clusterNode = "";
-			for(int j = 0; j < listOfCentroid.size(); j++)
-			{
-				double distance = 0.0;
-				
+	public static HashMap<String, ArrayList<String>> distanceAssign (ArrayList<String> listOfCentroid, ArrayList<String> listOfRemain, String distanceMeasure) {
+	    HashMap<String, ArrayList<String>> hashClusterAssign = new HashMap<String, ArrayList<String>>();
+	    // Calculate distance and assign points to clusters
+	    for (int i = 0; i < listOfRemain.size(); i++) {
+	        double minDistance = Double.MAX_VALUE;
+	        String closestCentroid = null;
 
-				if(distanceMeasure.equals("manhattan")) {
-					distance = calManhattanDist(listOfRemain.get(i),listOfCentroid.get(j));	
-				}
-				else if(distanceMeasure.equals("cosine")) {
-					distance = calCosineSimilarity(listOfRemain.get(i),listOfCentroid.get(j));
-				}
-				else if (distanceMeasure.equals("bray-curtis")) {
-					distance = calBrayCurtis(listOfRemain.get(i),listOfCentroid.get(j));
-				}
-				else {
-					distance = calEuclideanDist(listOfRemain.get(i),listOfCentroid.get(j));	
-				}
-				
-				if(minDistance == 0)
-				{
-					minDistance = distance;
-					clusterNode = listOfCentroid.get(j);
-				}
-				else if(distance<minDistance)
-				{
-					minDistance = distance;
-					clusterNode = listOfCentroid.get(j);
-				}
-			}
-			ArrayList<String> valueHashMap = hashClusterAssign.get(clusterNode);
-			if(valueHashMap != null)
-			{
-				valueHashMap.add(listOfRemain.get(i));
-			}
-			else
-			{
-				ArrayList<String> tempArray = new ArrayList<String>();
-				tempArray.add(listOfRemain.get(i));
-				hashClusterAssign.put(clusterNode, tempArray);
-			}
-		}
-		return hashClusterAssign;
+	        for (int j = 0; j < listOfCentroid.size(); j++) {
+	            double distance = calculateDistance(listOfRemain.get(i), listOfCentroid.get(j), distanceMeasure);
+	            
+	            if (distance < minDistance) {
+	                minDistance = distance;
+	                closestCentroid = listOfCentroid.get(j);
+	            }
+	        }
+	        hashClusterAssign.computeIfAbsent(closestCentroid, k -> new ArrayList<>()).add(listOfRemain.get(i));
+	    }
+	    // Ensure all centroids are in the hashmap, even if they have no assigned points
+	    for (String centroid : listOfCentroid) {
+	        hashClusterAssign.putIfAbsent(centroid, new ArrayList<>());
+	    }
+
+	    return hashClusterAssign;
+	}
+
+	private static double calculateDistance(String point1, String point2, String distanceMeasure) {
+	    switch (distanceMeasure.toLowerCase()) {
+	        case "manhattan":
+	            return calManhattanDist(point1, point2);
+	        case "cosine":
+	            return calCosineSimilarity(point1, point2);
+	        case "bray-curtis":
+	            return calBrayCurtis(point1, point2);
+	        default:
+	            return calEuclideanDist(point1, point2);
+	    }
 	}
 	
 	
@@ -490,4 +428,62 @@ public class Unsupervised {
 		return distance;
 		
 	}
+	
+	//a(i) : Calculate the average distance of point i to other points in its cluster.
+	public static double averageIntraClusterDistance(String point, ArrayList<String> cluster, String distanceMeasure) {
+	    double sumDistance = 0.0;
+	    for (String otherPoint : cluster) {
+	        sumDistance += calculateDistance(point, otherPoint, distanceMeasure );
+	    }
+	    return sumDistance / (cluster.size() - 1); // Exclude the point itself
+	}
+	
+	//b(i) : Calculate the smallest average distance of point i to all points in other clusters.
+	public static double smallestInterClusterDistance(String point, HashMap<String, ArrayList<String>> allCluster,
+			ArrayList<String> ownCluster, String distanceMeasure) {
+		
+	    double smallestAverage = Double.MAX_VALUE;
+    	for (String key : allCluster.keySet())
+    	{
+    		ArrayList<String> cluster = allCluster.get(key);
+    		if(cluster.equals(ownCluster)) continue; // Skip the same cluster contain the point
+    		double sumDistance = 0.0;
+    		for(String otherPoint : cluster) {
+    			sumDistance += calculateDistance(point, otherPoint, distanceMeasure);
+    		}
+    		double averageDistance = sumDistance / cluster.size();
+            if (averageDistance < smallestAverage) {
+                smallestAverage = averageDistance;
+    	        }
+    	}
+    	return smallestAverage;
+	}
+	
+	//Calculate the Silhouette Coefficient for Each Point
+	public static double silhouetteCoefficient(String point, ArrayList<String> ownCluster
+			, HashMap<String, ArrayList<String>> allClusters, String distanceMeasure) {
+		
+	    double a = averageIntraClusterDistance(point, ownCluster, distanceMeasure);
+	    double b = smallestInterClusterDistance(point, allClusters, ownCluster, distanceMeasure);
+	    return (b - a) / Math.max(a, b);
+	}
+	
+	//Calculate the SilhouetteCoefficient : Calculate the mean of the Silhouette Coefficients for all point
+	public static double averageSilhouetteCoefficient(HashMap<String, ArrayList<String>> allCluster, String distanceMeasure) {
+	    double sumSilhouette = 0.0;
+	    int numPoints = 0;
+
+	    for (String key : allCluster.keySet())
+	    {
+	    	ArrayList<String> cluster = allCluster.get(key);
+	    	for (String point : cluster)
+	    	{
+	    		sumSilhouette += silhouetteCoefficient(point, cluster, allCluster, distanceMeasure);
+	    		numPoints++;
+	    	}
+	    }
+	    System.out.println("Sum " + sumSilhouette);
+	    return sumSilhouette / numPoints;
+	}
+	
 }
