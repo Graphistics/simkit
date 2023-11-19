@@ -63,7 +63,6 @@ public class GraphTransform {
     }
 
 
-
     public static Double[][] euclideanDistance(List<NodeList2> nodeList) {
 
         int size = nodeList.size();

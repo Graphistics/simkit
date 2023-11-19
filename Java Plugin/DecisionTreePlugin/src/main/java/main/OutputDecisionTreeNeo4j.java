@@ -21,7 +21,6 @@ import static org.neo4j.driver.Values.parameters;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.function.DoubleUnaryOperator;
 import java.util.regex.Pattern;
 
 import org.neo4j.driver.AuthTokens;
@@ -218,7 +217,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				{
 					Result result = tx.run( "MATCH (a:" + dtType + "), (b:" + dtType + ") " +
 							"WHERE a.id = "+"\"" +"Index"+edgeListDetail.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
-							"CREATE (a)-[r:" + weight +  "]->(b)");
+							"CREATE (a)-[r:`link` {weight:" + weight +  "}]->(b)");
 					return message;
 				}
 			} );
@@ -349,13 +348,48 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		return stringBuilder.toString();
 	}
 
+	public Double [][] getDistanceMatrix(String distanceMeasure,ArrayList<ArrayList<String>> testData){
+		Double[][] DistanceMatrix = null;
+
+
+		switch (distanceMeasure){
+			case "euclideanDistance":
+				DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
+				break;
+			case "manhattanDistance" :
+				DistanceMatrix = DistanceMeasure.calculateCanberraDistance(testData);
+				break;
+			case "canberraDistance" :
+				DistanceMatrix = DistanceMeasure.calculateCanberraDistance(testData);
+				break;
+			case "cosineSimilarity" :
+				DistanceMatrix = DistanceMeasure.calculateCosineSimilarity(testData);
+				break;
+			case "jaccardCoefficient" :
+				DistanceMatrix = DistanceMeasure.calculateJaccardCoefficient(testData);
+				break;
+			case "brayCurtisDistance" :
+				DistanceMatrix = DistanceMeasure.calculateBrayCurtisDistance(testData);
+				break;
+			default:
+				System.out.println("give correct name");
+		}
+
+
+		return DistanceMatrix;
+
+
+
+	}
+
 
 	@UserFunction
-	public String createGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn,@Name("graphType") String graphType,@Name("epsilon") Double epsilon) throws Exception {
+	public String createGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn,@Name("graphType") String graphType,@Name("epsilon") Double epsilon,@Name("sigma") Integer sigma,@Name("Knn") Integer knn_neighbour) throws Exception {
 
 		String confusionMatrix = "";
 		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
 		{
+
 
 
 			if(dataPath == null && distanceMeasure == null) {
@@ -363,27 +397,24 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			}else {
 				Double[][] adj_mat = null;
 				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
-
 				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
-				if(graphType.equals("connectedGraph")) {
-					Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
-					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
+				Double[][] DistanceMatrix = getDistanceMatrix(distanceMeasure,testData);
+
+				if(graphType.equals("ConnectedGraph")) {
+					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,sigma);
 					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
 				}
-				if(graphType.equals("epsilonGraph")) {
-					Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
+				if(graphType.equals("EpsilonGraph")) {
 					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,epsilon);
 
 				}
 				if(graphType.equals("knnGraph")) {
-					Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
+					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
 
 				}
-				if(graphType.equals("mutualKnnGraph")) {
-					Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
+				if(graphType.equals("MutualKnnGraph")) {
+					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
 				}
 
@@ -415,7 +446,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	}
 	@UserFunction
-	public String createGraphFromNodes(@Name("dataPath") String label,@Name("distanceMeasure") String distanceMeasure,@Name("graphType") String graphType,@Name("epsilon") Double epsilon) throws Exception {
+	public String createGraphFromNodes(@Name("label") String label,@Name("distanceMeasure") String distanceMeasure,@Name("graphType") String graphType,@Name("epsilon") Double epsilon,@Name("epsilon") Integer sigma,@Name("Knn") Integer knn_neighbour) throws Exception {
 
 		String confusionMatrix = "";
 		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
@@ -427,28 +458,29 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			}else {
 				String graphName = null;
 				ArrayList<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
-				Double[][] DistanceMatrix = GraphTransform.euclideanDistance(nodePropertiesList);
+				//Double[][] DistanceMatrix = GraphTransform.euclideanDistance(nodePropertiesList);
+				Double[][] DistanceMatrix = getDistanceMatrixFromNodes(distanceMeasure,nodePropertiesList);
 				Double[][] adj_mat = null;
 //				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
 //				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
-				if(graphType.equals("connectedGraph")) {
-					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
+				if(graphType.equals("ConnectedGraph")) {
+					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,sigma);
 					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
 					graphName = "connectedGraph";
 				}
-				if(graphType.equals("epsilonGraph")) {
+				if(graphType.equals("EpsilonGraph")) {
 					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,epsilon);
 					graphName = "epsilonGraph";
 
 				}
 				if(graphType.equals("knnGraph")) {
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
+					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
 					graphName = "knnGraph";
 
 				}
-				if(graphType.equals("mutualKnnGraph")) {
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
+				if(graphType.equals("MutualKnnGraph")) {
+					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
 					graphName = "mutualKnnGraph";
 				}
@@ -477,6 +509,38 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
 
 	}
+
+	private Double[][] getDistanceMatrixFromNodes(String distanceMeasure, ArrayList<NodeList2> nodePropertiesList) {
+		Double[][] DistanceMatrix = null;
+
+
+		switch (distanceMeasure) {
+			case "euclideanDistance":
+				DistanceMatrix = GraphTransform.euclideanDistance(nodePropertiesList);
+				break;
+			case "manhattanDistance":
+				DistanceMatrix = DistanceMeasureNodes.manhattanDistance(nodePropertiesList);
+				break;
+			case "canberraDistance":
+				DistanceMatrix = DistanceMeasureNodes.canberraDistance(nodePropertiesList);
+				break;
+			case "cosineSimilarity":
+				DistanceMatrix = DistanceMeasureNodes.cosineSimilarity(nodePropertiesList);
+				break;
+			case "jaccardCoefficient":
+				DistanceMatrix = DistanceMeasureNodes.jaccardCoefficient(nodePropertiesList);
+				break;
+			case "brayCurtisDistance":
+				DistanceMatrix = DistanceMeasureNodes.brayCurtisDistance(nodePropertiesList);
+				break;
+			default:
+				System.out.println("Invalid distance measure type");
+		}
+
+		return DistanceMatrix;
+
+	}
+
 	public void createRelationshipConnectedGraphFromExistingNodes( final String dtType, final String message, final EdgeList edgeListDetail)
 	{
 		final long bid = edgeListDetail.getTarget();
@@ -502,7 +566,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 
 	@UserFunction
-	public String createGraphStringClass(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn,@Name("graphType") String graphType,@Name("epsilon") Double epsilon,@Name("epsilon") List<String> classTypes) throws Exception {
+	public String createGraphStringClass(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn,@Name("graphType") String graphType,@Name("epsilon") Double epsilon,@Name("sigma") Integer sigma,@Name("Knn") Integer knn_neighbour,@Name("class types") List<String> classTypes) throws Exception {
 
 		String confusionMatrix = "";
 		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
@@ -517,7 +581,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNewString(dataPath,IndexColumn,classTypes);
 				if(graphType.equals("connectedGraph")) {
 					Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
-					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
+					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,sigma);
 					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
 				}
 				if(graphType.equals("epsilonGraph")) {
@@ -527,13 +591,13 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				}
 				if(graphType.equals("knnGraph")) {
 					Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
+					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
 
 				}
 				if(graphType.equals("mutualKnnGraph")) {
 					Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
+					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
 				}
 
@@ -613,102 +677,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
 
 	}
-	@UserFunction
-	public String createKnnGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn) throws Exception {
-
-		String confusionMatrix = "";
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
-		{
-
-
-			if(dataPath == null && distanceMeasure == null) {
-				return "Missing dataPath or distance measure type";
-			}else {
-				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
-				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
-
-				Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
-//				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
-//				Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-				Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
-				Double[][] adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
-
-				ArrayList<String> nodeList = ReadCsvTestData.getNodeList(testData);
-				ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
-
-
-
-				for (String nodeDetail : nodeList) {
-
-					connector.createNodeConnectedGraph("connectedGraph", "created nodes in neo4j", nodeDetail);
-				}
-
-				//for (EdgeList edgeListDetail : edgeList) {
-				for (int i = 0; i < edgeList.size()-1; i++) {
-					EdgeList edgeListDetail = edgeList.get(i);
-					if(edgeListDetail.getWeight()==0.0){
-						continue;
-					}
-					connector.createRelationshipConnectedGraph("Index", "created relationship in neo4j \n", edgeListDetail);
-				}
-
-			}
-			return "Create fully connected graph successful, " + confusionMatrix;
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-
-	}
-
-	@UserFunction
-	public String createMutualKnnGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn) throws Exception {
-
-		String confusionMatrix = "";
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
-		{
-
-
-			if(dataPath == null && distanceMeasure == null) {
-				return "Missing dataPath or distance measure type";
-			}else {
-				ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
-				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
-
-				Double[][] DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
-//				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
-//				Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-				Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix);
-				Double[][] adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
-
-				ArrayList<String> nodeList = ReadCsvTestData.getNodeList(testData);
-				ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
-
-
-
-				for (String nodeDetail : nodeList) {
-
-					connector.createNodeConnectedGraph("connectedGraph", "created nodes in neo4j", nodeDetail);
-				}
-
-				//for (EdgeList edgeListDetail : edgeList) {
-				for (int i = 0; i < edgeList.size()-1; i++) {
-					EdgeList edgeListDetail = edgeList.get(i);
-					if(edgeListDetail.getWeight()==0.0){
-						continue;
-					}
-					connector.createRelationshipConnectedGraph("Index", "created relationship in neo4j \n", edgeListDetail);
-				}
-
-			}
-			return "Create fully connected graph successful, " + confusionMatrix;
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-
-	}
-
-
-
 	/**
 	 * This function is used to split the nodes from database based on training ratio given
 	 * @param nodeType
@@ -1092,7 +1060,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	/**
 	 * User defined function to create the decision tree with nodes and relationships in neo4j
-	 * @param path
+	 * path
 	 * @return
 	 * @throws Exception
 	 */
@@ -1131,7 +1099,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	}
 	/**
 	 * This function creates tree from csv path which is based on gain ratio
-	 * @param path The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
+	 *     is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
 	 * @return
 	 * @throws Exception
 	 */
@@ -1172,7 +1140,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	/**
 	 * This function creates tree from csv path which is based on information gain
 	 *
-	 * @param path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
+	 *  path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
 	 * @return
 	 * @throws Exception
 	 */
@@ -1213,8 +1181,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	/**
 	 * This function retrieves the confusion matrix of decision tree based on information gain
-	 * @param path
-	 * @param target
+	 *  path
+	 *  target
 	 * @return
 	 * @throws Exception
 	 */
@@ -1243,7 +1211,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	/**
 	 *
 	 * This function retrieves the confusion matrix of decision tree based on gain ratio
-	 * @param path
+	 *  path
 	 * @return
 	 * @throws Exception
 	 */
@@ -1272,7 +1240,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	/**
 	 *
 	 * This function retrieves the confusion matrix of decision tree based on gini index
-	 * @param path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
+	 *  path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
 	 * @return A string with confusion matrix
 	 * @throws Exception
 	 */
@@ -1300,7 +1268,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	/**
 	 * This function retrieves the confusion matrix of decision tree based on information gain
-	 * @param path
+	 *  path
 	 * @param target
 	 * @return
 	 * @throws Exception
@@ -1348,7 +1316,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	/**
 	 *
 	 * This function retrieves the confusion matrix of decision tree based on gini index
-	 * @param path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
+	 *  path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
 	 * @return A string with confusion matrix
 	 * @throws Exception
 	 */
@@ -1629,7 +1597,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		String Filename = "test.csv";
 		String testDataPath = "C:/Users/abhiv/.Neo4jDesktop/relate-data/dbmss/dbms-7ff4399d-8f4a-48ed-ba21-c30aa62e37b7/import/test.csv";
 
-		outputDecisionTreeNeo4j.createGraphFromNodes("test","test","connectedGraph",2.0);
+		outputDecisionTreeNeo4j.createGraphFromNodes("test","test","connectedGraph",2.0,2,2);
 		//outputDecisionTreeNeo4j.createConnectedGraph(testDataPath, "fully-conncted");
 
 		//test
