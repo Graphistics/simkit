@@ -1520,7 +1520,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
     }
 
 	@UserFunction
-	public String mapNodes(@Name("nodeType") String nodeType, @Name("overlook") String overLook) throws Exception {
+	public String mapNodes(@Name("nodeSet") String nodeSet, @Name("overlook") String overLook) throws Exception {
 	    String listOfData = "";
 	    String[] overLookArray = new String[0];
 
@@ -1531,7 +1531,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            overLookArray = overLook.split(",");
 	        }
 
-	        queryData(nodeType);
+	        queryData(nodeSet);
 
 	        for (Record key : dataKey) {
 	            List<Pair<String, Value>> values = key.fields();
@@ -1578,7 +1578,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	
 	 /**
      * Procedure for k-means clustering and visualization in neo4j
-     * @param nodeType type of node
+     * @param nodeSet type of node
      * @param numberOfCentroid 
      * @param numberOfInteration
      * @return cluster result and visualize
@@ -1586,32 +1586,35 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
      */
     @UserFunction
     @Description("Kmean clustering function")
-	public String kmean(@Name("nodeType") String nodeType, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
+	public String kmean(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
 	{
     	try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
         {
-			String kMeanAfterClustering = "";
+			String averageSilhouetteCoefficientString = "The average Silhouette Coefficient value is: ";
 			HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
 			int numberOfCentroidInt = Integer.parseInt(numberOfCentroid);
 			int numberOfInterationInt = Integer.parseInt(numberOfInteration);
+			
 			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure);
+			double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
+	        
 			for (String centroid: kmeanAssign.keySet()) {
         		ArrayList<String> clusterNode = kmeanAssign.get(centroid);
         		for (String node : clusterNode)
         		{
-        			connector.connectNodes(nodeType, "create relationship in kmean node",centroid,node);
+        			connector.connectNodes(nodeSet, "create relationship in kmean node",centroid,node);
         		}
-    		    
+		    
     		}
-	        return kMeanAfterClustering ;
+			return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue ;
 		}
 	}
 
     @UserFunction
     @Description("Calculate the mean of the Silhouette Coefficients for all point")
-	public String averageSilhouetteCoefficient(@Name("nodeType") String nodeType, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
+	public String averageSilhouetteCoefficient(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
 	{
-    	if(nodeType != null)
+    	if(nodeSet != null)
     	{
 			String averageSilhouetteCoefficientString = "The average Silhouette Coefficient value is: ";
 			HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
