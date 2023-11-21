@@ -180,24 +180,26 @@ public class ReadCsvTestData {
 
         return doubleArray;
     }
-    public static Double[] calculateKNN(Double[][] pdist,Integer knn_neighbour) {
+    public static Double[] calculateKNN(Double[][] pdist,String knn_neighbour) {
         Double[] sigmas = new Double[pdist.length];
 
         for (int i = 0; i < pdist.length; i++) {
             Double[] sortedDistances = Arrays.copyOf(pdist[i], pdist[i].length);
             Arrays.sort(sortedDistances);
-            sigmas[i] = sortedDistances[knn_neighbour];
+            sigmas[i] = sortedDistances[Integer.parseInt(knn_neighbour)];
         }
 
         return sigmas;
     }
-    public static Double[] calculateLocalSigmas(Double[][] pdist,Integer sigma) {
+    public static Double[] calculateLocalSigmas(Double[][] pdist,String sigma) {
         Double[] sigmas = new Double[pdist.length];
+
+
 
         for (int i = 0; i < pdist.length; i++) {
             Double[] sortedDistances = Arrays.copyOf(pdist[i], pdist[i].length);
             Arrays.sort(sortedDistances, Collections.reverseOrder());
-            sigmas[i] = sortedDistances[sigma];
+            sigmas[i] = sortedDistances[Integer.parseInt(sigma)];
         }
         return sigmas;
     }
@@ -233,12 +235,12 @@ public class ReadCsvTestData {
         ArrayList<String> nodeList = new ArrayList<>();
         // add all the nodes to the nodeList all entries
         for (int i = 0; i < TestDataArrayList.size(); i++) {
-            nodeList.add(i + "");
+            nodeList.add(String.valueOf(TestDataArrayList.get(i)));
         }
         return nodeList;
     }
     public static Double [][] calculateEpsilonNeighbourhoodGraph (Double[][] dist_,Double epsilon){
-        Double[][] adj = new Double[5][5];
+        Double[][] adj = new Double[dist_.length][dist_.length];
         for (int i = 0; i < dist_.length; i++) {
             for (int j = 0; j < dist_[i].length; j++) {
                 if (i == j) {

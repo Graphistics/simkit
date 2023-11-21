@@ -16,18 +16,19 @@ public class DistanceMeasure {
      */
     public static Double[][] calculateManhattanDistance(ArrayList<ArrayList<String>> testData){
         Double[][] distanceMatrix = convertToDoubleArray(testData);
+        Double[][] distanceMatrix_new = new Double[distanceMatrix.length][distanceMatrix.length];
 
         for (int i = 0; i < distanceMatrix.length; i++) {
             for (int j = 0; j < distanceMatrix.length; j++) {
                 if (i == j) {
-                    distanceMatrix[i][j] = 0.0; // Distance to itself is 0
+                    distanceMatrix_new[i][j] = 0.0; // Distance to itself is 0
                 } else {
-                    distanceMatrix[i][j] = manhattanDistance(distanceMatrix[i], distanceMatrix[j]);
+                    distanceMatrix_new[i][j] = manhattanDistance(distanceMatrix[i], distanceMatrix[j]);
                 }
             }
         }
 
-        return distanceMatrix;
+        return distanceMatrix_new;
     }
 
     private static Double manhattanDistance(Double[] distanceMatrix, Double[] distanceMatrix1) {
@@ -43,17 +44,18 @@ public class DistanceMeasure {
 
     public static Double[][] calculateCanberraDistance(ArrayList<ArrayList<String>> testData){
         Double[][] distanceMatrix = convertToDoubleArray(testData);
+        Double[][] distanceMatrix_new = new Double[distanceMatrix.length][distanceMatrix.length];
         for (int i = 0; i < distanceMatrix.length; i++) {
             for (int j = 0; j < distanceMatrix.length; j++) {
                 if (i == j) {
-                    distanceMatrix[i][j] = 0.0; // Distance to itself is 0
+                    distanceMatrix_new[i][j] = 0.0; // Distance to itself is 0
                 } else {
-                    distanceMatrix[i][j] = canberraDistance(distanceMatrix[i], distanceMatrix[j]);
+                    distanceMatrix_new[i][j] = canberraDistance(distanceMatrix[i], distanceMatrix[j]);
                 }
             }
         }
 
-        return distanceMatrix;
+        return distanceMatrix_new;
     }
 
     private static Double canberraDistance(Double[] distanceMatrix, Double[] distanceMatrix1) {
@@ -69,17 +71,18 @@ public class DistanceMeasure {
 
     public static Double[][] calculateCosineSimilarity(ArrayList<ArrayList<String>> testData){
         Double[][] distanceMatrix = convertToDoubleArray(testData);
+        Double[][] distanceMatrix_new = new Double[distanceMatrix.length][distanceMatrix.length];
         for (int i = 0; i < distanceMatrix.length; i++) {
             for (int j = 0; j < distanceMatrix.length; j++) {
                 if (i == j) {
-                    distanceMatrix[i][j] = 0.0; // Distance to itself is 0
+                    distanceMatrix_new[i][j] = 0.0; // Distance to itself is 0
                 } else {
-                    distanceMatrix[i][j] = cosineSimilarity(distanceMatrix[i], distanceMatrix[j]);
+                    distanceMatrix_new[i][j] = cosineSimilarity(distanceMatrix[i], distanceMatrix[j]);
                 }
             }
         }
 
-        return distanceMatrix;
+        return distanceMatrix_new;
     }
 
     private static Double cosineSimilarity(Double[] distanceMatrix, Double[] distanceMatrix1) {
@@ -101,17 +104,18 @@ public class DistanceMeasure {
 
     public static Double[][] calculateJaccardCoefficient(ArrayList<ArrayList<String>> testData){
         Double[][] distanceMatrix = convertToDoubleArray(testData);
+        Double[][] distanceMatrix_new = new Double[distanceMatrix.length][distanceMatrix.length];
         for (int i = 0; i < distanceMatrix.length; i++) {
             for (int j = 0; j < distanceMatrix.length; j++) {
                 if (i == j) {
-                    distanceMatrix[i][j] = 0.0; // Distance to itself is 0
+                    distanceMatrix_new[i][j] = 0.0; // Distance to itself is 0
                 } else {
-                    distanceMatrix[i][j] = jaccardCoefficient(distanceMatrix[i], distanceMatrix[j]);
+                    distanceMatrix_new[i][j] = jaccardCoefficient(distanceMatrix[i], distanceMatrix[j]);
                 }
             }
         }
 
-        return distanceMatrix;
+        return distanceMatrix_new;
     }
 
     private static Double jaccardCoefficient(Double[] distanceMatrix, Double[] distanceMatrix1) {
@@ -132,17 +136,18 @@ public class DistanceMeasure {
         */
     public static Double[][] calculateBrayCurtisDistance(ArrayList<ArrayList<String>> testData){
         Double[][] distanceMatrix = convertToDoubleArray(testData);
+        Double[][] distanceMatrix_new = new Double[distanceMatrix.length][distanceMatrix.length];
         for (int i = 0; i < distanceMatrix.length; i++) {
             for (int j = 0; j < distanceMatrix.length; j++) {
                 if (i == j) {
-                    distanceMatrix[i][j] = 0.0; // Distance to itself is 0
+                    distanceMatrix_new[i][j] = 0.0; // Distance to itself is 0
                 } else {
-                    distanceMatrix[i][j] = brayCurtisDistance(distanceMatrix[i], distanceMatrix[j]);
+                    distanceMatrix_new[i][j] = brayCurtisDistance(distanceMatrix[i], distanceMatrix[j]);
                 }
             }
         }
 
-        return distanceMatrix;
+        return distanceMatrix_new;
     }
 
     private static Double brayCurtisDistance(Double[] distanceMatrix, Double[] distanceMatrix1) {
