@@ -410,12 +410,12 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 				}
 				if(graphType.equals("knnGraph")) {
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
 
 				}
 				if(graphType.equals("MutualKnnGraph")) {
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
 				}
 
@@ -479,13 +479,13 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 				}
 				if(graphType.equals("knnGraph")) {
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
 					graphName = "knnGraph";
 
 				}
 				if(graphType.equals("MutualKnnGraph")) {
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
 					graphName = "mutualKnnGraph";
 				}
@@ -1599,11 +1599,11 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public static void main(String[] args) throws Exception {
 		OutputDecisionTreeNeo4j outputDecisionTreeNeo4j = new OutputDecisionTreeNeo4j();
 		//String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
-		String Filename = "test.csv";
+		String Filename = "D:/de/MASTER_THESIS/SimKit/simkit/dataset_1_iris_numeric/Iris_Mythica_Data_Set.csv";
 		String testDataPath = "C:/Users/abhiv/.Neo4jDesktop/relate-data/dbmss/dbms-7ff4399d-8f4a-48ed-ba21-c30aa62e37b7/import/test.csv";
 
 //		outputDecisionTreeNeo4j.createGraphFromNodes("test","test","connectedGraph",2.0,2,2);
-		outputDecisionTreeNeo4j.createGraph("D:/de/MASTER_THESIS/SimKit/simkit/dataset_1_iris_numeric/Iris_Mythica_Data_Set.csv","manhattanDistance",true,"euclideanDistance",2.0,"0","0");
+		outputDecisionTreeNeo4j.createGraph("C:/Users/abhiv/.Neo4jDesktop/relate-data/dbmss/dbms-7ff4399d-8f4a-48ed-ba21-c30aa62e37b7/import/test.csv","euclideanDistance",true,"knnGraph",2.0,"0","3");
 		//outputDecisionTreeNeo4j.createConnectedGraph(testDataPath, "fully-conncted");
 
 		//test
