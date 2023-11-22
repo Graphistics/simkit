@@ -442,12 +442,12 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 				}
 				if(graphType.equals("knnGraph")) {
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
 
 				}
 				if(graphType.equals("MutualKnnGraph")) {
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
 
 				}
@@ -512,13 +512,13 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 				}
 				if(graphType.equals("knnGraph")) {
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
 					graphName = "knnGraph";
 
 				}
 				if(graphType.equals("MutualKnnGraph")) {
-					Double[] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,knn_neighbour);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
 					graphName = "mutualKnnGraph";
 				}
