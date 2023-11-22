@@ -14,4 +14,3 @@ Plug-in for Neo4j containing user-defined procedures for similarity graph, Lapla
 
 ####################################################
 
-[Dataset 2 - Harth ](https://github.com/ntnu-ai-lab/harth-ml-experiments)
