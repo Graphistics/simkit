@@ -12,7 +12,9 @@ public class NodeList2 {
     }
 
     public NodeList2() {
-	}
+    }
+
+
 
 	public String getIndex() {
         return index;

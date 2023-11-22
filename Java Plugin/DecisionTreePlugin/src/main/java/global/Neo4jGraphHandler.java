@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+import graph.EdgeList;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.Result;
@@ -21,7 +22,7 @@ import definition.EdgeList2;
 import definition.NodeList2;
 
 public class Neo4jGraphHandler {
-  
+
     public static ArrayList<EdgeList2> retrieveEdgeListFromNeo4j(final String nodeType, Driver driver) {
         ArrayList<EdgeList2> edgeList = new ArrayList<>();
 
@@ -32,9 +33,9 @@ public class Neo4jGraphHandler {
             while (result.hasNext()) {
                 Record record = result.next();
 //              Node sourceNode = record.get("n").asNode();
-              Relationship relationship = record.get("r").asRelationship();
+                Relationship relationship = record.get("r").asRelationship();
 //              Node targetNode = record.get("m").asNode();
-              
+
                 String source = record.get("source").asString();
                 String target = record.get("target").asString();
                 double weight = record.get("weight").asDouble();  // Correctly extract the weight property
@@ -58,13 +59,16 @@ public class Neo4jGraphHandler {
         try (Session session = driver.session()) {
             String cypherQuery = "MATCH (n:" + nodeType + ") RETURN n, n.id AS index";
             Result result = session.run(cypherQuery);
+            String index = "";
+            int count = 0;
+
 
             while (result.hasNext()) {
                 Record record = result.next();
                 Node node = record.get("n").asNode();
 
-                String index = record.get("index").asString();
 
+                String index = record.get("index").asString();
                 Map<String, Object> nodeProperties = extractPropertiesFromNode(node);
 
                 NodeList2 nodeObject = new NodeList2(index, nodeProperties);
@@ -76,7 +80,7 @@ public class Neo4jGraphHandler {
         return nodeList;
     }
 
-    
+
     public static void createNodeGraph(String graphType, String message, NodeList2 nodeDetail, Driver driver) {
         final String id = nodeDetail.getIndex();
         final Map<String, Object> properties = nodeDetail.getProperties();
@@ -86,11 +90,12 @@ public class Neo4jGraphHandler {
                 @Override
                 public String execute(Transaction tx) {
                     String cypherQuery = "CREATE (:" + graphType + " {id: $id";
+
                     
                     for (Map.Entry<String, Object> entry : properties.entrySet()) {
                         cypherQuery += ", " + entry.getKey() + ": $" + entry.getKey();
                     }
-                    
+
                     cypherQuery += "})";
 
                     Map<String, Object> parameters = new HashMap<>();
@@ -107,6 +112,7 @@ public class Neo4jGraphHandler {
     }
 
     public static void createRelationshipGraph(String graphType, String message, EdgeList2 edgeListDetail, Driver driver) {
+
         final String source = edgeListDetail.getSource();
         final String target = edgeListDetail.getTarget();
         double weightValue = (double) Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
@@ -163,7 +169,5 @@ public class Neo4jGraphHandler {
         }
 
         return properties;
-    } 
-
-    
+    }
 }
