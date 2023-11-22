@@ -33,6 +33,7 @@ public class GraphTransform {
             }
         }
 
+
         return distanceMatrix;
 
     }
@@ -62,10 +63,10 @@ public class GraphTransform {
         return doubleArray;
     }
 
-
+    
     public static Double[][] euclideanDistance(List<NodeList2> nodeList) {
 
-        int size = nodeList.size();
+    	int size = nodeList.size();
         Double[][] distanceMatrix = new Double[size][size];
 
         for (int i = 0; i < size; i++) {
@@ -95,28 +96,28 @@ public class GraphTransform {
         return Math.sqrt(sum);
     }
 
-
+    
     public static Double[][] calculateAdjMatrix(Double[][] distanceMatrix, String method, Double epsilon) {
         try {
-            Double[][] adj_mat;
-            Double[] knn;
-            Double[] sigmas;
+        	Double[][] adj_mat;
+        	Double[] knn;
+        	Double[] sigmas;
 
             switch (method) {
                 case "FULLY_CONNECTED":
-                    sigmas = calculateLocalSigmas(distanceMatrix);
+                	sigmas = calculateLocalSigmas(distanceMatrix);
                     adj_mat = calculateAdjacencyMatrix(distanceMatrix, sigmas);
                     break;
                 case "EPSILON":
-                    adj_mat = calculateEpsilonNeighbourhoodGraph(distanceMatrix,epsilon);;
+                	adj_mat = calculateEpsilonNeighbourhoodGraph(distanceMatrix,epsilon);;
                     break;
                 case "KNN":
-                    knn = calculateKNN(distanceMatrix);
-                    adj_mat = calculateKNNGraph(distanceMatrix,knn);
+    				knn = calculateKNN(distanceMatrix);
+    				adj_mat = calculateKNNGraph(distanceMatrix,knn);
                     break;
                 case "MUTUAL_KNN":
-                    knn = calculateKNN(distanceMatrix);
-                    adj_mat = calculateMutualKNNGraph(distanceMatrix,knn);
+                	knn = calculateKNN(distanceMatrix);
+    				adj_mat = calculateMutualKNNGraph(distanceMatrix,knn);
                     break;
                 default:
                     throw new IllegalArgumentException("Invalid graph tranfsorm algorithm choice.");
@@ -229,8 +230,8 @@ public class GraphTransform {
 
         return adj;
     }
-
-
+    
+    
     public static ArrayList<EdgeList> calulateEdgeList(Double[][] adj_mat) {
         ArrayList<EdgeList> edgeList = new ArrayList<>();
 
@@ -264,19 +265,19 @@ public class GraphTransform {
         return nodeList;
     }
 
-
+    
+    
     public static ArrayList<EdgeList2> calculateEdgeList(List<NodeList2> nodePropertiesList, Double[][] adj_mat) {
         ArrayList<EdgeList2> edgeList = new ArrayList<>();
 
         for (int i = 0; i < adj_mat.length; i++) {
             for (int j = i + 1; j < adj_mat[i].length; j++) {
                 String sourceId = nodePropertiesList.get(i).getIndex();
-                String targetId = nodePropertiesList.get(j).getIndex();
+
                 edgeList.add(new EdgeList2(sourceId, targetId, adj_mat[i][j], i, null));
             }
         }
         return edgeList;
     }
-
 
 }

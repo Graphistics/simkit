@@ -57,6 +57,7 @@ public class EdgeList2 {
         this.relationshipProperties = relationshipProperties;
     }
 
+
     @Override
     public String toString() {
         return "EdgeList{" +
@@ -68,3 +69,4 @@ public class EdgeList2 {
                 '}';
     }
 }
+

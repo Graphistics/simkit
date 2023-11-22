@@ -62,13 +62,13 @@ public class Neo4jGraphHandler {
             String index = "";
             int count = 0;
 
+
             while (result.hasNext()) {
                 Record record = result.next();
                 Node node = record.get("n").asNode();
 
-                index = String.valueOf(count);
-                count++;
 
+                String index = record.get("index").asString();
                 Map<String, Object> nodeProperties = extractPropertiesFromNode(node);
 
                 NodeList2 nodeObject = new NodeList2(index, nodeProperties);
@@ -91,6 +91,7 @@ public class Neo4jGraphHandler {
                 public String execute(Transaction tx) {
                     String cypherQuery = "CREATE (:" + graphType + " {id: $id";
 
+                    
                     for (Map.Entry<String, Object> entry : properties.entrySet()) {
                         cypherQuery += ", " + entry.getKey() + ": $" + entry.getKey();
                     }
@@ -111,10 +112,11 @@ public class Neo4jGraphHandler {
     }
 
     public static void createRelationshipGraph(String graphType, String message, EdgeList2 edgeListDetail, Driver driver) {
-        final String source = String.valueOf(edgeListDetail.getSource());
-        final String target = String.valueOf(edgeListDetail.getTarget());
-        double weightValue = (double) Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
 
+        final String source = edgeListDetail.getSource();
+        final String target = edgeListDetail.getTarget();
+        double weightValue = (double) Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
+        
         try (Session session = driver.session()) {
             session.writeTransaction(new TransactionWork<Void>() {
                 @Override
@@ -168,6 +170,4 @@ public class Neo4jGraphHandler {
 
         return properties;
     }
-
-
 }
