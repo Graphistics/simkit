@@ -26,9 +26,16 @@ public class ReadCsvTestData {
         CSVFormat csvFormat = CSVFormat.DEFAULT.builder().build();
         Iterable<CSVRecord> records = csvFormat.parse(in);
         ArrayList<String> headers = new ArrayList<>();
+        Pattern pattern = Pattern.compile(".*\\..*");
         for (CSVRecord record : records) {
             for (int i = 0; i < record.size(); i++) {
-                headers.add(record.get(i));
+
+                if(pattern.matcher(record.get(i)).matches()){
+                    headers.add(record.get(i).replace(".","_"));
+                }else {
+                    headers.add(record.get(i));
+                }
+
             }
             break;
         }
@@ -74,6 +81,34 @@ public class ReadCsvTestData {
 
         return csvFilerow;
     }
+    public ArrayList<ArrayList<String>> readCsvFileNewString(String dataPath,Boolean indexColumn,List<String> classTypes) throws IOException {
+        Reader in = new FileReader(dataPath);
+        ArrayList<String> header = readCSVHeader(dataPath);
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader(header.toString()).setSkipHeaderRecord(true).build();
+        Iterable<CSVRecord> records = csvFormat.parse(in);
+
+        ArrayList<ArrayList<String>>  csvFilerow =  new ArrayList<ArrayList<String>>();
+
+        // read csv file without header
+        for (CSVRecord record : records) {
+            ArrayList<String> TestDataArrayList = new ArrayList<>();
+            for(int i = 0; i < header.size(); i++){
+                if(indexColumn && i==0){
+                    continue;
+                }
+                if(i==header.size()-1){
+
+                }
+                if(record.get(i).matches(".*[a-zA-Z].*")){
+                    continue;
+                }
+                TestDataArrayList.add(record.get(i));
+            }
+            csvFilerow.add(TestDataArrayList);
+        }
+
+        return csvFilerow;
+    }
 
 
 
@@ -103,7 +138,7 @@ public class ReadCsvTestData {
     public static Double[][] euclidianDistance(ArrayList<ArrayList<String>> TestDataArrayList){
 
 
-        double[][] doubleList = convertToDoubleArray(TestDataArrayList);
+        Double[][] doubleList = convertToDoubleArray(TestDataArrayList);
 
         Double[][] distanceMatrix = new Double[doubleList.length][doubleList.length];
 
@@ -121,7 +156,7 @@ public class ReadCsvTestData {
 
     }
 
-    private static double euclideanDistance(double[] point1, double[] point2) {
+    private static double euclideanDistance(Double[] point1, Double[] point2) {
         double sum = 0.0;
         for (int i = 0; i < point1.length; i++) {
             double diff = point1[i] - point2[i];
@@ -130,11 +165,11 @@ public class ReadCsvTestData {
 
         return Math.sqrt(sum);
     }
-    public static double[][] convertToDoubleArray(ArrayList<ArrayList<String>> arrayList) {
+    public static Double[][] convertToDoubleArray(ArrayList<ArrayList<String>> arrayList) {
         int numRows = arrayList.size();
         int numCols = arrayList.get(0).size(); // Assuming all inner lists have the same size
 
-        double[][] doubleArray = new double[numRows][numCols];
+        Double[][] doubleArray = new Double[numRows][numCols];
 
         for (int i = 0; i < numRows; i++) {
             ArrayList<String> row = arrayList.get(i);
@@ -145,24 +180,26 @@ public class ReadCsvTestData {
 
         return doubleArray;
     }
-    public static Double[] calculateKNN(Double[][] pdist) {
-        Double[] sigmas = new Double[5];
-
-        for (int i = 0; i < pdist.length; i++) {
-            Double[] sortedDistances = Arrays.copyOf(pdist[i], pdist[i].length);
-            Arrays.sort(sortedDistances);
-            sigmas[i] = sortedDistances[1];
-        }
-
-        return sigmas;
-    }
-    public static Double[] calculateLocalSigmas(Double[][] pdist) {
+    public static Double[] calculateKNN(Double[][] pdist,String knn_neighbour) {
         Double[] sigmas = new Double[pdist.length];
 
         for (int i = 0; i < pdist.length; i++) {
             Double[] sortedDistances = Arrays.copyOf(pdist[i], pdist[i].length);
+            Arrays.sort(sortedDistances);
+            sigmas[i] = sortedDistances[Integer.parseInt(knn_neighbour)];
+        }
+
+        return sigmas;
+    }
+    public static Double[] calculateLocalSigmas(Double[][] pdist,String sigma) {
+        Double[] sigmas = new Double[pdist.length];
+
+
+
+        for (int i = 0; i < pdist.length; i++) {
+            Double[] sortedDistances = Arrays.copyOf(pdist[i], pdist[i].length);
             Arrays.sort(sortedDistances, Collections.reverseOrder());
-            sigmas[i] = sortedDistances[2];
+            sigmas[i] = sortedDistances[Integer.parseInt(sigma)];
         }
         return sigmas;
     }
@@ -193,16 +230,17 @@ public class ReadCsvTestData {
         }
             return edgeList;
     }
+
     public static ArrayList<String> getNodeList(ArrayList<ArrayList<String>> TestDataArrayList) {
         ArrayList<String> nodeList = new ArrayList<>();
         // add all the nodes to the nodeList all entries
         for (int i = 0; i < TestDataArrayList.size(); i++) {
-            nodeList.add(i + "");
+            nodeList.add(String.valueOf(TestDataArrayList.get(i)));
         }
         return nodeList;
     }
     public static Double [][] calculateEpsilonNeighbourhoodGraph (Double[][] dist_,Double epsilon){
-        Double[][] adj = new Double[5][5];
+        Double[][] adj = new Double[dist_.length][dist_.length];
         for (int i = 0; i < dist_.length; i++) {
             for (int j = 0; j < dist_[i].length; j++) {
                 if (i == j) {
@@ -240,6 +278,29 @@ public class ReadCsvTestData {
 
         return adj;
     }
+    public static Double[][] calculateMutualKNNGraph(Double[][] dist_,Double [] knn){
+
+        Double[][] adj = new Double[dist_.length][dist_[0].length];
+        //calculateMutualKNNGraph
+        for (int i = 0; i < dist_.length; i++) {
+            for (int j = 0; j < dist_[i].length; j++) {
+                if (i == j) {
+                    adj[i][j] = 0.0;
+                    continue;
+                }
+                if (Objects.equals(dist_[i][j], knn[i]) && dist_[j][i] == knn[j]){
+                    adj[i][j] = 1.0;
+                }
+                else {
+                    adj[i][j] = 0.0;
+                }
+            }
+        }
+
+
+
+        return adj;
+    }
 
 
 
@@ -248,11 +309,13 @@ public class ReadCsvTestData {
         String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
         String dataPath1 = "D:/de/MASTER_THESIS/SimKit/simkit/dataset_1_iris_numeric/Iris_Mythica_Data_Set.csv";
 
-        ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
-        ArrayList<ArrayList<String>> arrayLists = readCsvTestData.readCsvFileNew(dataPath,true);
+        ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath1);
+        ArrayList<ArrayList<String>> arrayLists = readCsvTestData.readCsvFileNew(dataPath1,true);
         Double[][] dist_array = euclidianDistance(arrayLists);
-        Double[] sigmas = calculateLocalSigmas(dist_array);
-        calculateAdjacencyMatrix(dist_array,sigmas);
+//        Double[] sigmas = calculateLocalSigmas(dist_array);
+//        Double[][] adj_mat = calculateAdjacencyMatrix(dist_array,sigmas);
+//        Double[][] adj_mat_eps = calculateEpsilonNeighbourhoodGraph(dist_array,5.0);
+
 
 
 
