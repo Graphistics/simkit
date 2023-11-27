@@ -18,19 +18,19 @@ import eigendecomposed.EigenCalculation.EigenResult;
 public class EigenGap {
 
     public static void main(String[] args) {
-        EigenGap eigenGap = new EigenGap();
-
-        EigenResult eigenResult = EigenCalculation.calculateEigen(null);
-		double[] eigenvalues = eigenResult.eigenvalues;
-		DefaultCategoryDataset dataset = eigenGap.calculateEigenGapSpectrum(eigenvalues);
-		eigenGap.visualizeEigenGapSpectrum(dataset);
-
-		// Print eigen gap values
-		printEigenGapValues(eigenvalues);
-
-		// Print and identify the largest eigen gap
-		double largestEigenGap = findLargestEigenGap(eigenvalues);
-		System.out.println("Largest Eigen Gap: " + largestEigenGap);
+//        EigenGap eigenGap = new EigenGap();
+//
+//        EigenResult eigenResult = EigenCalculation.calculateEigen(null);
+//		double[] eigenvalues = eigenResult.eigenvalues;
+//		DefaultCategoryDataset dataset = eigenGap.calculateEigenGapSpectrum(eigenvalues);
+//		eigenGap.visualizeEigenGapSpectrum(dataset);
+//
+//		// Print eigen gap values
+//		printEigenGapValues(eigenvalues);
+//
+//		// Print and identify the largest eigen gap
+//		double largestEigenGap = findLargestEigenGap(eigenvalues);
+//		System.out.println("Largest Eigen Gap: " + largestEigenGap);
     }
 
     public DefaultCategoryDataset calculateEigenGapSpectrum(double[] eigenvalues) {

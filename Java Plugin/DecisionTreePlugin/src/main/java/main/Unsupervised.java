@@ -198,7 +198,7 @@ public class Unsupervised {
 	    }
 	    for(int i = 0; i < listOfRemain.size(); i ++)
 	    {
-	    	if(listOfCentroid.contains(listOfRemain.get(i)));
+	    	if(listOfCentroid.contains(listOfRemain.get(i)))
 	    	{
 	    		listOfRemain.remove(i);
 	    	}

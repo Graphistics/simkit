@@ -26,7 +26,7 @@ public class Neo4jGraphHandler {
         ArrayList<EdgeList2> edgeList = new ArrayList<>();
 
         try (Session session = driver.session()) {
-            String cypherQuery = "MATCH (n:" + nodeType + ")-[r]->(m:" + nodeType + ") RETURN n, m, r, n.id AS source, m.id AS target, r.weight AS weight, id(r) AS index";
+            String cypherQuery = "MATCH (n:" + nodeType + ")-[r]->(m:" + nodeType + ") RETURN n, m, r, toString(n.id) AS source, toString(m.id) AS target, r.value AS weight, id(r) AS index";
             Result result = session.run(cypherQuery);
 
             while (result.hasNext()) {
@@ -37,7 +37,7 @@ public class Neo4jGraphHandler {
               
                 String source = record.get("source").asString();
                 String target = record.get("target").asString();
-                double weight = record.get("weight").asDouble();  // Correctly extract the weight property
+                double weight = record.get("weight").asDouble(); 
                 long index = record.get("index").asLong();
 
                 Map<String, Object> relationshipProperties = extractPropertiesFromRelationship(relationship);
@@ -56,7 +56,7 @@ public class Neo4jGraphHandler {
         ArrayList<NodeList2> nodeList = new ArrayList<>();
 
         try (Session session = driver.session()) {
-            String cypherQuery = "MATCH (n:" + nodeType + ") RETURN n, n.id AS index";
+            String cypherQuery = "MATCH (n:" + nodeType + ") RETURN n, toString(n.id) AS index";
             Result result = session.run(cypherQuery);
 
             while (result.hasNext()) {
@@ -117,7 +117,7 @@ public class Neo4jGraphHandler {
                 public Void execute(Transaction tx) {
                     Result result = tx.run(
                             "MATCH (n:" + graphType + " {id: $source}), (m:" + graphType + " {id: $target}) " +
-                                    "CREATE (n)-[r:`link` {weight: $weightValue}]->(m)",
+                                    "CREATE (n)-[r:`link` {value: $weightValue}]->(m)",
                             parameters("source", source, "target", target, "weightValue", weightValue)
                     );
                     return null;
