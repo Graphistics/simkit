@@ -273,7 +273,7 @@ public class GraphTransform {
         for (int i = 0; i < adj_mat.length; i++) {
             for (int j = i + 1; j < adj_mat[i].length; j++) {
                 String sourceId = nodePropertiesList.get(i).getIndex();
-
+                String targetId = nodePropertiesList.get(j).getIndex();
                 edgeList.add(new EdgeList2(sourceId, targetId, adj_mat[i][j], i, null));
             }
         }

@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-import graph.EdgeList;
+//import graph.EdgeList;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.Result;
@@ -67,8 +67,7 @@ public class Neo4jGraphHandler {
                 Record record = result.next();
                 Node node = record.get("n").asNode();
 
-
-                String index = record.get("index").asString();
+                index = record.get("index").asString();
                 Map<String, Object> nodeProperties = extractPropertiesFromNode(node);
 
                 NodeList2 nodeObject = new NodeList2(index, nodeProperties);
