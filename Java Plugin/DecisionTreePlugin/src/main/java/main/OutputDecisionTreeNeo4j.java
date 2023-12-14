@@ -2051,8 +2051,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public static void main(String[] args) throws Exception {
 		OutputDecisionTreeNeo4j outputDecisionTreeNeo4j = new OutputDecisionTreeNeo4j();
 		String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
-		outputDecisionTreeNeo4j.createGraph(dataPath,"euclideanDistance",true,"ConnectedGraph","2");
-//		outputDecisionTreeNeo4j.createGraphFromNodes("test","euclideanDistance","euclideanDistance","2");
+//		outputDecisionTreeNeo4j.createGraph(dataPath,"euclideanDistance",true,"ConnectedGraph","2");
+		outputDecisionTreeNeo4j.createGraphFromNodes("test","euclideanDistance","EpsilonGraph","2");
 
 	}
 }

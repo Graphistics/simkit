@@ -59,7 +59,7 @@ public class Neo4jGraphHandler {
         try (Session session = driver.session()) {
             String cypherQuery = "MATCH (n:" + nodeType + ") RETURN n, n.id AS index";
             Result result = session.run(cypherQuery);
-            String index = "";
+            String index;
             int count = 0;
 
 
@@ -67,11 +67,12 @@ public class Neo4jGraphHandler {
                 Record record = result.next();
                 Node node = record.get("n").asNode();
 
-                index = record.get("index").asString();
+//                index = record.get("index").asString();
+                index = String.valueOf(count);
                 Map<String, Object> nodeProperties = extractPropertiesFromNode(node);
-
                 NodeList2 nodeObject = new NodeList2(index, nodeProperties);
                 nodeList.add(nodeObject);
+                count++;
             }
         } catch (Neo4jException e) {
             throw new RuntimeException("Error retrieving node data from Neo4j for label: " + nodeType + ", Error: " + e.getMessage());
