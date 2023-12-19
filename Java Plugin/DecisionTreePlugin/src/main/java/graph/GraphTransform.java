@@ -16,27 +16,27 @@ import definition.NodeList2;
 public class GraphTransform {
     public String dataPath;
 
-    public static Double[][] euclidianDistance(ArrayList<ArrayList<String>> TestDataArrayList){
-
-
-        double[][] doubleList = convertToDoubleArray(TestDataArrayList);
-
-        Double[][] distanceMatrix = new Double[doubleList.length][doubleList.length];
-
-        for (int i = 0; i < doubleList.length; i++) {
-            for (int j = 0; j < doubleList.length; j++) {
-                if (i == j) {
-                    distanceMatrix[i][j] = 0.0; // Distance to itself is 0
-                } else {
-                    distanceMatrix[i][j] = euclideanDistance(doubleList[i], doubleList[j]);
-                }
-            }
-        }
-
-
-        return distanceMatrix;
-
-    }
+//    public static Double[][] euclidianDistance(ArrayList<ArrayList<String>> TestDataArrayList){
+//
+//
+//        double[][] doubleList = convertToDoubleArray(TestDataArrayList);
+//
+//        Double[][] distanceMatrix = new Double[doubleList.length][doubleList.length];
+//
+//        for (int i = 0; i < doubleList.length; i++) {
+//            for (int j = 0; j < doubleList.length; j++) {
+//                if (i == j) {
+//                    distanceMatrix[i][j] = 0.0; // Distance to itself is 0
+//                } else {
+//                    distanceMatrix[i][j] = euclideanDistance(doubleList[i], doubleList[j]);
+//                }
+//            }
+//        }
+//
+//
+//        return distanceMatrix;
+//
+//    }
 
     private static double euclideanDistance(double[] point1, double[] point2) {
         double sum = 0.0;
