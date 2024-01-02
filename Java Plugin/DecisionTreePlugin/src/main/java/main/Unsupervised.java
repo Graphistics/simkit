@@ -316,7 +316,7 @@ public class Unsupervised {
 	    return hashClusterAssign;
 	}
 
-	private static double calculateDistance(String point1, String point2, String distanceMeasure) {
+	static double calculateDistance(String point1, String point2, String distanceMeasure) {
 	    switch (distanceMeasure.toLowerCase()) {
 	        case "manhattan":
 	            return calManhattanDist(point1, point2);

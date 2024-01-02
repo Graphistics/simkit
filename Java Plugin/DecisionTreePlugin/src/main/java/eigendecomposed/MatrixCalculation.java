@@ -107,10 +107,10 @@ public class MatrixCalculation {
             RealMatrix laplacianMatrix;
 
             switch (algorithm) {
-                case "SYMMETRIC":
+                case "sym":
                     laplacianMatrix = calculateSymmetricLaplacianMatrix(degreeMatrix, adjacencyMatrix);
                     break;
-                case "RANDOM_WALK":
+                case "rw":
                     laplacianMatrix = calculateRandomWalkLaplacianMatrix(degreeMatrix, adjacencyMatrix);
                     break;
                 default:

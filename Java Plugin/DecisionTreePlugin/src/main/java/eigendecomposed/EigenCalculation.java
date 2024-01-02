@@ -10,6 +10,7 @@ import org.apache.commons.math4.legacy.linear.BlockRealMatrix;
 import org.apache.commons.math4.legacy.linear.EigenDecomposition;
 import org.apache.commons.math4.legacy.linear.MatrixUtils;
 import org.apache.commons.math4.legacy.linear.RealMatrix;
+import org.apache.commons.math4.legacy.linear.RealVector;
 
 import definition.EdgeList2;
 import definition.NodeList2;
@@ -74,43 +75,8 @@ public class EigenCalculation {
         }
     }
     
-//    public static EigenResult calculateEigen(RealMatrix laplacianMatrix, double userDefinedK) {
-//        try {
-//            EigenDecomposition eigenDecomposition = new EigenDecomposition(laplacianMatrix);
-//            RealMatrix v = eigenDecomposition.getV();
-//            double[] e = eigenDecomposition.getRealEigenvalues();
-//
-//            // Sort eigenvalues and eigenvectors in ascending order
-//            Integer[] sortedIndices = new Integer[e.length];
-//            for (int i = 0; i < e.length; i++) {
-//                sortedIndices[i] = i;
-//            }
-//
-//            Arrays.sort(sortedIndices, Comparator.comparingDouble(index -> e[index]));
-//
-//            double[] sortedEigenvalues = new double[e.length];
-//            RealMatrix sortedEigenvectors = new BlockRealMatrix(v.getRowDimension(), v.getColumnDimension());
-//
-//            for (int i = 0; i < e.length; i++) {
-//                int originalIndex = sortedIndices[i];
-//                sortedEigenvalues[i] = e[originalIndex];
-//                sortedEigenvectors.setColumnVector(i, v.getColumnVector(originalIndex));
-//            }
-//
-//            int dimension = laplacianMatrix.getColumnDimension();
-//            int k = (int) ((userDefinedK > 0) ? userDefinedK : calculateOptimalK(sortedEigenvalues));
-//            RealMatrix X = sortedEigenvectors.getSubMatrix(0, dimension - 1, dimension - k, dimension - 1);
-//            return new EigenResult(sortedEigenvalues, sortedEigenvectors, X);
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            return new EigenResult(new double[0], MatrixUtils.createRealMatrix(0, 0), MatrixUtils.createRealMatrix(0, 0));
-//        }
-//    }
 
     private static int calculateOptimalK(double[] eigenvalues) {
-        // Your logic to determine the optimal value of k using eigen gap
-        // For example, you can use the largest eigen gap or a different criterion
-        // Here, I'm using the largest eigen gap as an example
         double largestEigenGap = EigenGap.findLargestEigenGap(eigenvalues);
         return (int) Math.round(largestEigenGap);
     }
@@ -140,25 +106,64 @@ public class EigenCalculation {
         System.out.println();
     }
     
-    public static ArrayList<EdgeList2> createEdgeList(List<NodeList2> nodePropertiesList, RealMatrix eigenvectors, double threshold) {
+    public static ArrayList<EdgeList2> createEdgeList(List<NodeList2> nodePropertiesList, RealMatrix X) {
         ArrayList<EdgeList2> edgeList = new ArrayList<>();
 
-        int numRows = eigenvectors.getRowDimension();
+        int numRows = X.getRowDimension();
+        Double[][] distanceMatrix = euclideanDistance(X);
 
         for (int i = 0; i < numRows; i++) {
             for (int j = i + 1; j < numRows; j++) {
-                double value = eigenvectors.getEntry(i, j);
+                double distance = distanceMatrix[i][j];
 
-                if (Math.abs(value) >= threshold) {
                     String sourceId = nodePropertiesList.get(i).getIndex();
                     String targetId = nodePropertiesList.get(j).getIndex();
-                    edgeList.add(new EdgeList2(sourceId, targetId, value, i, null));
-                }
+                    edgeList.add(new EdgeList2(sourceId, targetId, distance, i, null));
             }
         }
 
         return edgeList;
     }
+
+    public static Double[][] euclideanDistance(RealMatrix X) {
+        int size = X.getRowDimension();
+        Double[][] distanceMatrix = new Double[size][size];
+
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                double distance = calculateEuclideanDistance(X.getRowVector(i), X.getRowVector(j));
+                distanceMatrix[i][j] = distance;
+            }
+        }
+        return distanceMatrix;
+    }
+
+    private static double calculateEuclideanDistance(RealVector v1, RealVector v2) {
+        return v1.getDistance(v2);
+    }
+
+
+
+    
+//    public static ArrayList<EdgeList2> createEdgeList(List<NodeList2> nodePropertiesList, RealMatrix eigenvectors, double threshold) {
+//        ArrayList<EdgeList2> edgeList = new ArrayList<>();
+//
+//        int numRows = eigenvectors.getRowDimension();
+//
+//        for (int i = 0; i < numRows; i++) {
+//            for (int j = i + 1; j < numRows; j++) {
+//                double value = eigenvectors.getEntry(i, j);
+//
+//                if (Math.abs(value) >= threshold) {
+//                    String sourceId = nodePropertiesList.get(i).getIndex();
+//                    String targetId = nodePropertiesList.get(j).getIndex();
+//                    edgeList.add(new EdgeList2(sourceId, targetId, value, i, null));
+//                }
+//            }
+//        }
+//
+//        return edgeList;
+//    }
 
 
     public static ArrayList<NodeList2> createNodeList(RealMatrix eigenvectors, double threshold) {

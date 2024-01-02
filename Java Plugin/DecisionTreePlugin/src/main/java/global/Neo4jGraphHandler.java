@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.math4.legacy.linear.RealMatrix;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.Result;
@@ -76,6 +77,38 @@ public class Neo4jGraphHandler {
         return nodeList;
     }
 
+    public static void createNodeGraph(String graphType, String message, NodeList2 nodeDetail, RealMatrix X, Driver driver) {
+        final String id = nodeDetail.getIndex();
+        final Map<String, Object> properties = nodeDetail.getProperties();
+
+        for (int i = 0; i < X.getColumnDimension(); i++) {
+            properties.put("eigenvector_" + i, X.getEntry(Integer.parseInt(id), i));
+        }
+
+        try (Session session = driver.session()) {
+            session.writeTransaction(new TransactionWork<String>() {
+                @Override
+                public String execute(Transaction tx) {
+                    String cypherQuery = "CREATE (:" + graphType + " {id: $id";
+                    
+                    for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                        cypherQuery += ", " + entry.getKey() + ": $" + entry.getKey();
+                    }
+                    
+                    cypherQuery += "})";
+
+                    Map<String, Object> parameters = new HashMap<>();
+                    parameters.put("id", id);
+                    for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                        parameters.put(entry.getKey(), entry.getValue());
+                    }
+
+                    Result result = tx.run(cypherQuery, parameters);
+                    return message;
+                }
+            });
+        }
+    }
     
     public static void createNodeGraph(String graphType, String message, NodeList2 nodeDetail, Driver driver) {
         final String id = nodeDetail.getIndex();
