@@ -419,8 +419,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				ReadCsvTestData readCsvTestData = new ReadCsvTestData(data_path);
 //				//ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(data_path,IndexColumn);
 				ArrayList<NodeList2> nodePropertiesList = readCsvTestData.readCsvFileToMap(data_path);
-                ArrayList<NodeList2> nodePropertiesList_copy = readCsvTestData.readCsvFileToMap(data_path);
-				Double[][] DistanceMatrix = getDistanceMatrixFromNodes(distance_measure,nodePropertiesList_copy,removeListNew);
+//                ArrayList<NodeList2> nodePropertiesList_copy = readCsvTestData.readCsvFileToMap(data_path);
+				Double[][] DistanceMatrix = getDistanceMatrixFromNodes(distance_measure,nodePropertiesList,removeListNew);
 
 				if(graph_type.equals("full")) {
 					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,epsilon);
@@ -477,11 +477,11 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			}else {
 				String graphName = null;
 				ArrayList<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
-				ArrayList<NodeList2> nodePropertiesList_copy = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
+//				ArrayList<NodeList2> nodePropertiesList_copy = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
 				String[] removeList = remove_columns.split(",");
 				List<String> removeListNew = Arrays.stream(removeList).collect(Collectors.toList());
 //				Double[][] DistanceMatrix = GraphTransform.euclideanDistance(nodePropertiesList);
-				Double[][] DistanceMatrix = getDistanceMatrixFromNodes(distanceMeasure,nodePropertiesList_copy,removeListNew);
+				Double[][] DistanceMatrix = getDistanceMatrixFromNodes(distanceMeasure,nodePropertiesList,removeListNew);
 				Double[][] adj_mat = null;
 
 				if(graphType.equals("full")) {
@@ -2042,8 +2042,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public static void main(String[] args) throws Exception {
 		OutputDecisionTreeNeo4j outputDecisionTreeNeo4j = new OutputDecisionTreeNeo4j();
 		String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
-		outputDecisionTreeNeo4j.createGraphFromCsv(dataPath,"euclidean","full","2","class,points");
-//		outputDecisionTreeNeo4j.createGraphFromNodes("test","euclideanDistance","EpsilonGraph","2");
+//		outputDecisionTreeNeo4j.createGraphFromCsv(dataPath,"euclidean","full","2","class,points");
+		outputDecisionTreeNeo4j.createGraphFromNodes("test","euclidean","full","3","class,points");
 
 	}
 }
