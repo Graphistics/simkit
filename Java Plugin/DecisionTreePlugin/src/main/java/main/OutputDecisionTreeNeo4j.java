@@ -574,54 +574,54 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 
 
-//	@UserFunction
-//	public String createConnectedGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn) throws Exception {
-//
-//		String confusionMatrix = "";
-//		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
-//		{
-//
-//
-//			if(dataPath == null && distanceMeasure == null) {
-//				return "Missing dataPath or distance measure type";
-//			}else {
-//				ReadCsvFile readCsvTestData = new ReadCsvFile(dataPath);
-//				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
-//
-//				Double[][] DistanceMatrix = ReadCsvFile.euclidianDistance(testData);
-//				Double[] sigmas = ReadCsvFile.calculateLocalSigmas(DistanceMatrix);
-//				Double[][] adj_mat = ReadCsvFile.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-//
-//				ArrayList<String> nodeList = ReadCsvFile.getNodeList(testData);
-//				ArrayList<EdgeList> edgeList = ReadCsvFile.calulateEdgeList(adj_mat);
-//
-//
-//
-//				for (String nodeDetail : nodeList) {
-//
-//					connector.createNodeConnectedGraph("connectedGraph", "created nodes in neo4j", nodeDetail);
-//				}
-//
-//				//for (EdgeList edgeListDetail : edgeList) {
-//				for (int i = 0; i < edgeList.size()-1; i++) {
-//					EdgeList edgeListDetail = edgeList.get(i);
-////					ArrayList<String> relationshipDetail = new ArrayList<>();
-////					relationshipDetail.add(String.valueOf(edgeListDetail.getSource()));
-////					relationshipDetail.add(String.valueOf(edgeListDetail.getTarget()));
-////					relationshipDetail.add(String.valueOf(edgeListDetail.getWeight()));
-////					String testCypherQuery = "MATCH (a:" + dtType + "), (b:" + dtType + ") " +
-////							"WHERE a.id = "+"\"" +"Index"+edgeListDetail.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
-////							"CREATE (a)-[r:" + edgeListDetail.getWeight() + "]->(b)";
-//					connector.createRelationshipConnectedGraph("Index", "created relationship in neo4j \n", edgeListDetail);
-//				}
-//
-//			}
-//			return "Create fully connected graph successful, " + confusionMatrix;
-//		} catch (Exception e) {
-//			throw new RuntimeException(e);
-//		}
-//
-//	}
+	@UserFunction
+	public String createConnectedGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn) throws Exception {
+
+		String confusionMatrix = "";
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		{
+
+
+			if(dataPath == null && distanceMeasure == null) {
+				return "Missing dataPath or distance measure type";
+			}else {
+				ReadCsvFile readCsvTestData = new ReadCsvFile(dataPath);
+				ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(dataPath,IndexColumn);
+
+				Double[][] DistanceMatrix = ReadCsvFile.euclidianDistance(testData);
+				Double[] sigmas = ReadCsvFile.calculateLocalSigmas(DistanceMatrix);
+				Double[][] adj_mat = ReadCsvFile.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
+
+				ArrayList<String> nodeList = ReadCsvFile.getNodeList(testData);
+				ArrayList<EdgeList> edgeList = ReadCsvFile.calulateEdgeList(adj_mat);
+
+
+
+				for (String nodeDetail : nodeList) {
+
+					connector.createNodeConnectedGraph("connectedGraph", "created nodes in neo4j", nodeDetail,1);
+				}
+
+				//for (EdgeList edgeListDetail : edgeList) {
+				for (int i = 0; i < edgeList.size()-1; i++) {
+					EdgeList edgeListDetail = edgeList.get(i);
+//					ArrayList<String> relationshipDetail = new ArrayList<>();
+//					relationshipDetail.add(String.valueOf(edgeListDetail.getSource()));
+//					relationshipDetail.add(String.valueOf(edgeListDetail.getTarget()));
+//					relationshipDetail.add(String.valueOf(edgeListDetail.getWeight()));
+//					String testCypherQuery = "MATCH (a:" + dtType + "), (b:" + dtType + ") " +
+//							"WHERE a.id = "+"\"" +"Index"+edgeListDetail.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
+//							"CREATE (a)-[r:" + edgeListDetail.getWeight() + "]->(b)";
+					connector.createRelationshipConnectedGraph("Index", "created relationship in neo4j \n", edgeListDetail);
+				}
+
+			}
+			return "Create fully connected graph successful, " + confusionMatrix;
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+
+	}
 //
 //	@UserFunction
 //	public String createEpsilonGraph(@Name("dataPath") String dataPath,@Name("distanceMeasure") String distanceMeasure,@Name("IndexBoolean") Boolean IndexColumn,@Name("epsilon") Double epsilon) throws Exception {
@@ -2043,8 +2043,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
                 {
                 	//a is present for the node
             		Result result = tx.run( "MERGE (a"+":ClusteringNodeType" +" {" + nodeCentroid +"}) " +
-            				"MERGE (b "+":ClusteringNodeType" + " {" + nodeCluster +"}) " +
-            				"MERGE (a)-[r:link]->(b) "  +
+            				"MERGE (b "+":" + nodeType + " {" + nodeCluster +"}) " +
+            				"MERGE (a)-[r:cluster]->(b) "  +
                             "SET r.distance = " + distance + " " + 
             				"RETURN a.message");
 				    return result.single().get( 0 ).asString();
