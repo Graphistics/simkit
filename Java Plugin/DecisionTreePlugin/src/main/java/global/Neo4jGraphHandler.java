@@ -27,7 +27,7 @@ public class Neo4jGraphHandler {
         ArrayList<EdgeList2> edgeList = new ArrayList<>();
 
         try (Session session = driver.session()) {
-            String cypherQuery = "MATCH (n:" + nodeType + ")-[r]->(m:" + nodeType + ") RETURN n, m, r, toString(n.id) AS source, toString(m.id) AS target, r.value AS weight, id(r) AS index";
+        	String cypherQuery = "MATCH (n:" + nodeType + ")-[r]->(m:" + nodeType + ") WHERE r.value IS NOT NULL RETURN n, m, r, toString(n.id) AS source, toString(m.id) AS target, r.value AS weight, id(r) AS index";
             Result result = session.run(cypherQuery);
 
             while (result.hasNext()) {

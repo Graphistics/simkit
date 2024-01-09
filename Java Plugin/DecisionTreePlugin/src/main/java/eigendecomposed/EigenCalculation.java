@@ -52,21 +52,22 @@ public class EigenCalculation {
                 sortedEigenvectors.setColumnVector(i, v.getColumnVector(originalIndex));
             }
 
-            // Round eigenvalues to 4 decimal places
-            DecimalFormat decimalFormat = new DecimalFormat("#.####");
+
+            int dimension = laplacianMatrix.getColumnDimension();
+            int k = (int) ((userDefinedK > 0) ? userDefinedK : calculateOptimalK(sortedEigenvalues) +1);
+            
+            // Round eigenvalues to 7 decimal places
+            DecimalFormat decimalFormat = new DecimalFormat("#.#######");
             for (int i = 0; i < sortedEigenvalues.length; i++) {
                 sortedEigenvalues[i] = Double.parseDouble(decimalFormat.format(sortedEigenvalues[i]));
             }
 
-            // Round eigenvectors to 4 decimal places
+            // Round eigenvectors to 7 decimal places
             for (int i = 0; i < sortedEigenvectors.getRowDimension(); i++) {
                 for (int j = 0; j < sortedEigenvectors.getColumnDimension(); j++) {
                     sortedEigenvectors.setEntry(i, j, Double.parseDouble(decimalFormat.format(sortedEigenvectors.getEntry(i, j))));
                 }
             }
-
-            int dimension = laplacianMatrix.getColumnDimension();
-            int k = (int) ((userDefinedK > 0) ? userDefinedK : calculateOptimalK(sortedEigenvalues));
             RealMatrix X = sortedEigenvectors.getSubMatrix(0, dimension - 1, dimension - k, dimension - 1);
             return new EigenResult(sortedEigenvalues, sortedEigenvectors, X);
         } catch (Exception e) {

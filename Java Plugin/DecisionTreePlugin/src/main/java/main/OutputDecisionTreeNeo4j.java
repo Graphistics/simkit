@@ -1,6 +1,7 @@
 package main;
 import static org.neo4j.driver.Values.parameters;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -413,7 +414,12 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			if(data_path == null && distance_measure == null) {
 				return "Missing data_path or distance measure type";
 			}else {
-				String graphName = null;
+				Path path = Paths.get(data_path);
+		        String fileName = path.getFileName().toString();
+		        String fileNameWithoutExtension = fileName.replaceFirst("[.][^.]+$", "");
+//		        String fileType = path.getName(path.getNameCount() - 1).toString();
+		        String graphName = fileNameWithoutExtension + "_" + graph_type;
+//				String graphName = null;
 				Double[][] adj_mat = null;
 				List<String> removeList = Arrays.stream(remove_columns.split(",")).collect(Collectors.toList());
 				ReadCsvTestData readCsvTestData = new ReadCsvTestData(data_path);
@@ -425,29 +431,31 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				if(graph_type.equals("full")) {
 					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,epsilon);
 					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graphName.concat("_"+epsilon);
 				}
 				if(graph_type.equals("eps")) {
 					Double espilonValue = Double.parseDouble(epsilon);
 					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,espilonValue);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graphName.concat("_"+epsilon);
 				}
 				if(graph_type.equals("knn")) {
 					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graphName.concat("_"+epsilon);
 
 				}
 				if(graph_type.equals("mknn")) {
 					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graphName.concat("_"+epsilon);
 				}
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
 
 				for (NodeList2 node : nodePropertiesList) {
 					Neo4jGraphHandler.createNodeGraph(graphName.concat("new"), "created nodes in neo4j", node, connector.getDriver());
 				}
+				
+				
 
 				for (int i = 0; i < edgeList.size(); i++) {
 					EdgeList2 edgeListDetail = edgeList.get(i);
@@ -846,7 +854,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            ArrayList<NodeList2> nodeListEigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(node_label, connector.getDriver());
 	            ArrayList<EdgeList2> edgeListEigen = EigenCalculation.createEdgeList(nodeListEigen, eigenResult.X);
 	            
-	            String graphName = "eigendecomposedGraph_" + laplacian_type + "_" + node_label + "_" + number_of_eigenvectors;
+	            String graphName = "eigendecomposedGraph_" + laplacian_type + "_" + node_label + "_" + Math.round(number_of_eigenvectors);
 	            
 	            for (NodeList2 node : nodeListEigen) {
 	            	Neo4jGraphHandler.createNodeGraph(graphName, "created nodes in neo4j", node, eigenResult.X, connector.getDriver());
@@ -870,7 +878,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	@UserFunction
 	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("threshold") double threshold, @Name("laplacianType") String laplacianType, @Name("epsilon") Double epsilon) throws Exception {
-	    String outputString = "";
+//	    String outputString = "";
 	    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
 	        if (nodeType == null) {
 	            return "Missing nodeType";
@@ -886,26 +894,44 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            ArrayList<NodeList2> nodeListEigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(nodeType, connector.getDriver());
 	            ArrayList<EdgeList2> edgeListEigen = EigenCalculation.createEdgeList(nodeListEigen, eigenResult.X);
 
+	            
+	            
+	            
 	            // Debug information
-	            outputString += "Original Edge List:\n";
+	            StringBuilder outputString = new StringBuilder("Edge List Data: ");
 	            for (EdgeList2 edge : edgeList) {
-	                outputString += edge.toString() + "\n";
-	            }
+                    outputString.append(" | ").append(edge.toString());
+                }
+	            
+	            outputString.append("\n\nAdjacency Matrix:\n").append(matrixToString(adjacencyMatrix));
+                outputString.append("\n\nDegree Matrix:\n").append(matrixToString(degreeMatrix));
+                outputString.append("\n\nLaplacian Matrix:\n").append(matrixToString(laplacianMatrix));
 
-	            outputString += "\nEigenDecomposed Edge List:\n";
-	            for (EdgeList2 edge : edgeListEigen) {
-	                outputString += edge.toString() + "\n";
-	            }
+                outputString.append("\n\nEigenvalues:\n").append(Arrays.toString(eigenResult.eigenvalues));
+                outputString.append("\n\nEigenvectors:\n").append(matrixToString(eigenResult.eigenvectors));
+                outputString.append("\n\nX:\n").append(matrixToString(eigenResult.X));
+                
 
+                
 	            if (edgeListEigen.size() > 0) {
-	                for (int i = 0; i < edgeListEigen.size(); i++) {
-	                    outputString = outputString + " | " + edgeListEigen.get(i).toString();
+	                outputString.append("\n\nEigendecomposed Eigen List:\n");
+	                for (EdgeList2 edge : edgeListEigen) {
+	                    outputString.append(" | ").append(edge.toString());
 	                }
 	            } else {
-	                outputString = "Could not retrieve edge list or no edges passed the threshold.";
+	                outputString.append("Could not retrieve edge list or no edges passed the threshold.");
 	            }
+	            
+	            String graphName = "eigendecomposedGraph_" + laplacianType + "_" + nodeType + "_" + Math.round(epsilon);
+
+	            
+//	            for (NodeList2 node : nodeListEigen) {
+//	            	Neo4jGraphHandler.createNodeGraph(graphName, "created nodes in neo4j", node, eigenResult.X, connector.getDriver());
+//	            }
+	            
+	            return outputString.toString();
 	        }
-	        return "Node List Data:  " + outputString;
+	        
 	    } catch (Neo4jException e) {
 	        throw new RuntimeException("Error creating laplacian graph in Neo4j: " + e.getMessage());
 	    }
@@ -936,7 +962,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
                 outputString.append("\n\nDegree Matrix:\n").append(matrixToString(degreeMatrix));
 
                 // Display Laplacian matrix
-                RealMatrix laplacianMatrix = MatrixCalculation.calculateLaplacianMatrix(degreeMatrix, adjacencyMatrix, "SYMMETRIC");
+                RealMatrix laplacianMatrix = MatrixCalculation.calculateLaplacianMatrix(degreeMatrix, adjacencyMatrix, "sym");
                 outputString.append("\n\nLaplacian Matrix:\n").append(matrixToString(laplacianMatrix));
 
                 // Display Eigenvalues, Eigenvectors, and X
