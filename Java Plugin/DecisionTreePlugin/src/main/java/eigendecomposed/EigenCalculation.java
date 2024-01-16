@@ -54,7 +54,7 @@ public class EigenCalculation {
 
 
             int dimension = laplacianMatrix.getColumnDimension();
-            int k = (int) ((userDefinedK > 0) ? userDefinedK : calculateOptimalK(sortedEigenvalues) +1);
+            int k = (int) ((userDefinedK > 0) ? userDefinedK : calculateOptimalK(sortedEigenvalues));
             
             // Round eigenvalues to 7 decimal places
             DecimalFormat decimalFormat = new DecimalFormat("#.#######");
@@ -107,7 +107,7 @@ public class EigenCalculation {
         System.out.println();
     }
     
-    public static ArrayList<EdgeList2> createEdgeList(List<NodeList2> nodePropertiesList, RealMatrix X) {
+    public static ArrayList<EdgeList2> createEdgeList(List<NodeList2> nodePropertiesList, RealMatrix X, ArrayList<EdgeList2> originalEdgeList) {
         ArrayList<EdgeList2> edgeList = new ArrayList<>();
 
         int numRows = X.getRowDimension();
@@ -119,7 +119,14 @@ public class EigenCalculation {
 
                     String sourceId = nodePropertiesList.get(i).getIndex();
                     String targetId = nodePropertiesList.get(j).getIndex();
+                    
+                    boolean hasOriginalEdge = originalEdgeList.stream()
+                            .anyMatch(edge -> (edge.getSource().equals(sourceId) && edge.getTarget().equals(targetId))
+                                    || (edge.getSource().equals(targetId) && edge.getTarget().equals(sourceId)));
+
+                    if (hasOriginalEdge) {
                     edgeList.add(new EdgeList2(sourceId, targetId, distance, i, null));
+                    }
             }
         }
 

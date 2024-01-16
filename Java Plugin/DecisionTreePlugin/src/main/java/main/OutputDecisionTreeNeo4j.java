@@ -487,7 +487,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			}else {
 				String graphName = null;
 				ArrayList<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
-				List<String> removeList = Arrays.stream(remove_columns.split(",")).toList();
+//				List<String> removeList = Arrays.stream(remove_columns.split(",")).toList();
+				List<String> removeList = Arrays.stream(remove_columns.split(",")).collect(Collectors.toList());
 //				Double[][] DistanceMatrix = GraphTransform.euclideanDistance(nodePropertiesList);
 				Double[][] DistanceMatrix = getDistanceMatrixFromNodes(distanceMeasure,nodePropertiesList,removeList);
 				Double[][] adj_mat = null;
@@ -852,7 +853,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	            EigenCalculation.EigenResult eigenResult = EigenCalculation.calculateEigen(laplacianMatrix, number_of_eigenvectors);
 	            ArrayList<NodeList2> nodeListEigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(node_label, connector.getDriver());
-	            ArrayList<EdgeList2> edgeListEigen = EigenCalculation.createEdgeList(nodeListEigen, eigenResult.X);
+//	            ArrayList<EdgeList2> edgeListEigen = EigenCalculation.createEdgeList(nodeListEigen, eigenResult.X);
+	            ArrayList<EdgeList2> edgeListEigen = EigenCalculation.createEdgeList(nodeListEigen, eigenResult.X, edgeList);
+
 	            
 	            String graphName = "eigendecomposedGraph_" + laplacian_type + "_" + node_label + "_" + Math.round(number_of_eigenvectors);
 	            
@@ -863,9 +866,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 //	            for (EdgeList2 edge : edgeListEigen) {
 	            for (int i = 0; i < edgeListEigen.size(); i++) {
 					EdgeList2 edgeListDetail = edgeListEigen.get(i);
-					if(edgeListDetail.getWeight()==0.0){
-						continue;
-					}
+//					if(edgeListDetail.getWeight()==0.0){
+//						continue;
+//					}
 	            	Neo4jGraphHandler.createRelationshipGraph(graphName, "created relationship in neo4j \n", edgeListDetail, connector.getDriver());
 	            }
 	        }
@@ -892,7 +895,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	            EigenCalculation.EigenResult eigenResult = EigenCalculation.calculateEigen(laplacianMatrix, epsilon);
 	            ArrayList<NodeList2> nodeListEigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(nodeType, connector.getDriver());
-	            ArrayList<EdgeList2> edgeListEigen = EigenCalculation.createEdgeList(nodeListEigen, eigenResult.X);
+	            ArrayList<EdgeList2> edgeListEigen = EigenCalculation.createEdgeList(nodeListEigen, eigenResult.X, edgeList);
 
 	            
 	            
@@ -925,9 +928,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            String graphName = "eigendecomposedGraph_" + laplacianType + "_" + nodeType + "_" + Math.round(epsilon);
 
 	            
-//	            for (NodeList2 node : nodeListEigen) {
-//	            	Neo4jGraphHandler.createNodeGraph(graphName, "created nodes in neo4j", node, eigenResult.X, connector.getDriver());
-//	            }
+	            for (NodeList2 node : nodeListEigen) {
+	            	Neo4jGraphHandler.createNodeGraph(graphName, "created nodes in neo4j", node, eigenResult.X, connector.getDriver());
+	            }
 	            
 	            return outputString.toString();
 	        }
