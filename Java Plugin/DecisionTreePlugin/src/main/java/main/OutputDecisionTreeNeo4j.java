@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.Map;
 
 import org.apache.commons.math4.legacy.linear.BlockRealMatrix;
 import org.apache.commons.math4.legacy.linear.RealMatrix;
@@ -2097,6 +2098,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	    }
 	    return valueOfNode.toString();
 	}
+	
 	private String getStringValue(StringBuilder valueOfNode) {
 	    return valueOfNode.length() > 0 ? ", " : "";
 	}
@@ -2157,80 +2159,119 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
     		return null;
     	}
 	}
+    
+    //////////////////////////////Calculation of Ajusted rand index
 
-	public static void main(String[] args) throws Exception {
-//		OutputDecisionTreeNeo4j outputDecisionTreeNeo4j = new OutputDecisionTreeNeo4j();
-//		//String dataPath = "D:/de/MASTER_THESIS/Decision-Tree-Neo4j/Java Plugin/DecisionTreePlugin/src/main/resources/test.csv";
-//		String Filename = "test.csv";
-//		String testDataPath = "data\\test.csv";
-//		//test
-//		ReadCsvTestData readCsvTestData = new ReadCsvTestData(testDataPath);
-//		ArrayList<TestData> testData = readCsvTestData.readCsvFile(testDataPath);
-//		Double[][] DistanceMatrix = readCsvTestData.euclidianDistance(testData);
-//		Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix);
-//		Double[][] adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
+//    public static int[] labelStrings(List<String> strings) {
+//        Map<String, Integer> labelMap = new HashMap<>();
+//        int[] labels = new int[strings.size()];
 //
-//		ArrayList<Nodelist> nodeList = ReadCsvTestData.getNodeList(testData);
-//		ArrayList<EdgeList> edgeList = ReadCsvTestData.calulateEdgeList(adj_mat);
-//		for (int i = 0; i < edgeList.size()-1; i++) {
-//			EdgeList edgeListDetail = edgeList.get(i);
-//			System.out.println("edgeListDetail " + edgeList.get(i));
-//			
-//			long bid = edgeListDetail.getTarget();
-//			String dtType = "connected";
-//			String bindex = "Index" + bid;
-//			double weightValue = (double)Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
-//			String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "`}" ;
-//			String finalString = "MATCH (a:" + dtType + ")S, (b:" + dtType + ") " +
-//					"WHERE a.id = "+"\"" +"Index"+edgeListDetail.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
-//					"CREATE (a)-[r:" + weight +  "]->(b)";
-//			System.out.println("--" + finalString);
-//		}
-//		
-		
-//		
-//		int rows = adj_mat.length;
-//		int cols = adj_mat[0].length;
-//
-//		double[][] newAdjMat = new double[rows][cols];
-//	
-//		for (int i = 0; i < rows; i++) {
-//		    for (int j = 0; j < cols; j++) {
-//		        newAdjMat[i][j] = adj_mat[i][j];
-//		    }
-//		}
-//
-//		double[][] adjmatrxiEigen = MatrixCalculation.convertToAdjacencyMatrix(edgeList);
-//		RealMatrix degreeMatrix = MatrixCalculation.calculateDegreeMatrix(newAdjMat);
-//		RealMatrix adjacencyMatrix = new BlockRealMatrix(adjmatrxiEigen);
-//		RealMatrix laplacianMatrix = MatrixCalculation.calculateLaplacianMatrix(degreeMatrix, adjacencyMatrix,"SYMMETRIC");
-//		displayMatrix(adjacencyMatrix,"adjacencyMatrix");
-//		displayMatrix(degreeMatrix,"degreeMatrix");
-//		displayMatrix(laplacianMatrix,"laplacianMatrix");
-//
-//        try {
-//        	EigenCalculation.EigenResult eigenResult = EigenCalculation.calculateEigen(laplacianMatrix);
-//            EigenCalculation.displayEigenResult(eigenResult);
-////            EigenCalculation.drawScatterPlot(eigenResult.eigenvalues);
-//
-//            double threshold = 0.01;
-//            ArrayList<EdgeList> edgeListEigen = EigenCalculation.createEdgeList(eigenResult.eigenvectors, threshold);
-//            
-//    		for (EdgeList edge : edgeListEigen) {
-//    			long bid = edge.getTarget();
-//    			String bindex = "Index" + bid;
-//    			String dtType = "eigendecomposedGraph";
-//    			double weightValue = (double)Math.round(edge.getWeight() * 100000d) / 100000d;
-//    			String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "}" ;
-//    			String finalString = "MATCH (a:" + dtType + "), (b:" + dtType + ") " + 
-//    					"WHERE a.id = "+"\"" +"Index"+ edge.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
-//    					"CREATE (a)-[r:" + weight +  "]->(b)";
-//    			System.out.println(finalString);
-//    		}
-//        } catch (Exception e) {
-//            e.printStackTrace();
+//        int currentLabel = 0;
+//        for (int i = 0; i < strings.size(); i++) {
+//            String s = strings.get(i);
+//            if (!labelMap.containsKey(s)) {
+//                labelMap.put(s, currentLabel++);
+//            }
+//            labels[i] = labelMap.get(s);
 //        }
-		
+//
+//        return labels;
+//    }
+    
+//    @UserFunction
+//	public String getTrueLabels(@Name("nodeSet") String nodeSet, @Name("trueLabels") String trueLabel) throws Exception {
+//	    String listOfData = "";
+//	    int[] labels = new int[];
+//	    
+//	    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+//	        queryData(nodeSet);
+//	        for (Record key : dataKey) {
+//	            List<Pair<String, Value>> values = key.fields();
+//	            for (Pair<String, Value> nodeValues : values) {
+//	                if ("n".equals(nodeValues.key())) {
+//	                    Value value = nodeValues.value();
+//	                    StringBuilder nodeLabel = new StringBuilder();
+//	                    for (String nodeKey : value.keys()) {
+//	                    	if(nodeKey.equals(trueLabel))
+//	                    	{
+//	                    		try {
+//	                	            double num = Double.parseDouble(String.valueOf(value.get(nodeKey)));
+//	                	            if (value.get(nodeKey).getClass().equals(String.class)) {
+//	                	            	nodeLabel.append(getStringValue(nodeLabel)).append(nodeKey).append(":").append(value.get(nodeKey));
+//	                	            } else {
+//	                	            	nodeLabel.append(getStringValue(nodeLabel)).append(nodeKey).append(":").append(value.get(nodeKey));
+//	                	            }
+//	                	        } catch (NumberFormatException e) {
+//	                	            System.out.println(value.get(nodeKey) + " is not a number.");
+//	                	        }
+//	                    	}
+//	                    }
+//	                    String valueOfNode = getNodeValues(value, overLookArray);
+//	                    mapNodeList.add(valueOfNode);
+////	                    listOfData = listOfData + valueOfNode + " | ";
+//	                    listOfData = mapNodeList.toString();
+//	                }
+//	            }
+//	        }
+//	    }
+//	    return "Map all node data: " + listOfData;
+//	}
+    
+    public static double calculateAdjustedRandIndex(double[] trueLabels, double[] predictedLabels) {
+        if (trueLabels.length != predictedLabels.length) {
+            throw new IllegalArgumentException("Input arrays must have the same length");
+        }
+
+        int n = trueLabels.length;
+        Map<Double, Map<Double, Double>> contingencyTable = new HashMap<>();
+        Map<Double, Double> trueLabelCounts = new HashMap<>();
+        Map<Double, Double> predictedLabelCounts = new HashMap<>();
+
+        // Build the contingency table and label counts 
+        for (int i = 0; i < n; i++) {
+            double trueLabel = trueLabels[i];
+            double predictedLabel = predictedLabels[i];
+
+            contingencyTable.computeIfAbsent(trueLabel, k -> new HashMap<>());
+            contingencyTable.get(trueLabel).merge(predictedLabel, 1.0, Double::sum);
+
+            trueLabelCounts.merge(trueLabel, 1.0, Double::sum);
+            predictedLabelCounts.merge(predictedLabel, 1.0, Double::sum);
+        }
+
+        double a = 0.0; // Number of pairs in the same cluster in both true and predicted
+        for (Map<Double, Double> row : contingencyTable.values()) {
+            for (double count : row.values()) {
+                a += count * (count - 1) / 2.0;
+            }
+        }
+
+        double b = 0.0; // Number of pairs in the same cluster in trueLabels
+        for (double count : trueLabelCounts.values()) {
+            b += count * (count - 1) / 2.0;
+        }
+
+        double c = 0.0; // Number of pairs in the same cluster in predictedLabels
+        for (double count : predictedLabelCounts.values()) {
+            c += count * (count - 1) / 2.0;
+        }
+
+        double totalPairs = n * (n - 1) / 2.0;
+        double expectedIndex = (b * c) / totalPairs;
+        double maxIndex = 0.5 * (b + c);
+        double adjustedRandIndex = (a - expectedIndex) / (maxIndex - expectedIndex);
+
+        return adjustedRandIndex;
+    }
+    
+    
+	public static void main(String[] args) throws Exception {
+
+		double[] trueLabels = {3.0, 2.0, 1.0, 2.0, 1.0, 4.0, 4.0, 3.0};
+	    double[] predictedLabels = {4.0, 2.0, 1.0, 2.0, 4.0, 3.0, 4.0, 1.0};
+
+	    double ari = calculateAdjustedRandIndex(trueLabels, predictedLabels);
+	    System.out.println("Adjusted Rand Index: " + ari);
 	}
 
 
