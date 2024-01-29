@@ -66,6 +66,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	private static ArrayList<String> autoSplitDataList =  new ArrayList<String>();
 	private static ArrayList<String> classificationDataList = new ArrayList<String>();
 	private static ArrayList<String> mapNodeList =  new ArrayList<String>();
+	private static List<Double> trueNodeLabels = new ArrayList<Double>();
+	private static List<Double> predictedNodeLabels = new ArrayList<Double>();
+	
 
 	/**
 	 * Creation of driver object using bolt protocol
@@ -2115,28 +2118,34 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
     @Description("Kmean clustering function")
 	public String kmean(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
 	{
+    	predictedNodeLabels.clear();
     	try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
         {
 			String averageSilhouetteCoefficientString = "The average Silhouette Coefficient value is: ";
 			HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
 			int numberOfCentroidInt = Integer.parseInt(numberOfCentroid);
 			int numberOfInterationInt = Integer.parseInt(numberOfInteration);
+			double centroidNumber = 1.0;
 			
 			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure);
 			double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
 	        
 			for (String centroid : kmeanAssign.keySet()) {
 			    ArrayList<String> clusterNode = kmeanAssign.get(centroid);
-			    for (String node : clusterNode) {
+			    for (int i = 0; i < clusterNode.size(); i++) {
+			    	//Add predict labels
+		    		predictedNodeLabels.add(centroidNumber);
+
 			    	DecimalFormat decimalFormat = new DecimalFormat("#.###");
-			        double distance = Unsupervised.calculateDistance(node, centroid, distanceMeasure);
+			        double distance = Unsupervised.calculateDistance(clusterNode.get(i), centroid, distanceMeasure);
 			        String formattedDistance = decimalFormat.format(distance);
 			        double roundedDistance = Double.parseDouble(formattedDistance);
-			        connector.connectNodes(nodeSet, "create relationship in kmean node", centroid, node, roundedDistance);
+			        connector.connectNodes(nodeSet, "create relationship in kmean node", centroid, clusterNode.get(i), roundedDistance);
 			    }
+			    centroidNumber = centroidNumber + 1;
 			}
 
-			return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue ;
+			return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue + " predicted labels: " + predictedNodeLabels;
 		}
 	}
     
@@ -2161,76 +2170,92 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	}
     
     //////////////////////////////Calculation of Ajusted rand index
+    
+   
+    
+    public static List<Double> convertStringLabels(List<String> strings) {
+        Map<String, Double> labelMap = new HashMap<>();
+        List<Double> labels = new ArrayList<>();
 
-//    public static int[] labelStrings(List<String> strings) {
-//        Map<String, Integer> labelMap = new HashMap<>();
-//        int[] labels = new int[strings.size()];
-//
-//        int currentLabel = 0;
-//        for (int i = 0; i < strings.size(); i++) {
-//            String s = strings.get(i);
-//            if (!labelMap.containsKey(s)) {
-//                labelMap.put(s, currentLabel++);
-//            }
-//            labels[i] = labelMap.get(s);
-//        }
-//
-//        return labels;
-//    }
-    
-//    @UserFunction
-//	public String getTrueLabels(@Name("nodeSet") String nodeSet, @Name("trueLabels") String trueLabel) throws Exception {
-//	    String listOfData = "";
-//	    int[] labels = new int[];
-//	    
-//	    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
-//	        queryData(nodeSet);
-//	        for (Record key : dataKey) {
-//	            List<Pair<String, Value>> values = key.fields();
-//	            for (Pair<String, Value> nodeValues : values) {
-//	                if ("n".equals(nodeValues.key())) {
-//	                    Value value = nodeValues.value();
-//	                    StringBuilder nodeLabel = new StringBuilder();
-//	                    for (String nodeKey : value.keys()) {
-//	                    	if(nodeKey.equals(trueLabel))
-//	                    	{
-//	                    		try {
-//	                	            double num = Double.parseDouble(String.valueOf(value.get(nodeKey)));
-//	                	            if (value.get(nodeKey).getClass().equals(String.class)) {
-//	                	            	nodeLabel.append(getStringValue(nodeLabel)).append(nodeKey).append(":").append(value.get(nodeKey));
-//	                	            } else {
-//	                	            	nodeLabel.append(getStringValue(nodeLabel)).append(nodeKey).append(":").append(value.get(nodeKey));
-//	                	            }
-//	                	        } catch (NumberFormatException e) {
-//	                	            System.out.println(value.get(nodeKey) + " is not a number.");
-//	                	        }
-//	                    	}
-//	                    }
-//	                    String valueOfNode = getNodeValues(value, overLookArray);
-//	                    mapNodeList.add(valueOfNode);
-////	                    listOfData = listOfData + valueOfNode + " | ";
-//	                    listOfData = mapNodeList.toString();
-//	                }
-//	            }
-//	        }
-//	    }
-//	    return "Map all node data: " + listOfData;
-//	}
-    
-    public static double calculateAdjustedRandIndex(double[] trueLabels, double[] predictedLabels) {
-        if (trueLabels.length != predictedLabels.length) {
-            throw new IllegalArgumentException("Input arrays must have the same length");
+        double currentLabel = 0.0;
+        for (String s : strings) {
+            if (!labelMap.containsKey(s)) {
+                labelMap.put(s, currentLabel++);
+            }
+            labels.add(labelMap.get(s));
         }
 
-        int n = trueLabels.length;
+        return labels;
+    }
+    
+    @UserFunction
+	public String ajustedRandIndex(@Name("nodeSet") String nodeSet, @Name("trueLabels") String trueLabel) throws Exception {
+	    if(predictedNodeLabels.size()==0)
+	    {
+	    	
+	    	return " predicted Labels is null, please run kmean clustering to add the predicted labels";
+	    }
+	    else {
+	    	String listOfData = "";
+	    	Double ajustedRandIndexValue = 0.0;
+		    trueNodeLabels.clear();
+		    List<String> stringTrueNodeLabelsList = new ArrayList<String>();
+		    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+		        queryData(nodeSet);
+		        for (Record key : dataKey) {
+		            List<Pair<String, Value>> values = key.fields();
+		            for (Pair<String, Value> nodeValues : values) {
+		                if ("n".equals(nodeValues.key())) {
+		                    Value value = nodeValues.value();
+		                    StringBuilder nodeLabel = new StringBuilder();
+		                    for (String nodeKey : value.keys()) {
+		                    	if(nodeKey.equals(trueLabel))
+		                    	{
+		                    		try {
+		                	            double num = Double.parseDouble(String.valueOf(value.get(nodeKey)));
+	                	            	trueNodeLabels.add(num);
+	                	            	listOfData = listOfData + num;
+	//	                	            	nodeLabel.append(getStringValue(nodeLabel)).append(nodeKey).append(":").append(value.get(nodeKey));
+		                	        } catch (NumberFormatException e) {
+		                	            System.out.println(value.get(nodeKey) + " is not a number.");
+		                	            stringTrueNodeLabelsList.add(String.valueOf(value.get(nodeKey)));
+		                	        }
+		                    	}
+		                    }
+		                }
+		            }
+		        }
+		        if(stringTrueNodeLabelsList.size() != 0 )
+		        {
+		        	trueNodeLabels =  convertStringLabels(stringTrueNodeLabelsList);
+		        }
+		        
+		        if(trueNodeLabels.size() != predictedNodeLabels.size())
+		        {
+		        	return "true labels size: " + trueNodeLabels +" and predicted labels:" + predictedNodeLabels + " does not have the same size";
+		        }
+		        else {
+		        	ajustedRandIndexValue = calculateAdjustedRandIndex(trueNodeLabels, predictedNodeLabels);
+				}
+		    }
+		    return "ajusted rand index of " + nodeSet + " is: " + ajustedRandIndexValue ;
+	    }
+	}
+    
+    public static double calculateAdjustedRandIndex(List<Double> trueLabels, List<Double> predictedLabels) {
+        if (trueLabels.size() != predictedLabels.size()) {
+            throw new IllegalArgumentException("Input lists must have the same length");
+        }
+
+        int n = trueLabels.size();
         Map<Double, Map<Double, Double>> contingencyTable = new HashMap<>();
         Map<Double, Double> trueLabelCounts = new HashMap<>();
         Map<Double, Double> predictedLabelCounts = new HashMap<>();
 
-        // Build the contingency table and label counts 
+        // Build the contingency table and label counts
         for (int i = 0; i < n; i++) {
-            double trueLabel = trueLabels[i];
-            double predictedLabel = predictedLabels[i];
+            double trueLabel = trueLabels.get(i);
+            double predictedLabel = predictedLabels.get(i);
 
             contingencyTable.computeIfAbsent(trueLabel, k -> new HashMap<>());
             contingencyTable.get(trueLabel).merge(predictedLabel, 1.0, Double::sum);
@@ -2267,8 +2292,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
     
 	public static void main(String[] args) throws Exception {
 
-		double[] trueLabels = {3.0, 2.0, 1.0, 2.0, 1.0, 4.0, 4.0, 3.0};
-	    double[] predictedLabels = {4.0, 2.0, 1.0, 2.0, 4.0, 3.0, 4.0, 1.0};
+	    List<Double> trueLabels = List.of(3.0, 2.0, 1.0, 2.0, 1.0, 4.0, 4.0, 3.0);
+        List<Double> predictedLabels = List.of(1.0, 2.0, 1.0, 2.0, 4.0, 3.0, 4.0, 4.0);
 
 	    double ari = calculateAdjustedRandIndex(trueLabels, predictedLabels);
 	    System.out.println("Adjusted Rand Index: " + ari);
