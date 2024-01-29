@@ -124,11 +124,16 @@ public class DistanceMeasureNodes {
         Double[][] distanceMatrix = new Double[size][size];
 
         for (int i = 0; i < size; i++) {
-            for (int j = i; j < size; j++) {
+            for (int j = 0; j < size; j++) {
 
-                    double distance = calculateCosineSimilarity(nodeList.get(i), nodeList.get(j),removeList);
+                if (i == j) {
+                    distanceMatrix[i][j] = 0.00;
+                } else {
+
+                    double distance = calculateCosineSimilarity(nodeList.get(i), nodeList.get(j), removeList);
                     distanceMatrix[i][j] = distance;
                     distanceMatrix[j][i] = distance;
+                }
             }
         }
         return distanceMatrix;
