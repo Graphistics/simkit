@@ -53,7 +53,7 @@ public class Neo4jGraphHandler {
     }
 
 
-    public static ArrayList<NodeList2> retrieveNodeListFromNeo4j(final String nodeType, Driver driver) {
+    public static ArrayList<NodeList2> retrieveNodeListFromNeo4jSimilarityGraph(final String nodeType, Driver driver) {
         ArrayList<NodeList2> nodeList = new ArrayList<>();
 
         try (Session session = driver.session()) {
@@ -66,8 +66,6 @@ public class Neo4jGraphHandler {
             while (result.hasNext()) {
                 Record record = result.next();
                 Node node = record.get("n").asNode();
-
-//                index = record.get("index").asString();
                 index = String.valueOf(count);
                 Map<String, Object> nodeProperties = extractPropertiesFromNode(node);
                 NodeList2 nodeObject = new NodeList2(index, nodeProperties);

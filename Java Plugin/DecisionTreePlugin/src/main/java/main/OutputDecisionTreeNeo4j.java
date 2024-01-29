@@ -476,7 +476,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				return "Missing dataPath or distance measure type";
 			}else {
 				String graphName = null;
-				ArrayList<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
+				ArrayList<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
 //				ArrayList<NodeList2> nodePropertiesList_copy = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
 				String[] removeList = remove_columns.split(",");
 				List<String> removeListNew = Arrays.stream(removeList).collect(Collectors.toList());
@@ -747,7 +747,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	        if (label == null || distanceMeasure == null) {
 	            return "Missing label or distance measure type";
 	        } else {
-	        	ArrayList<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
+	        	ArrayList<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
 	            Double[][] distanceMatrix = GraphTransform.euclideanDistance(nodePropertiesList);
 	            Double[][] adjMatrix = GraphTransform.calculateAdjMatrix(distanceMatrix, method, epsilon);
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adjMatrix);
@@ -790,7 +790,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            RealMatrix laplacianMatrix = MatrixCalculation.calculateLaplacianMatrix(degreeMatrix, adjacencyMatrix, laplacianType);
 
 	            EigenCalculation.EigenResult eigenResult = EigenCalculation.calculateEigen(laplacianMatrix);
-	            ArrayList<NodeList2> nodeListEigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(nodeType, connector.getDriver());
+	            ArrayList<NodeList2> nodeListEigen = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(nodeType, connector.getDriver());
 	            ArrayList<EdgeList2> edgeListEigen = EigenCalculation.createEdgeList(nodeListEigen, eigenResult.eigenvectors, threshold);
 	            
 	            String graphName = "eigendecomposedGraph_" + laplacianType + "_" + nodeType;
@@ -822,7 +822,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	        	ArrayList<NodeList2> nodeList = new ArrayList<>();
 	        	List<NodeList2> nodelist2 = new ArrayList<>();
 	        	edgeList = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(nodeType, connector.getDriver());
-	        	nodeList = Neo4jGraphHandler.retrieveNodeListFromNeo4j(nodeType, connector.getDriver());
+	        	nodeList = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(nodeType, connector.getDriver());
 	        	
 	            Double[][] distanceMatrix = GraphTransform.euclideanDistance(nodeList);
 	            Double[][] adjMatrix = GraphTransform.calculateAdjMatrix(distanceMatrix, method, epsilon);
