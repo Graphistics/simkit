@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-import graph.EdgeList;
+//import graph.EdgeList;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.Result;
@@ -53,22 +53,43 @@ public class Neo4jGraphHandler {
     }
 
 
-    public static ArrayList<NodeList2> retrieveNodeListFromNeo4j(final String nodeType, Driver driver) {
+    public static ArrayList<NodeList2> retrieveNodeListFromNeo4jSimilarityGraph(final String nodeType, Driver driver) {
         ArrayList<NodeList2> nodeList = new ArrayList<>();
 
         try (Session session = driver.session()) {
             String cypherQuery = "MATCH (n:" + nodeType + ") RETURN n, n.id AS index";
             Result result = session.run(cypherQuery);
-            String index = "";
+            String index;
             int count = 0;
 
 
             while (result.hasNext()) {
                 Record record = result.next();
                 Node node = record.get("n").asNode();
+                index = String.valueOf(count);
+                Map<String, Object> nodeProperties = extractPropertiesFromNode(node);
+                NodeList2 nodeObject = new NodeList2(index, nodeProperties);
+                nodeList.add(nodeObject);
+                count++;
+            }
+        } catch (Neo4jException e) {
+            throw new RuntimeException("Error retrieving node data from Neo4j for label: " + nodeType + ", Error: " + e.getMessage());
+        }
+        return nodeList;
+    }
+    public static ArrayList<NodeList2> retrieveNodeListFromNeo4j(final String nodeType, Driver driver) {
+        ArrayList<NodeList2> nodeList = new ArrayList<>();
 
+        try (Session session = driver.session()) {
+            String cypherQuery = "MATCH (n:" + nodeType + ") RETURN n, n.id AS index";
+            Result result = session.run(cypherQuery);
+
+            while (result.hasNext()) {
+                Record record = result.next();
+                Node node = record.get("n").asNode();
 
                 String index = record.get("index").asString();
+
                 Map<String, Object> nodeProperties = extractPropertiesFromNode(node);
 
                 NodeList2 nodeObject = new NodeList2(index, nodeProperties);
@@ -79,8 +100,6 @@ public class Neo4jGraphHandler {
         }
         return nodeList;
     }
-
-
     public static void createNodeGraph(String graphType, String message, NodeList2 nodeDetail, Driver driver) {
         final String id = nodeDetail.getIndex();
         final Map<String, Object> properties = nodeDetail.getProperties();
