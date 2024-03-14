@@ -58,6 +58,31 @@ public class Neo4jGraphHandler {
         }
         return edge_list;
     }
+    
+    public static ArrayList<NodeList2> retrieveNodeListFromNeo4jSimilarityGraph(final String nodeType, Driver driver) {
+        ArrayList<NodeList2> nodeList = new ArrayList<>();
+
+        try (Session session = driver.session()) {
+            String cypherQuery = "MATCH (n:" + nodeType + ") RETURN n, n.id AS index";
+            Result result = session.run(cypherQuery);
+            String index;
+            int count = 0;
+
+
+            while (result.hasNext()) {
+                Record record = result.next();
+                Node node = record.get("n").asNode();
+                index = String.valueOf(count);
+                Map<String, Object> nodeProperties = extractPropertiesFromNode(node);
+                NodeList2 nodeObject = new NodeList2(index, nodeProperties);
+                nodeList.add(nodeObject);
+                count++;
+            }
+        } catch (Neo4jException e) {
+            throw new RuntimeException("Error retrieving node data from Neo4j for label: " + nodeType + ", Error: " + e.getMessage());
+        }
+        return nodeList;
+    }
 
     /**
      * Retrieves the node list from Neo4j for a specified node type.
@@ -89,17 +114,47 @@ public class Neo4jGraphHandler {
         }
         return nodeList;
     }
+    
+    public static void createNodeGraph(String graphType, String message, NodeList2 nodeDetail, Driver driver) {
+        final String id = nodeDetail.getIndex();
+        final Map<String, Object> properties = nodeDetail.getProperties();
+
+        try (Session session = driver.session()) {
+            session.writeTransaction(new TransactionWork<String>() {
+                @Override
+                public String execute(Transaction tx) {
+                    String cypherQuery = "CREATE (:" + graphType + " {id: $id";
+
+                    
+                    for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                        cypherQuery += ", " + entry.getKey() + ": $" + entry.getKey();
+                    }
+
+                    cypherQuery += "})";
+
+                    Map<String, Object> parameters = new HashMap<>();
+                    parameters.put("id", id);
+                    for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                        parameters.put(entry.getKey(), entry.getValue());
+                    }
+
+                    Result result = tx.run(cypherQuery, parameters);
+                    return message;
+                }
+            });
+        }
+    }
 
     /**
      * Creates nodes in Neo4j for the transformed graph after Laplacian Eigen Transform.
      *
-     * @param graphType   The type of the transformed graph.
+     * @param graph_type   The type of the transformed graph.
      * @param message     A message indicating the operation.
      * @param nodeDetail  Details of the node to be created.
      * @param X           The X matrix obtained from eigen decomposition.
      * @param driver      The Neo4j Driver instance.
      */
-    public static void createNodeGraphEigenTransform(String graphType, String message, NodeList2 nodeDetail, RealMatrix X, Driver driver) {
+    public static void createNodeGraphEigenTransform(String graph_type, String message, NodeList2 nodeDetail, RealMatrix X, Driver driver) {
         final String id = nodeDetail.getIndex();
         final Map<String, Object> properties = nodeDetail.getProperties();
 
@@ -111,7 +166,7 @@ public class Neo4jGraphHandler {
             session.writeTransaction(new TransactionWork<String>() {
                 @Override
                 public String execute(Transaction tx) {
-                    String cypher_query = "CREATE (:" + graphType + " {id: $id";
+                    String cypher_query = "CREATE (:" + graph_type + " {id: $id";
                     
                     for (Map.Entry<String, Object> entry : properties.entrySet()) {
                         cypher_query += ", " + entry.getKey() + ": $" + entry.getKey();
@@ -135,12 +190,12 @@ public class Neo4jGraphHandler {
     /**
      * Creates relationships in Neo4j for the transformed graph after Laplacian Eigen Transform.
      *
-     * @param graphType        The type of the transformed graph.
+     * @param graph_type        The type of the transformed graph.
      * @param message          A message indicating the operation.
      * @param edge_list_detail   Details of the edge to be created.
      * @param driver           The Neo4j Driver instance.
      */
-    public static void createRelationshipGraph(String graphType, String message, EdgeList2 edge_list_detail, Driver driver) {
+    public static void createRelationshipGraph(String graph_type, String message, EdgeList2 edge_list_detail, Driver driver) {
         final String source = edge_list_detail.getSource();
         final String target = edge_list_detail.getTarget();
         double weightValue = (double) Math.round(edge_list_detail.getWeight() * 100000d) / 100000d;
@@ -150,7 +205,7 @@ public class Neo4jGraphHandler {
                 @Override
                 public Void execute(Transaction tx) {
                     Result result = tx.run(
-                            "MATCH (n:" + graphType + " {id: $source}), (m:" + graphType + " {id: $target}) " +
+                            "MATCH (n:" + graph_type + " {id: $source}), (m:" + graph_type + " {id: $target}) " +
                                     "CREATE (n)-[r:`link` {value: $weightValue}]->(m)",
                             parameters("source", source, "target", target, "weightValue", weightValue)
                     );
