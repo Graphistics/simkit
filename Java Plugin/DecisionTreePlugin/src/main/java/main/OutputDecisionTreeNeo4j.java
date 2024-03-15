@@ -564,9 +564,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            ArrayList<EdgeList2> edge_list = new ArrayList<>();
 	            edge_list = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(node_label, connector.getDriver());
 
-	            double[][] adjacency_matrix_data = MatrixCalculation.convertToAdjacencyMatrix(edge_list);
-	            RealMatrix adjacency_matrix = new BlockRealMatrix(adjacency_matrix_data);
-	            RealMatrix degree_matrix = MatrixCalculation.calculateDegreeMatrix(adjacency_matrix_data);
+	            RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list);
+	            RealMatrix degree_matrix = MatrixCalculation.calculateDegreeMatrix(adjacency_matrix);
 	            RealMatrix laplacian_matrix = MatrixCalculation.calculateLaplacianMatrix(degree_matrix, adjacency_matrix, laplacian_type);
 
 	            EigenCalculation.EigenResult eigen_result = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
@@ -654,12 +653,11 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
                 }
 
                 // Display adjacency matrix
-                double[][] adjacency_matrix_data = MatrixCalculation.convertToAdjacencyMatrix(edge_list);
-                RealMatrix adjacency_matrix = new BlockRealMatrix(adjacency_matrix_data);
+                RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list);
                 outputString.append("\n\nAdjacency Matrix:\n").append(matrixToString(adjacency_matrix));
 
                 // Display degree matrix
-                RealMatrix degree_matrix = MatrixCalculation.calculateDegreeMatrix(adjacency_matrix_data);
+                RealMatrix degree_matrix = MatrixCalculation.calculateDegreeMatrix(adjacency_matrix);
                 outputString.append("\n\nDegree Matrix:\n").append(matrixToString(degree_matrix));
 
                 // Display Laplacian matrix

@@ -46,7 +46,7 @@ public class MatrixCalculation {
      * @param edge_list The edge list to convert.
      * @return 2D array representing the adjacency matrix.
      */
-    public static double[][] convertToAdjacencyMatrix(ArrayList<EdgeList2> edge_list) {
+    public static RealMatrix convertToAdjacencyMatrix(ArrayList<EdgeList2> edge_list) {
         Set<String> unique_indices = new HashSet<>();
         for (EdgeList2 edge : edge_list) {
             unique_indices.add(edge.getSource());
@@ -71,8 +71,9 @@ public class MatrixCalculation {
             adjacency_matrix_data[i][j] = weight;
             adjacency_matrix_data[j][i] = weight;
         }
-
-        return adjacency_matrix_data;
+        
+        RealMatrix adjacency_matrix = new BlockRealMatrix(adjacency_matrix_data);
+        return adjacency_matrix;
     }
    
     /**
@@ -110,8 +111,7 @@ public class MatrixCalculation {
      * @param adj_mat The adjacency matrix.
      * @return The degree matrix.
      */
-    public static RealMatrix calculateDegreeMatrix(double[][] adj_mat) {
-        RealMatrix adjacency_matrix = new BlockRealMatrix(adj_mat);
+    public static RealMatrix calculateDegreeMatrix(RealMatrix adjacency_matrix) {
         int dimension = adjacency_matrix.getColumnDimension();
 
         double[] columnSum = new double[dimension];
