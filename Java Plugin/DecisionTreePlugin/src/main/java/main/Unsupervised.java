@@ -203,7 +203,6 @@ public class Unsupervised {
 	    		listOfRemain.remove(i);
 	    	}
 	    }
-	    System.out.println("---------------- numberOfCentroids : " + listOfCentroid.size());
 	    
 		// First clusters
 		HashMap<String, ArrayList<String>> hashClusterAssign = distanceAssign(listOfCentroid,listOfRemain, distanceMeasure);
