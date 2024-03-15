@@ -1,27 +1,26 @@
 package graph;
 
+import definition.NodeList2;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 
 import definition.EdgeList;
-import definition.NodeList2;
 
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 public class ReadCsvTestData {
     public String dataPath;
 
-    public ReadCsvTestData(String dataPath){
+    public ReadCsvTestData(String dataPath) {
         this.dataPath = dataPath;
     }
 
-    String[] HEADERS = { "points","x_coordinate","y_coordinate","class"};
+    String[] HEADERS = {"points", "x_coordinate", "y_coordinate", "class"};
 
     public ArrayList<String> readCSVHeader(String dataPath) throws IOException {
         Reader in = new FileReader(dataPath);
@@ -33,9 +32,9 @@ public class ReadCsvTestData {
         for (CSVRecord record : records) {
             for (int i = 0; i < record.size(); i++) {
 
-                if(pattern.matcher(record.get(i)).matches()){
-                    headers.add(record.get(i).replace(".","_"));
-                }else {
+                if (pattern.matcher(record.get(i)).matches()) {
+                    headers.add(record.get(i).replace(".", "_"));
+                } else {
                     headers.add(record.get(i));
                 }
 
@@ -44,6 +43,7 @@ public class ReadCsvTestData {
         }
         return headers;
     }
+
     public ArrayList<String> readCSVFirstLine(String dataPath) throws IOException {
         Reader in = new FileReader(dataPath);
         CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setSkipHeaderRecord(true).build();
@@ -58,7 +58,7 @@ public class ReadCsvTestData {
         }
         return First;
     }
-    
+
     public ArrayList<NodeList2> readCsvFileToMap(String dataPath) throws IOException {
         Reader in = new FileReader(dataPath);
         ArrayList<String> header = readCSVHeader(dataPath);
@@ -122,26 +122,26 @@ public class ReadCsvTestData {
 
         return csvFilerow;
     }
-    
-    public ArrayList<ArrayList<String>> readCsvFileNewString(String dataPath,Boolean indexColumn,List<String> classTypes) throws IOException {
+
+    public ArrayList<ArrayList<String>> readCsvFileNewString(String dataPath, Boolean indexColumn, List<String> classTypes) throws IOException {
         Reader in = new FileReader(dataPath);
         ArrayList<String> header = readCSVHeader(dataPath);
         CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader(header.toString()).setSkipHeaderRecord(true).build();
         Iterable<CSVRecord> records = csvFormat.parse(in);
 
-        ArrayList<ArrayList<String>>  csvFilerow =  new ArrayList<ArrayList<String>>();
+        ArrayList<ArrayList<String>> csvFilerow = new ArrayList<ArrayList<String>>();
 
         // read csv file without header
         for (CSVRecord record : records) {
             ArrayList<String> TestDataArrayList = new ArrayList<>();
-            for(int i = 0; i < header.size(); i++){
-                if(indexColumn && i==0){
+            for (int i = 0; i < header.size(); i++) {
+                if (indexColumn && i == 0) {
                     continue;
                 }
-                if(i==header.size()-1){
+                if (i == header.size() - 1) {
 
                 }
-                if(record.get(i).matches(".*[a-zA-Z].*")){
+                if (record.get(i).matches(".*[a-zA-Z].*")) {
                     continue;
                 }
                 TestDataArrayList.add(record.get(i));
@@ -153,16 +153,11 @@ public class ReadCsvTestData {
     }
 
 
-
-
     public ArrayList<TestData> readCsvFile(String dataPath) throws IOException {
         ArrayList<TestData> TestDataArrayList = new ArrayList<>();
         Reader in = new FileReader(dataPath);
 
-        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
-                .setHeader(HEADERS)
-                .setSkipHeaderRecord(true)
-                .build();
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader(HEADERS).setSkipHeaderRecord(true).build();
 
 
         Iterable<CSVRecord> records = csvFormat.parse(in);
@@ -172,12 +167,13 @@ public class ReadCsvTestData {
             String x_coordinate = record.get("x_coordinate");
             String y_coordinate = record.get("y_coordinate");
             String Class = record.get("class");
-            TestData testData = new TestData(Double.parseDouble(x_coordinate),Double.parseDouble(y_coordinate),Double.parseDouble(Class),points);
+            TestData testData = new TestData(Double.parseDouble(x_coordinate), Double.parseDouble(y_coordinate), Double.parseDouble(Class), points);
             TestDataArrayList.add(testData);
         }
         return TestDataArrayList;
     }
-    public static Double[][] euclidianDistance(ArrayList<ArrayList<String>> TestDataArrayList){
+
+    public static Double[][] euclidianDistance(ArrayList<ArrayList<String>> TestDataArrayList) {
 
 
         Double[][] doubleList = convertToDoubleArray(TestDataArrayList);
@@ -192,7 +188,7 @@ public class ReadCsvTestData {
                     distanceMatrix[i][j] = euclideanDistance(doubleList[i], doubleList[j]);
                 }
             }
-            }
+        }
 
         return distanceMatrix;
 
@@ -207,6 +203,7 @@ public class ReadCsvTestData {
 
         return Math.sqrt(sum);
     }
+
     public static Double[][] convertToDoubleArray(ArrayList<ArrayList<String>> arrayList) {
         int numRows = arrayList.size();
         int numCols = arrayList.get(0).size(); // Assuming all inner lists have the same size
@@ -222,7 +219,8 @@ public class ReadCsvTestData {
 
         return doubleArray;
     }
-    public static Double[][] calculateKNN(Double[][] pdist,String knn_neighbour) {
+
+    public static Double[][] calculateKNN(Double[][] pdist, String knn_neighbour) {
 //        Double[] sigmas = new Double[pdist.length];
         Double[][] sigmas = new Double[pdist.length][Integer.parseInt(knn_neighbour)];
 
@@ -235,9 +233,9 @@ public class ReadCsvTestData {
 
         return sigmas;
     }
-    public static Double[] calculateLocalSigmas(Double[][] pdist,String sigma) {
-        Double[] sigmas = new Double[pdist.length];
 
+    public static Double[] calculateLocalSigmas(Double[][] pdist, String sigma) {
+        Double[] sigmas = new Double[pdist.length];
 
 
         for (int i = 0; i < pdist.length; i++) {
@@ -247,6 +245,7 @@ public class ReadCsvTestData {
         }
         return sigmas;
     }
+
     public static Double[][] calculateAdjacencyMatrix(Double[][] dist_, Double[] sigmas) {
         Double[][] adj = new Double[dist_.length][dist_.length];
 
@@ -257,22 +256,23 @@ public class ReadCsvTestData {
                     continue;
                 }
                 //adj[i][j] = Math.exp( (-Math.pow(dist_[i][j], 2)) / ((2 * Math.pow(sigmas[i], 2))) );
-                adj[i][j] = Math.exp( (-1* Math.pow(dist_[i][j], 2)) / ((sigmas[i] * sigmas[j])) );
+                adj[i][j] = Math.exp((-1 * Math.pow(dist_[i][j], 2)) / ((sigmas[i] * sigmas[j])));
                 //adj[j][i] = Math.exp( (-1 * Math.pow(dist_[i][j], 2)) / ((sigmas[i] * sigmas[j])) );
             }
         }
 
         return adj;
     }
+
     public static ArrayList<EdgeList> calulateEdgeList(Double[][] adj_mat) {
         ArrayList<EdgeList> edgeList = new ArrayList<>();
 
         for (int i = 0; i < adj_mat.length; i++) {
             for (int j = i + 1; j < adj_mat[i].length; j++) {
-                edgeList.add(new EdgeList(i, j, adj_mat[i][j],i));
+                edgeList.add(new EdgeList(i, j, adj_mat[i][j], i));
             }
         }
-            return edgeList;
+        return edgeList;
     }
 
     public static ArrayList<String> getNodeList(ArrayList<ArrayList<String>> TestDataArrayList) {
@@ -283,7 +283,8 @@ public class ReadCsvTestData {
         }
         return nodeList;
     }
-    public static Double [][] calculateEpsilonNeighbourhoodGraph (Double[][] dist_,Double epsilon){
+
+    public static Double[][] calculateEpsilonNeighbourhoodGraph(Double[][] dist_, Double epsilon) {
         Double[][] adj = new Double[dist_.length][dist_.length];
         for (int i = 0; i < dist_.length; i++) {
             for (int j = 0; j < dist_[i].length; j++) {
@@ -291,17 +292,17 @@ public class ReadCsvTestData {
                     adj[i][j] = 0.0;
                     continue;
                 }
-                if (dist_[i][j] <= epsilon){
+                if (dist_[i][j] <= epsilon) {
                     adj[i][j] = 1.0;
-                }
-                else {
+                } else {
                     adj[i][j] = 0.0;
                 }
             }
         }
         return adj;
     }
-    public static Double[][] calculateKNNGraph(Double[][] dist_,Double [][] knn){
+
+    public static Double[][] calculateKNNGraph(Double[][] dist_, Double[][] knn) {
 
         Double[][] adj = new Double[dist_.length][dist_[0].length];
 
@@ -311,10 +312,9 @@ public class ReadCsvTestData {
                     adj[i][j] = 0.0;
                     continue;
                 }
-                if (Arrays.asList(knn[i]).contains(dist_[i][j])){
+                if (Arrays.asList(knn[i]).contains(dist_[i][j])) {
                     adj[i][j] = 1.0;
-                }
-                else {
+                } else {
                     adj[i][j] = 0.0;
                 }
             }
@@ -322,7 +322,8 @@ public class ReadCsvTestData {
 
         return adj;
     }
-    public static Double[][] calculateMutualKNNGraph(Double[][] dist_,Double [][] knn){
+
+    public static Double[][] calculateMutualKNNGraph(Double[][] dist_, Double[][] knn) {
 
         Double[][] adj = new Double[dist_.length][dist_[0].length];
         //calculateMutualKNNGraph
@@ -332,11 +333,10 @@ public class ReadCsvTestData {
                     adj[i][j] = 0.0;
                     continue;
                 }
-                if (Arrays.asList(knn[i]).contains(dist_[i][j]) && Arrays.asList(knn[j]).contains(dist_[i][j])){
+                if (Arrays.asList(knn[i]).contains(dist_[i][j]) && Arrays.asList(knn[j]).contains(dist_[i][j])) {
                     adj[i][j] = 1.0;
                     adj[j][i] = 1.0;
-                }
-                else{
+                } else {
                     adj[i][j] = 0.0;
                 }
             }
@@ -345,7 +345,6 @@ public class ReadCsvTestData {
 
         return adj;
     }
-
 
 
     public static void main(String[] args) throws IOException {
@@ -359,11 +358,6 @@ public class ReadCsvTestData {
 //        Double[] sigmas = calculateLocalSigmas(dist_array);
 //        Double[][] adj_mat = calculateAdjacencyMatrix(dist_array,sigmas);
 //        Double[][] adj_mat_eps = calculateEpsilonNeighbourhoodGraph(dist_array,5.0);
-
-
-
-
-
 
 
     }

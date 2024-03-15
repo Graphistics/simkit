@@ -56,7 +56,8 @@ public class EdgeList2 {
     public void setRelationshipProperties(Map<String, Object> relationshipProperties) {
         this.relationshipProperties = relationshipProperties;
     }
-    
+
+
     @Override
     public String toString() {
         return "EdgeList{" +
@@ -68,3 +69,4 @@ public class EdgeList2 {
                 '}';
     }
 }
+

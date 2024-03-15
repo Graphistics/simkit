@@ -15,7 +15,7 @@ import definition.NodeList2;
 
 public class GraphTransform {
     public String dataPath;
-    
+
 //    public static Double[][] euclidianDistance(ArrayList<ArrayList<String>> TestDataArrayList){
 //
 //
@@ -31,7 +31,8 @@ public class GraphTransform {
 //                    distanceMatrix[i][j] = euclideanDistance(doubleList[i], doubleList[j]);
 //                }
 //            }
-//            }
+//        }
+//
 //
 //        return distanceMatrix;
 //
@@ -61,7 +62,6 @@ public class GraphTransform {
 
         return doubleArray;
     }
-
 
     
     public static Double[][] euclideanDistance(List<NodeList2> nodeList) {
@@ -206,7 +206,7 @@ public class GraphTransform {
 
         return adj;
     }
-    
+
     public static Double[][] calculateMutualKNNGraph(Double[][] dist_,Double [] knn){
 
         Double[][] adj = new Double[dist_.length][dist_[0].length];
@@ -240,7 +240,7 @@ public class GraphTransform {
                 edgeList.add(new EdgeList(i, j, adj_mat[i][j],i));
             }
         }
-            return edgeList;
+        return edgeList;
     }
 
     public static ArrayList<String> getNodeList(ArrayList<ArrayList<String>> TestDataArrayList) {
@@ -251,7 +251,7 @@ public class GraphTransform {
         }
         return nodeList;
     }
-    
+
     public static List<NodeList2> getNodeList2(ArrayList<ArrayList<String>> TestDataArrayList) {
         List<NodeList2> nodeList = new LinkedList<>();
         // add all the nodes to the nodeList with entries and properties
@@ -264,6 +264,7 @@ public class GraphTransform {
         }
         return nodeList;
     }
+
     
     
     public static ArrayList<EdgeList2> calculateEdgeList(List<NodeList2> nodePropertiesList, Double[][] adj_mat) {
@@ -272,12 +273,11 @@ public class GraphTransform {
         for (int i = 0; i < adj_mat.length; i++) {
             for (int j = i + 1; j < adj_mat[i].length; j++) {
                 String sourceId = nodePropertiesList.get(i).getIndex();
-                String targetId = nodePropertiesList.get(j).getIndex(); 
+                String targetId = nodePropertiesList.get(j).getIndex();
                 edgeList.add(new EdgeList2(sourceId, targetId, adj_mat[i][j], i, null));
             }
         }
         return edgeList;
     }
 
-    
 }

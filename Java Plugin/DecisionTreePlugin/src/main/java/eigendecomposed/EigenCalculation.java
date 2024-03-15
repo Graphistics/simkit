@@ -29,47 +29,54 @@ public class EigenCalculation {
         }
     }
     
-    public static EigenResult calculateEigen(RealMatrix laplacianMatrix, double userDefinedK) {
+    /**
+     * Calculates the eigenvalues, eigenvectors, and X matrix from the provided Laplacian matrix.
+     *
+     * @param laplacianMatrix The Laplacian matrix of the graph.
+     * @param number_of_eigenvectors The number of desired eigenvectors to compute during eigen decomposition.
+     * @return EigenResult containing eigenvalues, eigenvectors, and X matrix.
+     */
+    public static EigenResult calculateEigen(RealMatrix laplacian_matrix, double number_of_eigenvectors) {
         try {
-            EigenDecomposition eigenDecomposition = new EigenDecomposition(laplacianMatrix);
-            RealMatrix v = eigenDecomposition.getV();
-            double[] e = eigenDecomposition.getRealEigenvalues();
+            EigenDecomposition eigen_decomposition = new EigenDecomposition(laplacian_matrix);
+            RealMatrix v = eigen_decomposition.getV();
+            double[] e = eigen_decomposition.getRealEigenvalues();
 
             // Sort eigenvalues and eigenvectors in ascending order
-            Integer[] sortedIndices = new Integer[e.length];
+            Integer[] sorted_indices = new Integer[e.length];
             for (int i = 0; i < e.length; i++) {
-                sortedIndices[i] = i;
+                sorted_indices[i] = i;
             }
 
-            Arrays.sort(sortedIndices, Comparator.comparingDouble(index -> e[index]));
+            Arrays.sort(sorted_indices, Comparator.comparingDouble(index -> e[index]));
 
-            double[] sortedEigenvalues = new double[e.length];
-            RealMatrix sortedEigenvectors = new BlockRealMatrix(v.getRowDimension(), v.getColumnDimension());
+            double[] sorted_eigenvalues = new double[e.length];
+            RealMatrix sorted_eigenvectors = new BlockRealMatrix(v.getRowDimension(), v.getColumnDimension());
 
             for (int i = 0; i < e.length; i++) {
-                int originalIndex = sortedIndices[i];
-                sortedEigenvalues[i] = e[originalIndex];
-                sortedEigenvectors.setColumnVector(i, v.getColumnVector(originalIndex));
+                int original_index = sorted_indices[i];
+                sorted_eigenvalues[i] = e[original_index];
+                sorted_eigenvectors.setColumnVector(i, v.getColumnVector(original_index));
             }
 
 
-            int dimension = laplacianMatrix.getColumnDimension();
-            int k = (int) ((userDefinedK > 0) ? userDefinedK : calculateOptimalK(sortedEigenvalues) +1);
+            int dimension = laplacian_matrix.getColumnDimension();
+            int k = (int) ((number_of_eigenvectors > 0) ? number_of_eigenvectors : calculateOptimalK(sorted_eigenvalues));
             
             // Round eigenvalues to 7 decimal places
-            DecimalFormat decimalFormat = new DecimalFormat("#.#######");
-            for (int i = 0; i < sortedEigenvalues.length; i++) {
-                sortedEigenvalues[i] = Double.parseDouble(decimalFormat.format(sortedEigenvalues[i]));
+            DecimalFormat decimal_format = new DecimalFormat("#.#######");
+            for (int i = 0; i < sorted_eigenvalues.length; i++) {
+                sorted_eigenvalues[i] = Double.parseDouble(decimal_format.format(sorted_eigenvalues[i]));
             }
 
             // Round eigenvectors to 7 decimal places
-            for (int i = 0; i < sortedEigenvectors.getRowDimension(); i++) {
-                for (int j = 0; j < sortedEigenvectors.getColumnDimension(); j++) {
-                    sortedEigenvectors.setEntry(i, j, Double.parseDouble(decimalFormat.format(sortedEigenvectors.getEntry(i, j))));
+            for (int i = 0; i < sorted_eigenvectors.getRowDimension(); i++) {
+                for (int j = 0; j < sorted_eigenvectors.getColumnDimension(); j++) {
+                    sorted_eigenvectors.setEntry(i, j, Double.parseDouble(decimal_format.format(sorted_eigenvectors.getEntry(i, j))));
                 }
             }
-            RealMatrix X = sortedEigenvectors.getSubMatrix(0, dimension - 1, dimension - k, dimension - 1);
-            return new EigenResult(sortedEigenvalues, sortedEigenvectors, X);
+            RealMatrix X = sorted_eigenvectors.getSubMatrix(0, dimension - 1, dimension - k, dimension - 1);
+            return new EigenResult(sorted_eigenvalues, sorted_eigenvectors, X);
         } catch (Exception e) {
             e.printStackTrace();
             return new EigenResult(new double[0], MatrixUtils.createRealMatrix(0, 0), MatrixUtils.createRealMatrix(0, 0));
@@ -78,12 +85,12 @@ public class EigenCalculation {
     
 
     private static int calculateOptimalK(double[] eigenvalues) {
-        double largestEigenGap = EigenGap.findLargestEigenGap(eigenvalues);
-        return (int) Math.round(largestEigenGap);
+        double largest_eigen_gap = EigenGap.findLargestEigenGap(eigenvalues);
+        return (int) Math.round(largest_eigen_gap);
     }
 
 
-    private static void displayEigenResult(EigenResult eigenResult) {
+    public static void displayEigenResult(EigenResult eigenResult) {
         displayArray(eigenResult.eigenvalues, "eigenvalues");
         displayMatrix(eigenResult.eigenvectors, "eigenvectors");
         displayMatrix(eigenResult.X, "X matrix");
@@ -94,7 +101,7 @@ public class EigenCalculation {
         System.out.println();
     }
 
-    private static void displayMatrix(RealMatrix matrix, String matrixName) {
+    public static void displayMatrix(RealMatrix matrix, String matrixName) {
         System.out.println(matrixName + ": ");
         int rows = matrix.getRowDimension();
         int cols = matrix.getColumnDimension();
@@ -107,79 +114,54 @@ public class EigenCalculation {
         System.out.println();
     }
     
-    public static ArrayList<EdgeList2> createEdgeList(List<NodeList2> nodePropertiesList, RealMatrix X) {
-        ArrayList<EdgeList2> edgeList = new ArrayList<>();
+    /**
+     * Creates an edge list based on the provided node properties, eigenvectors, and original edge list.
+     *
+     * @param node_properties_list List of node properties.
+     * @param X                  The matrix of eigenvectors.
+     * @param original_edge_list   The original edge list.
+     * @return ArrayList of EdgeList2 representing the new edge list.
+     */
+    public static ArrayList<EdgeList2> createEdgeList(List<NodeList2> node_properties_list, RealMatrix X, ArrayList<EdgeList2> original_edge_list) {
+        ArrayList<EdgeList2> edge_list = new ArrayList<>();
 
-        int numRows = X.getRowDimension();
-        Double[][] distanceMatrix = euclideanDistance(X);
+        int num_rows = X.getRowDimension();
+        Double[][] distance_matrix = euclideanDistance(X);
 
-        for (int i = 0; i < numRows; i++) {
-            for (int j = i + 1; j < numRows; j++) {
-                double distance = distanceMatrix[i][j];
+        for (int i = 0; i < num_rows; i++) {
+            for (int j = i + 1; j < num_rows; j++) {
+                double distance = distance_matrix[i][j];
 
-                    String sourceId = nodePropertiesList.get(i).getIndex();
-                    String targetId = nodePropertiesList.get(j).getIndex();
-                    edgeList.add(new EdgeList2(sourceId, targetId, distance, i, null));
+                    String source_id = node_properties_list.get(i).getIndex();
+                    String target_id = node_properties_list.get(j).getIndex();
+                    
+                    boolean has_original_edge = original_edge_list.stream()
+                            .anyMatch(edge -> (edge.getSource().equals(source_id) && edge.getTarget().equals(target_id))
+                                    || (edge.getSource().equals(target_id) && edge.getTarget().equals(source_id)));
+
+                    if (has_original_edge) {
+                    edge_list.add(new EdgeList2(source_id, target_id, distance, i, null));
+                    }
             }
         }
 
-        return edgeList;
+        return edge_list;
     }
 
     public static Double[][] euclideanDistance(RealMatrix X) {
         int size = X.getRowDimension();
-        Double[][] distanceMatrix = new Double[size][size];
+        Double[][] distance_matrix = new Double[size][size];
 
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
                 double distance = calculateEuclideanDistance(X.getRowVector(i), X.getRowVector(j));
-                distanceMatrix[i][j] = distance;
+                distance_matrix[i][j] = distance;
             }
         }
-        return distanceMatrix;
+        return distance_matrix;
     }
 
     private static double calculateEuclideanDistance(RealVector v1, RealVector v2) {
         return v1.getDistance(v2);
-    }
-
-
-
-    
-//    public static ArrayList<EdgeList2> createEdgeList(List<NodeList2> nodePropertiesList, RealMatrix eigenvectors, double threshold) {
-//        ArrayList<EdgeList2> edgeList = new ArrayList<>();
-//
-//        int numRows = eigenvectors.getRowDimension();
-//
-//        for (int i = 0; i < numRows; i++) {
-//            for (int j = i + 1; j < numRows; j++) {
-//                double value = eigenvectors.getEntry(i, j);
-//
-//                if (Math.abs(value) >= threshold) {
-//                    String sourceId = nodePropertiesList.get(i).getIndex();
-//                    String targetId = nodePropertiesList.get(j).getIndex();
-//                    edgeList.add(new EdgeList2(sourceId, targetId, value, i, null));
-//                }
-//            }
-//        }
-//
-//        return edgeList;
-//    }
-
-
-    public static ArrayList<NodeList2> createNodeList(RealMatrix eigenvectors, double threshold) {
-        ArrayList<NodeList2> nodeList = new ArrayList<>();
-
-        int numRows = eigenvectors.getRowDimension();
-
-        for (int i = 0; i < numRows; i++) {
-            double value = eigenvectors.getEntry(i, i);
-
-            if (Math.abs(value) >= threshold) {
-                nodeList.add(new NodeList2(Integer.toString(i), null));
-            }
-        }
-
-        return nodeList;
     }
 }

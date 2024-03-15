@@ -25,12 +25,17 @@ public class DistanceMeasureNodes {
         Map<String, Object> properties1 = node1.getProperties();
         Map<String, Object> properties2 = node2.getProperties();
 
-        removeList.forEach(properties1.keySet()::remove);
-        removeList.forEach(properties2.keySet()::remove);
+
+//        removeList.forEach(properties1.keySet()::remove);
+//        removeList.forEach(properties2.keySet()::remove);
 
         double sum = 0.0;
 
         for (String propertyKey : properties1.keySet()) {
+            // ignore the properties in the removeList
+            if (removeList.contains(propertyKey)){
+                continue;
+            }
             Object value1 = properties1.get(propertyKey);
             Object value2 = properties2.get(propertyKey);
 
@@ -58,14 +63,17 @@ public class DistanceMeasureNodes {
         Map<String, Object> properties1 = node1.getProperties();
         Map<String, Object> properties2 = node2.getProperties();
 
-        removeList.forEach(properties1.keySet()::remove);
-        removeList.forEach(properties2.keySet()::remove);
+//        removeList.forEach(properties1.keySet()::remove);
+//        removeList.forEach(properties2.keySet()::remove);
 
         double sum = 0.0;
 
 
 
         for (String propertyKey : properties1.keySet()) {
+            if (removeList.contains(propertyKey)){
+                continue;
+            }
             Object value1 = properties1.get(propertyKey);
             Object value2 = properties2.get(propertyKey);
 
@@ -92,12 +100,15 @@ public class DistanceMeasureNodes {
         Map<String, Object> properties1 = node1.getProperties();
         Map<String, Object> properties2 = node2.getProperties();
 
-        removeList.forEach(properties1.keySet()::remove);
-        removeList.forEach(properties2.keySet()::remove);
+//        removeList.forEach(properties1.keySet()::remove);
+//        removeList.forEach(properties2.keySet()::remove);
 
         double sum = 0.0;
 
         for (String propertyKey : properties1.keySet()) {
+            if (removeList.contains(propertyKey)){
+                continue;
+            }
             Object value1 = properties1.get(propertyKey);
             Object value2 = properties2.get(propertyKey);
 
@@ -113,11 +124,16 @@ public class DistanceMeasureNodes {
         Double[][] distanceMatrix = new Double[size][size];
 
         for (int i = 0; i < size; i++) {
-            for (int j = i; j < size; j++) {
+            for (int j = 0; j < size; j++) {
 
-                    double distance = calculateCosineSimilarity(nodeList.get(i), nodeList.get(j),removeList);
+                if (i == j) {
+                    distanceMatrix[i][j] = 0.00;
+                } else {
+
+                    double distance = calculateCosineSimilarity(nodeList.get(i), nodeList.get(j), removeList);
                     distanceMatrix[i][j] = distance;
                     distanceMatrix[j][i] = distance;
+                }
             }
         }
         return distanceMatrix;
@@ -126,14 +142,17 @@ public class DistanceMeasureNodes {
         Map<String, Object> properties1 = node1.getProperties();
         Map<String, Object> properties2 = node2.getProperties();
 
-        removeList.forEach(properties1.keySet()::remove);
-        removeList.forEach(properties2.keySet()::remove);
+//        removeList.forEach(properties1.keySet()::remove);
+//        removeList.forEach(properties2.keySet()::remove);
 
         double sum = 0.0;
         double sum1 = 0.0;
         double sum2 = 0.0;
 
         for (String propertyKey : properties1.keySet()) {
+            if (removeList.contains(propertyKey)){
+                continue;
+            }
             Object value1 = properties1.get(propertyKey);
             Object value2 = properties2.get(propertyKey);
 
@@ -163,14 +182,17 @@ public class DistanceMeasureNodes {
         Map<String, Object> properties1 = node1.getProperties();
         Map<String, Object> properties2 = node2.getProperties();
 
-        removeList.forEach(properties1.keySet()::remove);
-        removeList.forEach(properties2.keySet()::remove);
+//        removeList.forEach(properties1.keySet()::remove);
+//        removeList.forEach(properties2.keySet()::remove);
 
         double sum = 0.0;
         double sum1 = 0.0;
         double sum2 = 0.0;
 
         for (String propertyKey : properties1.keySet()) {
+            if (removeList.contains(propertyKey)){
+                continue;
+            }
             Object value1 = properties1.get(propertyKey);
             Object value2 = properties2.get(propertyKey);
 
@@ -201,13 +223,16 @@ public class DistanceMeasureNodes {
         Map<String, Object> properties1 = node1.getProperties();
         Map<String, Object> properties2 = node2.getProperties();
 
-        removeList.forEach(properties1.keySet()::remove);
-        removeList.forEach(properties2.keySet()::remove);
+//        removeList.forEach(properties1.keySet()::remove);
+//        removeList.forEach(properties2.keySet()::remove);
 
         double sum1 = 0.0;
         double sum2 = 0.0;
 
         for (String propertyKey : properties1.keySet()) {
+            if (removeList.contains(propertyKey)){
+                continue;
+            }
             Object value1 = properties1.get(propertyKey);
             Object value2 = properties2.get(propertyKey);
 
@@ -220,4 +245,10 @@ public class DistanceMeasureNodes {
 
     }
     
+    
+    
+    
+    
+
+
 }
