@@ -561,7 +561,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	}
 
-	
 	/**
 	 * Creates a Laplacian Eigen Transform graph based on Laplacian matrix type and specified number of eigenvectors.
 	 *
@@ -571,6 +570,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	 * @return String indicating the success of the graph creation and create Graph with Nodes and Relationships in Neo4j.
 	 * @throws Exception.
 	 */
+	@UserFunction
 	public String createLaplacianEigenTransformGraph(@Name("node_label") String node_label,  @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors) throws Exception {
 		
 		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
@@ -650,6 +650,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
     }
 
+	@UserFunction
 	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath,@Name("method") String method, @Name("epsilon") Double epsilon) throws Exception {
 		
     	String outputString = "";
