@@ -17,144 +17,143 @@ import definition.EdgeList2;
 public class MatrixCalculation {
 	
     public static class MatrixResult {
-        private static RealMatrix adjacencyMatrix;
-        private static RealMatrix degreeMatrix;
-        private static RealMatrix laplacianMatrix;
+        private static RealMatrix adjacency_matrix;
+        private static RealMatrix degree_matrix;
+        private static RealMatrix laplacian_matrix;
 
-        public MatrixResult(RealMatrix adjacencyMatrix, RealMatrix degreeMatrix, RealMatrix laplacianMatrix) {
-            MatrixResult.adjacencyMatrix = adjacencyMatrix;
-            MatrixResult.degreeMatrix = degreeMatrix;
-            MatrixResult.laplacianMatrix = laplacianMatrix;
+        public MatrixResult(RealMatrix adjacency_matrix, RealMatrix degree_matrix, RealMatrix laplacian_matrix) {
+            MatrixResult.adjacency_matrix = adjacency_matrix;
+            MatrixResult.degree_matrix = degree_matrix;
+            MatrixResult.laplacian_matrix = laplacian_matrix;
         }
 
         public RealMatrix getAdjacencyMatrix() {
-            return adjacencyMatrix;
+            return adjacency_matrix;
         }
 
         public static RealMatrix getDegreeMatrix() {
-            return degreeMatrix;
+            return degree_matrix;
         }
 
         public static RealMatrix getLaplacianMatrix() {
-            return laplacianMatrix;
+            return laplacian_matrix;
         }
     }
     
-    public static double[][] convertToAdjacencyMatrix2(ArrayList<EdgeList2> edgeList) {
-        Set<String> uniqueIndices = new HashSet<>();
-        for (EdgeList2 edge : edgeList) {
-            uniqueIndices.add(edge.getSource());
-            uniqueIndices.add(edge.getTarget());
+    /**
+     * Converts an edge list into an adjacency matrix.
+     *
+     * @param edge_list The edge list to convert.
+     * @return 2D array representing the adjacency matrix.
+     */
+    public static double[][] convertToAdjacencyMatrix(ArrayList<EdgeList2> edge_list) {
+        Set<String> unique_indices = new HashSet<>();
+        for (EdgeList2 edge : edge_list) {
+            unique_indices.add(edge.getSource());
+            unique_indices.add(edge.getTarget());
         }
 
-        int dimension = uniqueIndices.size();
-        List<String> sortedIndices = new ArrayList<>(uniqueIndices);
-        Collections.sort(sortedIndices);
+        int dimension = unique_indices.size();
+        List<String> sorted_indices = new ArrayList<>(unique_indices);
+        Collections.sort(sorted_indices);
 
-        Map<String, Integer> indexMapping = new HashMap<>();
+        Map<String, Integer> index_mapping = new HashMap<>();
         for (int i = 0; i < dimension; i++) {
-            indexMapping.put(sortedIndices.get(i), i);
+            index_mapping.put(sorted_indices.get(i), i);
         }
 
-        double[][] adjacencyMatrixData = new double[dimension][dimension];
+        double[][] adjacency_matrix_data = new double[dimension][dimension];
 
-        for (EdgeList2 edge : edgeList) {
-            int i = indexMapping.get(edge.getSource());
-            int j = indexMapping.get(edge.getTarget());
+        for (EdgeList2 edge : edge_list) {
+            int i = index_mapping.get(edge.getSource());
+            int j = index_mapping.get(edge.getTarget());
             double weight = edge.getWeight();
-            adjacencyMatrixData[i][j] = weight;
-            adjacencyMatrixData[j][i] = weight;
+            adjacency_matrix_data[i][j] = weight;
+            adjacency_matrix_data[j][i] = weight;
         }
 
-        return adjacencyMatrixData;
+        return adjacency_matrix_data;
     }
-
-    
-    
-//    public static double[][] convertToAdjacencyMatrix(ArrayList<EdgeList2> edgeList) {
-//        // Find the maximum index value to determine the dimension of the adjacency matrix
-//        int maxIndex = 0;
-//        for (EdgeList2 edge : edgeList) {
-//            int sourceIndex = extractIndexFromId(edge.getSource());
-//            int targetIndex = extractIndexFromId(edge.getTarget());
-//
-//            maxIndex = Math.max(maxIndex, sourceIndex);
-//            maxIndex = Math.max(maxIndex, targetIndex);
-//        }
-//
-//        // Dimension of the adjacency matrix
-//        int dimension = maxIndex + 1;
-//        double[][] adjacencyMatrixData = new double[dimension][dimension];
-//
-//        // Initialize adjacency matrix with appropriate weights
-//        for (EdgeList2 edge : edgeList) {
-//            int i = extractIndexFromId(edge.getSource());
-//            int j = extractIndexFromId(edge.getTarget());
-//            double weight = edge.getWeight();
-//            adjacencyMatrixData[i][j] = weight;
-//            adjacencyMatrixData[j][i] = weight;
-//        }
-//
-//        return adjacencyMatrixData;
-//    }
-//
-//    private static int extractIndexFromId(String id) {
-//        return Integer.parseInt(id.replaceAll("\\D", ""));
-//    }
    
-    public static RealMatrix calculateLaplacianMatrix(RealMatrix degreeMatrix, RealMatrix adjacencyMatrix, String algorithm) {
+    /**
+     * Calculates the Laplacian matrix based on the provided degree matrix, adjacency matrix and desired type of Laplacian matrix.
+     *
+     * @param degree_matrix    The degree matrix of the graph.
+     * @param adjacency_matrix The adjacency matrix of the graph.
+     * @param algorithm       The algorithm to use for Laplacian matrix calculation ("sym" or "rw").
+     * @return The Laplacian matrix.
+     */
+    public static RealMatrix calculateLaplacianMatrix(RealMatrix degree_matrix, RealMatrix adjacency_matrix, String algorithm) {
         try {
-            RealMatrix laplacianMatrix;
+            RealMatrix laplacian_matrix;
 
             switch (algorithm) {
-                case "SYMMETRIC":
-                    laplacianMatrix = calculateSymmetricLaplacianMatrix(degreeMatrix, adjacencyMatrix);
+                case "sym":
+                    laplacian_matrix = calculateSymmetricLaplacianMatrix(degree_matrix, adjacency_matrix);
                     break;
-                case "RANDOM_WALK":
-                    laplacianMatrix = calculateRandomWalkLaplacianMatrix(degreeMatrix, adjacencyMatrix);
+                case "rw":
+                    laplacian_matrix = calculateRandomWalkLaplacianMatrix(degree_matrix, adjacency_matrix);
                     break;
                 default:
                     throw new IllegalArgumentException("Invalid Laplacian algorithm choice.");
             }
 
-            return laplacianMatrix;
+            return laplacian_matrix;
         } catch (Exception e) {
             throw new RuntimeException("Error calculating Laplacian matrix: " + e.getMessage());
         }
     }
 
-    
+    /**
+     * Calculates the degree matrix from an adjacency matrix.
+     *
+     * @param adj_mat The adjacency matrix.
+     * @return The degree matrix.
+     */
     public static RealMatrix calculateDegreeMatrix(double[][] adj_mat) {
-        RealMatrix adjacencyMatrix = new BlockRealMatrix(adj_mat);
-        int dimension = adjacencyMatrix.getColumnDimension();
+        RealMatrix adjacency_matrix = new BlockRealMatrix(adj_mat);
+        int dimension = adjacency_matrix.getColumnDimension();
 
         double[] columnSum = new double[dimension];
         for (int col = 0; col < dimension; col++) {
-            columnSum[col] = adjacencyMatrix.getColumnVector(col).getL1Norm();
+            columnSum[col] = adjacency_matrix.getColumnVector(col).getL1Norm();
         }
 
         return MatrixUtils.createRealDiagonalMatrix(columnSum);
     }
 
-    
-    public static RealMatrix calculateSymmetricLaplacianMatrix(RealMatrix degreeMatrix, RealMatrix adjacencyMatrix) {
-        int dimension = degreeMatrix.getColumnDimension();
+    /**
+     * Calculates the symmetric Laplacian matrix based on the degree matrix and adjacency matrix.
+     *
+     * @param degree_matrix    The degree matrix of the graph.
+     * @param adjacency_matrix The adjacency matrix of the graph.
+     * @return The symmetric Laplacian matrix.
+     */
+    public static RealMatrix calculateSymmetricLaplacianMatrix(RealMatrix degree_matrix, RealMatrix adjacency_matrix) {
+        int dimension = degree_matrix.getColumnDimension();
         RealMatrix dHalf = MatrixUtils.createRealMatrix(dimension, dimension);
 
         for (int i = 0; i < dimension; i++) {
-            double dHalfValue = 1.0 / Math.sqrt(degreeMatrix.getEntry(i, i));
+            double dHalfValue = 1.0 / Math.sqrt(degree_matrix.getEntry(i, i));
             dHalf.setEntry(i, i, dHalfValue);
         }
 
-        RealMatrix laplacianMatrixNormalized = dHalf.multiply(adjacencyMatrix).multiply(dHalf);
-        return laplacianMatrixNormalized;
+        RealMatrix laplacian_matrix_normalized = dHalf.multiply(adjacency_matrix).multiply(dHalf);
+        return laplacian_matrix_normalized;
     }
 
-    public static RealMatrix calculateRandomWalkLaplacianMatrix(RealMatrix degreeMatrix, RealMatrix adjacencyMatrix) {
-        RealMatrix inverseDegreeMatrix = MatrixUtils.inverse(degreeMatrix);
-        RealMatrix randomWalkLaplacianMatrix = inverseDegreeMatrix.multiply(adjacencyMatrix);
+    /**
+     * Calculates the random walk Laplacian matrix based on the degree matrix and adjacency matrix.
+     *
+     * @param degree_matrix    The degree matrix of the graph.
+     * @param adjacency_matrix The adjacency matrix of the graph.
+     * @return The random walk Laplacian matrix.
+     */
+    public static RealMatrix calculateRandomWalkLaplacianMatrix(RealMatrix degree_matrix, RealMatrix adjacency_matrix) {
+        RealMatrix inverse_degree_matrix = MatrixUtils.inverse(degree_matrix);
+        RealMatrix random_walk_laplacian_matrix = inverse_degree_matrix.multiply(adjacency_matrix);
 
-        return randomWalkLaplacianMatrix;
+        return random_walk_laplacian_matrix;
     }
 
     
