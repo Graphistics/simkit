@@ -83,7 +83,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	/**
 	 * Creation of driver object using bolt protocol
-	 * @param uri Uniform resource identifier for bolt
+	 * @param uri Uniform resource identifier for bolto
 	 * @param user Username
 	 * @param password Password
 	 */
@@ -1770,27 +1770,36 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
      */
     @UserFunction
     @Description("Kmean clustering function")
-	public String kmean(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
+    public String kmean(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
 	{
+    	predictedNodeLabels.clear();
     	try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
         {
 			String averageSilhouetteCoefficientString = "The average Silhouette Coefficient value is: ";
 			HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
 			int numberOfCentroidInt = Integer.parseInt(numberOfCentroid);
 			int numberOfInterationInt = Integer.parseInt(numberOfInteration);
-			
+			double centroidNumber = 1.0;
+
 			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure);
 			double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
-	        
-			for (String centroid: kmeanAssign.keySet()) {
-        		ArrayList<String> clusterNode = kmeanAssign.get(centroid);
-        		for (String node : clusterNode)
-        		{
-        			connector.connectNodes(nodeSet, "create relationship in kmean node",centroid,node);
-        		}
-		    
-    		}
-			return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue ;
+
+			for (String centroid : kmeanAssign.keySet()) {
+			    ArrayList<String> clusterNode = kmeanAssign.get(centroid);
+			    for (int i = 0; i < clusterNode.size(); i++) {
+			    	//Add predict labels
+		    		predictedNodeLabels.add(centroidNumber);
+
+			    	DecimalFormat decimalFormat = new DecimalFormat("#.###");
+			        double distance = Unsupervised.calculateDistance(clusterNode.get(i), centroid, distanceMeasure);
+			        String formattedDistance = decimalFormat.format(distance);
+			        double roundedDistance = Double.parseDouble(formattedDistance);
+			        connector.connectNodes(nodeSet, "create relationship in kmean node", centroid, clusterNode.get(i), roundedDistance);
+			    }
+			    centroidNumber = centroidNumber + 1;
+			}
+
+			return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue + " predicted labels: " + predictedNodeLabels;
 		}
 	}
     
@@ -1830,7 +1839,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
     }
     
     @UserFunction
-	public String ajustedRandIndex(@Name("nodeSet") String nodeSet, @Name("trueLabels") String trueLabel) throws Exception {
+	public String adjustedRandIndex(@Name("nodeSet") String nodeSet, @Name("trueLabels") String trueLabel) throws Exception {
 	    if(predictedNodeLabels.size()==0)
 	    {
 	    	
@@ -1838,7 +1847,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	    }
 	    else {
 	    	String listOfData = "";
-	    	Double ajustedRandIndexValue = 0.0;
+	    	Double adjustedRandIndexValue = 0.0;
 		    trueNodeLabels.clear();
 		    List<String> stringTrueNodeLabelsList = new ArrayList<String>();
 		    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
@@ -1876,10 +1885,10 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		        	return "true labels size: " + trueNodeLabels +" and predicted labels:" + predictedNodeLabels + " does not have the same size";
 		        }
 		        else {
-		        	ajustedRandIndexValue = calculateAdjustedRandIndex(trueNodeLabels, predictedNodeLabels);
+		        	adjustedRandIndexValue = calculateAdjustedRandIndex(trueNodeLabels, predictedNodeLabels);
 				}
 		    }
-		    return "ajusted rand index of " + nodeSet + " is: " + ajustedRandIndexValue ;
+		    return "ajusted rand index of " + nodeSet + " is: " + adjustedRandIndexValue ;
 	    }
 	}
     
