@@ -1,12 +1,29 @@
 package main;
+import java.util.Scanner;
+
+import definition.EdgeList2;
+import definition.NodeList2;
+import global.Neo4jGraphHandler;
+import org.neo4j.procedure.Description;
+import org.neo4j.procedure.Name;
+import org.neo4j.procedure.UserFunction;
+
+import cv.CrossValidation;
+import evaluate.EvaluateTree;
+import gainratio.EvaluateTreeGR;
+import gini.EvaluateTreeGI;
+import input.ProcessInputData;
+import output.PrintTree;
+import graph.*;
+
 import static org.neo4j.driver.Values.parameters;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+
 import java.util.List;
-import java.util.Scanner;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -23,23 +40,12 @@ import org.neo4j.driver.TransactionWork;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.util.Pair;
-import org.neo4j.procedure.Description;
-import org.neo4j.procedure.Name;
-import org.neo4j.procedure.UserFunction;
 
-import cv.CrossValidation;
 import definition.EdgeList;
-import definition.EdgeList2;
-import definition.NodeList2;
 import eigendecomposed.EigenCalculation;
 import eigendecomposed.MatrixCalculation;
-import evaluate.EvaluateTree;
-import gainratio.EvaluateTreeGR;
-import gini.EvaluateTreeGI;
-import global.Neo4jGraphHandler;
 import global.ReadCsvFile;
 import graph.DistanceMeasure;
-import graph.DistanceMeasureNodes;
 import graph.GraphTransform;
 import graph.ReadCsvTestData;
 import input.ProcessInputData;
@@ -360,7 +366,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public Double [][] getDistanceMatrix(String distanceMeasure,ArrayList<ArrayList<String>> testData){
 		Double[][] DistanceMatrix = null;
 
-
 		switch (distanceMeasure){
 			case "euclideanDistance":
 				DistanceMatrix = ReadCsvTestData.euclidianDistance(testData);
@@ -388,7 +393,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	@UserFunction
 	public String createGraphFromCsv(@Name("data_path") String data_path, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("parameter") String epsilon,@Name("remove_column") String remove_columns) throws Exception {
-
 
 		String confusionMatrix = "";
 		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
@@ -447,17 +451,13 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-
 	}
-	
 	@UserFunction
 	public String createGraphFromNodes(@Name("label") String label,@Name("distance_measure") String distanceMeasure,@Name("graph_type") String graphType,@Name("parameter") String epsilon,@Name("remove_column") String remove_columns) throws Exception {
 
 		String confusionMatrix = "";
 		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
 		{
-
-
 			if(label == null && distanceMeasure == null) {
 				return "Missing dataPath or distance measure type";
 			}else {
@@ -509,7 +509,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 					Neo4jGraphHandler.createRelationshipGraph(graphName.concat("new"), "created relationship in neo4j \n", edgeListDetail, connector.getDriver());
 
 				}
-
 			}
 			return "Create fully connected graph successful, " + confusionMatrix;
 		} catch (Exception e) {
@@ -546,7 +545,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		return DistanceMatrix;
 
 	}
-
+	
 	/**
 	 * Creates a Laplacian Eigen Transform graph based on Laplacian matrix type and specified number of eigenvectors.
 	 *
@@ -573,8 +572,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            EigenCalculation.EigenResult eigen_result = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
 	            ArrayList<NodeList2> node_list_eigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(node_label, connector.getDriver());
 	            ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_list_eigen, eigen_result.X, edge_list);
-
-	            
+    
 	            String graph_name = "eigendecomposedGraph_" + laplacian_type + "_" + node_label + "_" + Math.round(number_of_eigenvectors);
 	            
 	            for (NodeList2 node : node_list_eigen) {
@@ -592,6 +590,43 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	        }
 	        return "Create eigendecomposed graph successful!";
 	    } catch (Neo4jException e) {
+	        throw new RuntimeException("Error creating laplacian graph in Neo4j: " + e.getMessage());
+	    }
+	}
+
+	@UserFunction
+	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath,@Name("method") String method, @Name("epsilon") Double epsilon) throws Exception {
+		
+    	String outputString = "";
+		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+	        if (nodeType == null) {
+	            return "Missing nodeType";
+	        } else {
+	        	ArrayList<EdgeList2> edgeList = new ArrayList<>();
+	        	ArrayList<NodeList2> nodeList = new ArrayList<>();
+	        	List<NodeList2> nodelist2 = new ArrayList<>();
+	        	edgeList = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(nodeType, connector.getDriver());
+	        	nodeList = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(nodeType, connector.getDriver());
+	        	
+	            Double[][] distanceMatrix = GraphTransform.euclideanDistance(nodeList);
+	            Double[][] adjMatrix = GraphTransform.calculateAdjMatrix(distanceMatrix, method, epsilon);
+	            nodelist2 = ReadCsvFile.retrieveNodeListFromCSV(dataPath);
+				ArrayList<EdgeList2> edgeList2 = GraphTransform.calculateEdgeList(nodeList,adjMatrix);
+	        	
+	        	if(edgeList.size()>0)
+	        	{
+	        		for(int i = 0; i < edgeList.size(); i++) {   
+		        		outputString = outputString + " | " + edgeList.get(i).toString(); 
+	        		}
+	        	}
+        		else
+        		{
+        			outputString = "could not retrieve edge list";
+        		}
+        	}
+	        return "Node List Data:  " + outputString;
+        }
+	     catch (Neo4jException e) {
 	        throw new RuntimeException("Error creating laplacian graph in Neo4j: " + e.getMessage());
 	    }
 	}
@@ -652,7 +687,30 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
         }
         return result.toString();
     }
-  
+
+	public void createRelationshipConnectedGraphFromExistingNodes( final String dtType, final String message, final EdgeList edgeListDetail)
+	{
+		final long bid = edgeListDetail.getTarget();
+		final String bindex = "Index" + bid;
+		double weightValue = (double)Math.round(edgeListDetail.getWeight() * 100000d) / 100000d;
+		final String weight = "`" + Double.toString(weightValue) + "` {value: " + weightValue + "}" ;
+		//final String weight = "_" + Double.toString(edgeListDetail.getWeight()).replace(".","_") + "_";
+		try ( Session session = driver.session() )
+		{
+			String greeting = session.writeTransaction( new TransactionWork<String>()
+			{
+				@Override
+				public String execute( Transaction tx )
+				{
+					Result result = tx.run( "MATCH (a:" + dtType + "), (b:" + dtType + ") " +
+							"WHERE a.id = "+"\"" +"Index"+edgeListDetail.getSource() +  "\""+" AND "+ "b.id ="+ "\""+bindex+"\""+" "+
+							"CREATE (a)-[r:" + weight +  "]->(b)");
+					return message;
+				}
+			} );
+		}
+	}
+
 	/**
 	 * This function is used to split the nodes from database based on training ratio given
 	 * @param nodeType
@@ -726,8 +784,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
 		return "The Data has been split -  Train Ratio: " + trainRatio + " Test Ratio: " + testRatio;
 	}
-
-
 
 	/**
 	 * This function is used to query the test dataset from Neo4j and populate the global arraylist of Java Code
@@ -856,6 +912,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
 		return "The Data: " + listOfData;
 	}
+
 	/**
 	 * This function is used to display the nodes which has been queried and populated already. Used for testing purpose.
 	 * @param dataType
@@ -990,7 +1047,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	}
 
-
 	/**
 	 * User defined function to create the decision tree with nodes and relationships in neo4j. This creates a tree based on gain ratio.
 	 * @param target attribute
@@ -1033,10 +1089,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	}
 
-
 	/**
 	 * User defined function to create the decision tree with nodes and relationships in neo4j
-	 * @param path
+	 * path
 	 * @return
 	 * @throws Exception
 	 */
@@ -1073,13 +1128,13 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		return "Create the Gini Index Decision Tree successful, " + confusionMatrix;
 
 	}
+
 	/**
 	 * This function creates tree from csv path which is based on gain ratio
-	 * @param path The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
+	 *     is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
 	 * @return
 	 * @throws Exception
 	 */
-
 	@UserFunction
 	public String createTreeGRcsv(@Name("trainPath") String trainPath,@Name("testPath") String testPath, @Name("targetAttribute") String targetAttribute, @Name("isPruned") String isPruned, @Name("maxDepth") String max_depth) throws Exception
 	{
@@ -1116,11 +1171,10 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	/**
 	 * This function creates tree from csv path which is based on information gain
 	 *
-	 * @param path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
+	 *  path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
 	 * @return
 	 * @throws Exception
 	 */
-
 	@UserFunction
 	public String createTreeIGcsv(@Name("trainPath") String trainPath,@Name("testPath") String testPath, @Name("targetAttribute") String targetAttribute, @Name("isPruned") String isPruned, @Name("maxDepth") String max_depth )throws Exception
 	{
@@ -1157,8 +1211,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	/**
 	 * This function retrieves the confusion matrix of decision tree based on information gain
-	 * @param path
-	 * @param target
+	 *  path
+	 *  target
 	 * @return
 	 * @throws Exception
 	 */
@@ -1187,11 +1241,10 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	/**
 	 *
 	 * This function retrieves the confusion matrix of decision tree based on gain ratio
-	 * @param path
+	 *  path
 	 * @return
 	 * @throws Exception
 	 */
-
 	@UserFunction
 	@Description("retrieve the confusion matrix Gain Ratio Decision Tree")
 	public String confmGRcsv(@Name("trainPath") String trainPath,@Name("testPath") String testPath, @Name("targetAttribute") String targetAttribute, @Name("isPruned") String isPruned, @Name("maxDepth") String max_depth ) throws Exception
@@ -1216,11 +1269,10 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	/**
 	 *
 	 * This function retrieves the confusion matrix of decision tree based on gini index
-	 * @param path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
+	 *  path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
 	 * @return A string with confusion matrix
 	 * @throws Exception
 	 */
-
 	@UserFunction
 	@Description("retrieve the confusion matrix Gini Index Decision Tree")
 	public String confmGIcsv(@Name("trainPath") String trainPath,@Name("testPath") String testPath, @Name("targetAttribute") String targetAttribute, @Name("isPruned") String isPruned, @Name("maxDepth") String max_depth) throws Exception
@@ -1244,7 +1296,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 	/**
 	 * This function retrieves the confusion matrix of decision tree based on information gain
-	 * @param path
+	 *  path
 	 * @param target
 	 * @return
 	 * @throws Exception
@@ -1292,11 +1344,10 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	/**
 	 *
 	 * This function retrieves the confusion matrix of decision tree based on gini index
-	 * @param path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
+	 *  path - The path is composed of 3 parts, 1st-training dataset, 2nd-test dataset, 3rd- target attribute(as string)
 	 * @return A string with confusion matrix
 	 * @throws Exception
 	 */
-
 	@UserFunction
 	@Description("retrieve the confusion matrix Gini Index Decision Tree")
 	public String confmGI(@Name("target") String target, @Name("isPruned") String isPruned, @Name("maxDepth") String max_depth ) throws Exception
@@ -1343,7 +1394,6 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			return result;
 		}
 	}
-
 
 	@UserFunction
 	@Description("cross validation time for data from graph database for GainRatio")
@@ -1423,22 +1473,17 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
 	}
 
-
-
-
 	/**
 	 * To calculate the average of a list
 	 * @param final_score
 	 * @return
 	 */
-
 	private double calculateAverage(ArrayList<Double> final_score) {
 		return final_score.stream()
 				.mapToDouble(d -> d)
 				.average()
 				.orElse(0.0);
 	}
-
 
 	@UserFunction
 	@Description("cross validation time for data from csv for GainRatio")

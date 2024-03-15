@@ -40,9 +40,9 @@ public class Neo4jGraphHandler {
             while (result.hasNext()) {
                 Record record = result.next();
 //              Node sourceNode = record.get("n").asNode();
-              Relationship relationship = record.get("r").asRelationship();
+                Relationship relationship = record.get("r").asRelationship();
 //              Node targetNode = record.get("m").asNode();
-              
+
                 String source = record.get("source").asString();
                 String target = record.get("target").asString();
                 double weight = record.get("weight").asDouble(); 
@@ -58,7 +58,8 @@ public class Neo4jGraphHandler {
         }
         return edge_list;
     }
-    
+
+
     public static ArrayList<NodeList2> retrieveNodeListFromNeo4jSimilarityGraph(final String nodeType, Driver driver) {
         ArrayList<NodeList2> nodeList = new ArrayList<>();
 
@@ -124,12 +125,9 @@ public class Neo4jGraphHandler {
                 @Override
                 public String execute(Transaction tx) {
                     String cypherQuery = "CREATE (:" + graphType + " {id: $id";
-
-                    
                     for (Map.Entry<String, Object> entry : properties.entrySet()) {
                         cypherQuery += ", " + entry.getKey() + ": $" + entry.getKey();
                     }
-
                     cypherQuery += "})";
 
                     Map<String, Object> parameters = new HashMap<>();
@@ -242,7 +240,6 @@ public class Neo4jGraphHandler {
         }
     }
 
-
     private static Map<String, Object> extractPropertiesFromRelationship(Relationship relationship) {
         Map<String, Object> properties = new HashMap<>();
 
@@ -252,7 +249,5 @@ public class Neo4jGraphHandler {
         }
 
         return properties;
-    } 
-
-    
+    }
 }
