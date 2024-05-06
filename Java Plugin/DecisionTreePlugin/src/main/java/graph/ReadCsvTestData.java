@@ -240,7 +240,7 @@ public class ReadCsvTestData {
 
         for (int i = 0; i < pdist.length; i++) {
             Double[] sortedDistances = Arrays.copyOf(pdist[i], pdist[i].length);
-            Arrays.sort(sortedDistances, Collections.reverseOrder());
+            Arrays.sort(sortedDistances);
             sigmas[i] = sortedDistances[Integer.parseInt(sigma)];
         }
         return sigmas;
