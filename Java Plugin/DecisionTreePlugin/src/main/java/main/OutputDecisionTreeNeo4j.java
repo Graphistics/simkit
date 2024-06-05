@@ -586,7 +586,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	 * @throws Exception.
 	 */
 	@UserFunction
-	public String createLaplacianEigenTransformGraph(@Name("node_label") String node_label,  @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors) throws Exception {
+	public String createEigenGraph(@Name("node_label") String node_label,  @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors) throws Exception {
 		
 		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
 	        if (node_label == null) {
@@ -604,7 +604,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_list_eigen, eigen_result.X, edge_list);
 
 	            
-	            String graph_name = "eigendecomposedGraph_" + laplacian_type + "_" + node_label + "_" + Math.round(number_of_eigenvectors);
+	            String graph_name = "eigenGraph_" + laplacian_type + "_" + node_label + "_" + Math.round(number_of_eigenvectors);
 	            
 	            for (NodeList2 node : node_list_eigen) {
 	            	Neo4jGraphHandler.createNodeGraphEigenTransform(graph_name, "created nodes in neo4j", node, eigen_result.X, connector.getDriver());
@@ -696,6 +696,68 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
         	}
 	        return "Node List Data:  " + outputString;
         }
+    }
+	
+	@UserFunction
+	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("method") String method, @Name("parameter") String epsilon,@Name("remove_column") String remove_columns) throws Exception {
+		
+		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+		
+		if(dataPath == null && distance_measure == null) {
+			return "Missing data_path or distance measure type";
+		}else {
+			
+            // Display edge list
+
+			
+			String graphName = null;
+			Double[][] adj_mat = null;
+			String[] removeList = remove_columns.split(",");
+			List<String> removeListNew = Arrays.stream(removeList).collect(Collectors.toList());
+			ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
+//			//ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(data_path,IndexColumn);
+			ArrayList<NodeList2> nodePropertiesList = readCsvTestData.readCsvFileToMap(dataPath);
+//            ArrayList<NodeList2> nodePropertiesList_copy = readCsvTestData.readCsvFileToMap(data_path);
+			Double[][] DistanceMatrix = getDistanceMatrixFromNodes(distance_measure,nodePropertiesList,removeListNew);
+
+            StringBuilder outputString = new StringBuilder("Graph Data: ");
+            outputString.append("\n\nDistance Matrix:\n").append(DistanceMatrix);
+			
+			
+			if(graph_type.equals("full")) {
+				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,epsilon);
+				adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
+				graphName = graph_type.concat("_"+epsilon);
+			}
+			if(graph_type.equals("eps")) {
+				Double espilonValue = Double.parseDouble(epsilon);
+				adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,espilonValue);
+				graphName = graph_type.concat("_"+epsilon);
+			}
+			if(graph_type.equals("knn")) {
+				Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
+				adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
+				graphName = graph_type.concat("_"+epsilon);
+			}
+			if(graph_type.equals("mknn")) {
+				Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
+				adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
+				graphName = graph_type.concat("_"+epsilon);
+			}
+			
+			outputString.append("\n\nAdjacency Matrix:\n").append(adj_mat);
+			
+			ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
+			
+			outputString.append("\n\nEdge List:\n");
+            for (EdgeList2 edge : edgeList) {
+                outputString.append(" | ").append(edge.toString());
+            }
+			
+			
+			return outputString.toString();
+		}
+		}
     }
 
     private String matrixToString(RealMatrix matrix) {
