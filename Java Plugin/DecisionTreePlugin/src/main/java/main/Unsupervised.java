@@ -198,12 +198,11 @@ public class Unsupervised {
 	    }
 	    for(int i = 0; i < listOfRemain.size(); i ++)
 	    {
-	    	if(listOfCentroid.contains(listOfRemain.get(i)));
+	    	if(listOfCentroid.contains(listOfRemain.get(i)))
 	    	{
 	    		listOfRemain.remove(i);
 	    	}
 	    }
-	    System.out.println("---------------- numberOfCentroids : " + listOfCentroid.size());
 	    
 		// First clusters
 		HashMap<String, ArrayList<String>> hashClusterAssign = distanceAssign(listOfCentroid,listOfRemain, distanceMeasure);
@@ -316,7 +315,7 @@ public class Unsupervised {
 	    return hashClusterAssign;
 	}
 
-	private static double calculateDistance(String point1, String point2, String distanceMeasure) {
+	static double calculateDistance(String point1, String point2, String distanceMeasure) {
 	    switch (distanceMeasure.toLowerCase()) {
 	        case "manhattan":
 	            return calManhattanDist(point1, point2);
