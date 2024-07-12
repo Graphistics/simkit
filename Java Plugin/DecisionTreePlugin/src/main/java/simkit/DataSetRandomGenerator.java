@@ -1,8 +1,7 @@
-package main;
+package simkit;
 
 import java.util.Random;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 public class DataSetRandomGenerator {
 	public static ArrayList<String> randomDataSet =  new ArrayList<String>(); 

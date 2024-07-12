@@ -1,4 +1,4 @@
-package main;
+package simkit;
 import java.util.Scanner;
 
 import definition.EdgeList2;
@@ -25,11 +25,9 @@ import java.util.HashMap;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.commons.math4.legacy.linear.BlockRealMatrix;
 import org.apache.commons.math4.legacy.linear.RealMatrix;
 import org.neo4j.driver.AuthTokens;
 import org.neo4j.driver.Driver;
@@ -43,22 +41,13 @@ import org.neo4j.driver.Value;
 import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.util.Pair;
 
-import cv.CrossValidation;
-import definition.EdgeList2;
-import definition.NodeList2;
 import eigendecomposed.EigenCalculation;
 import eigendecomposed.MatrixCalculation;
-import evaluate.EvaluateTree;
-import gainratio.EvaluateTreeGR;
-import gini.EvaluateTreeGI;
-import global.Neo4jGraphHandler;
-import input.ProcessInputData;
-import output.PrintTree;
 import definition.EdgeList;
-import eigendecomposed.EigenCalculation;
-import eigendecomposed.MatrixCalculation;
 import global.ReadCsvFile;
 import graph.GraphTransform;
+import org.neo4j.driver.exceptions.ServiceUnavailableException;
+import org.neo4j.driver.exceptions.AuthenticationException;
 
 /**
  *
@@ -81,26 +70,60 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	private static List<Double> trueNodeLabels =  new ArrayList<Double>();
 	private static List<Double> predictedNodeLabels =  new ArrayList<Double>();
 
-	/**
-	 * Creation of driver object using bolt protocol
-	 * @param uri Uniform resource identifier for bolto
-	 * @param user Username
-	 * @param password Password
-	 */
-	public OutputDecisionTreeNeo4j( String uri, String user, String password )
-	{
-		driver = GraphDatabase.driver( uri, AuthTokens.basic( user, password ) );
-
-	}
+	private static String uri;
+    private static String username;
+    private static String password;
 
 	/**
-	 * Empty constructor
+     * Creation of driver object using bolt protocol
+     * @param uri Uniform resource identifier for bolt
+     */
+    public OutputDecisionTreeNeo4j(String uri, String username, String password) {
+       	driver = GraphDatabase.driver(uri, AuthTokens.basic(username, password));
+    }
+
+    /**
+     * Empty constructor
+     */
+    public OutputDecisionTreeNeo4j() {
+        driver = null;
+    }
+
+	/**
+	 * This function is used to initialize the SimKit
+	 * @param uri The URI of DB
+	 * @param user The Username for DB
+	 * @param pass The Password for DB
+	 * @throws Exception if connection to Neo4j fails
+	 * @author Jonas Heinzmann
 	 */
-	public OutputDecisionTreeNeo4j()
-	{
-		driver = null;
-	}
-	
+	@UserFunction
+	public String initSimKit(@Name("URI") String uri, @Name("User") String user, @Name("Password") String pass) {
+        String output;
+
+        try {
+            driver = GraphDatabase.driver(uri, AuthTokens.basic(user, pass));
+            // Attempt to establish a connection to verify credentials and availability
+            driver.verifyConnectivity();
+            output = "Init successful";
+            // Store credentials if needed
+            OutputDecisionTreeNeo4j.uri = uri;
+            OutputDecisionTreeNeo4j.username = user;
+            OutputDecisionTreeNeo4j.password = pass;
+        } catch (ServiceUnavailableException e) {
+            output = "Connection error: Service unavailable";
+        } catch (AuthenticationException e) {
+            output = "Connection error: Authentication failed";
+        } catch (Neo4jException e) {
+            output = "Connection error: " + e.getMessage();
+        } finally {
+            if (driver != null) {
+                driver.close();
+            }
+        }
+        return output;
+    }
+
     public Driver getDriver() {
         return driver;
     }
@@ -140,7 +163,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	{
 		String output = "";
 		classificationDataList.clear();
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
 		{
 			boolean isTrainListEmpty = trainDataList.isEmpty();
 			boolean isTestListEmpty = testDataList.isEmpty();
@@ -181,7 +204,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public void createNodeConnectedGraph(final String GraphType, final String message, final String nodeDetail,final int index)
 	{
 		final String name = "Index" + index;
- 
+
 		try ( Session session = driver.session() )
 		{
 			String greeting = session.writeTransaction( new TransactionWork<String>()
@@ -231,7 +254,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			} );
 		}
 	}
-	
+
 	public void createRelationshipConnectedGraph( final String dtType, final String message, final EdgeList edgeListDetail)
 	{
 		final long bid = edgeListDetail.getTarget();
@@ -254,7 +277,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			} );
 		}
 	}
-	
+
 
 	/**
 	 * Create relationship between nodes in Java
@@ -314,7 +337,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	@UserFunction
 	public String loadCsvGraph(@Name("dataPath") String dataPath,@Name("Name") String Name)  throws Exception{
 
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
 		{
 			if(dataPath == null && Name == null) {
 				return "Missing dataPath or distance measure type";
@@ -331,11 +354,11 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		return dataPath;
 	}
 	private void loadCsvConnector(String dataPath, String Name,ArrayList<String> arrayListHeaders,ArrayList<String> arrayListFirst) throws Exception {
-		 
+
 		// LOAD CSV with headers FROM 'file:///test.csv' AS row
 		//merge (:csvdata8 {points: row.points,x_cordinate: toFloat(row.x_coordinate),y_cordinate: toFloat(row.y_coordinate),class: toFloat(row.class)})
 		String proerties = OutputDecisionTreeNeo4j.getHeadersList(arrayListHeaders,arrayListFirst);
- 
+
 		String FileName = Name.substring(0,Name.indexOf("."));
 		try ( Session session = driver.session() )
 		{
@@ -349,7 +372,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				}
 			} );
 		}
- 
+
 	}
 
 	private static String getHeadersList(ArrayList<String> arrayListHeaders,ArrayList<String> arrayListFirst) {
@@ -420,7 +443,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
 
 		String confusionMatrix = "";
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
 		{
 
 			if(data_path == null && distance_measure == null) {
@@ -482,7 +505,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public String createGraphFromNodes(@Name("label") String label,@Name("distance_measure") String distanceMeasure,@Name("graph_type") String graphType,@Name("parameter") String epsilon,@Name("remove_column") String remove_columns) throws Exception {
 
 		String confusionMatrix = "";
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
 		{
 
 
@@ -583,12 +606,12 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	 * @param laplacian_type        The type of Laplacian matrix to be used.
 	 * @param number_of_eigenvectors The number of desired eigenvectors to compute during eigen decomposition.
 	 * @return String indicating the success of the graph creation and create Graph with Nodes and Relationships in Neo4j.
-	 * @throws Exception.
+	 * @throws Exception
 	 */
 	@UserFunction
 	public String createEigenGraph(@Name("node_label") String node_label,  @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors) throws Exception {
-		
-		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+
+		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) ) {
 	        if (node_label == null) {
 	            return "Missing node label";
 	        } else {
@@ -603,9 +626,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	            ArrayList<NodeList2> node_list_eigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(node_label, connector.getDriver());
 	            ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_list_eigen, eigen_result.X, edge_list);
 
-	            
+
 	            String graph_name = "eigenGraph_" + laplacian_type + "_" + node_label + "_" + Math.round(number_of_eigenvectors);
-	            
+
 	            for (NodeList2 node : node_list_eigen) {
 	            	Neo4jGraphHandler.createNodeGraphEigenTransform(graph_name, "created nodes in neo4j", node, eigen_result.X, connector.getDriver());
 	            }
@@ -630,7 +653,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	 */
     @UserFunction
     public String displayGraphList(@Name("node_label") String node_label, @Name("numberOfEigenvectors") Double number_of_eigenvectors) throws Exception {
-        try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+        try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password)) {
             if (node_label == null) {
                 return "Missing nodeType";
             } else {
@@ -666,9 +689,9 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
     }
 
 	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath,@Name("method") String method, @Name("epsilon") Double epsilon) throws Exception {
-		
+
     	String outputString = "";
-		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password)) {
 	        if (nodeType == null) {
 	            return "Missing nodeType";
 	        } else {
@@ -677,16 +700,16 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	        	List<NodeList2> nodelist2 = new ArrayList<>();
 	        	edgeList = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(nodeType, connector.getDriver());
 	        	nodeList = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(nodeType, connector.getDriver());
-	        	
+
 	            Double[][] distanceMatrix = GraphTransform.euclideanDistance(nodeList);
 	            Double[][] adjMatrix = GraphTransform.calculateAdjMatrix(distanceMatrix, method, epsilon);
 	            nodelist2 = ReadCsvFile.retrieveNodeListFromCSV(dataPath);
 				ArrayList<EdgeList2> edgeList2 = GraphTransform.calculateEdgeList(nodeList,adjMatrix);
-	        	
+
 	        	if(edgeList.size()>0)
 	        	{
-	        		for(int i = 0; i < edgeList.size(); i++) {   
-		        		outputString = outputString + " | " + edgeList.get(i).toString(); 
+	        		for(int i = 0; i < edgeList.size(); i++) {
+		        		outputString = outputString + " | " + edgeList.get(i).toString();
 	        		}
 	        	}
         		else
@@ -697,19 +720,19 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	        return "Node List Data:  " + outputString;
         }
     }
-	
+
 	@UserFunction
 	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("method") String method, @Name("parameter") String epsilon,@Name("remove_column") String remove_columns) throws Exception {
-		
-		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
-		
+
+		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password)) {
+
 		if(dataPath == null && distance_measure == null) {
 			return "Missing data_path or distance measure type";
 		}else {
-			
+
             // Display edge list
 
-			
+
 			String graphName = null;
 			Double[][] adj_mat = null;
 			String[] removeList = remove_columns.split(",");
@@ -722,8 +745,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
             StringBuilder outputString = new StringBuilder("Graph Data: ");
             outputString.append("\n\nDistance Matrix:\n").append(DistanceMatrix);
-			
-			
+
+
 			if(graph_type.equals("full")) {
 				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,epsilon);
 				adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
@@ -744,17 +767,17 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 				adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
 				graphName = graph_type.concat("_"+epsilon);
 			}
-			
+
 			outputString.append("\n\nAdjacency Matrix:\n").append(adj_mat);
-			
+
 			ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
-			
+
 			outputString.append("\n\nEdge List:\n");
             for (EdgeList2 edge : edgeList) {
                 outputString.append(" | ").append(edge.toString());
             }
-			
-			
+
+
 			return outputString.toString();
 		}
 		}
@@ -770,7 +793,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
         }
         return result.toString();
     }
-  
+
 
 
 
@@ -813,7 +836,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		autoSplitDataList.clear();
 		testDataList.clear();
 		trainDataList.clear();
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
 		{
 			queryData(nodeType);
 			for (Record key : dataKey) {
@@ -885,7 +908,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	{
 		String listOfData = "";
 		testDataList.clear();
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
 		{
 			queryData(nodeType);
 			for (Record key : dataKey) {
@@ -951,7 +974,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	{
 		String listOfData = "";
 		trainDataList.clear();
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
 		{
 			queryData(nodeType);
 			for (Record key : dataKey) {
@@ -1013,7 +1036,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	{
 		String listOfData = "";
 		int countLine = 0;
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
 		{
 			if(dataType.equals("train"))
 			{
@@ -1061,7 +1084,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public String createTreeIG(@Name("target") String target, @Name("isPruned") String isPruned, @Name("maxDepth") String max_depth) throws Exception {
 
 		String confusionMatrix = "";
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
 		{
 
 			boolean isTrainListEmpty = trainDataList.isEmpty();
@@ -1103,7 +1126,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public String createTreeGI(@Name("target") String target, @Name("isPruned") String isPruned, @Name("maxDepth") String max_depth) throws Exception {
 
 		String confusionMatrix = "";
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
+
 		{
 
 			boolean isTrainListEmpty = trainDataList.isEmpty();
@@ -1146,7 +1170,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public String createTreeGR(@Name("target") String target, @Name("isPruned") String isPruned, @Name("maxDepth") String max_depth) throws Exception {
 
 		String confusionMatrix = "";
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
 		{
 
 			boolean isTrainListEmpty = trainDataList.isEmpty();
@@ -1189,7 +1213,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public String createTreeGIcsv(@Name("trainPath") String trainPath,@Name("testPath") String testPath, @Name("targetAttribute") String targetAttribute, @Name("isPruned") String isPruned, @Name("maxDepth") String max_depth ) throws Exception
 	{
 		String confusionMatrix = "";
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
 		{
 			Scanner in = new Scanner(System.in);
 
@@ -1229,7 +1253,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public String createTreeGRcsv(@Name("trainPath") String trainPath,@Name("testPath") String testPath, @Name("targetAttribute") String targetAttribute, @Name("isPruned") String isPruned, @Name("maxDepth") String max_depth) throws Exception
 	{
 		String confusionMatrix = "";
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
+
 		{
 			Scanner in = new Scanner(System.in);
 
@@ -1270,7 +1295,8 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	public String createTreeIGcsv(@Name("trainPath") String trainPath,@Name("testPath") String testPath, @Name("targetAttribute") String targetAttribute, @Name("isPruned") String isPruned, @Name("maxDepth") String max_depth )throws Exception
 	{
 		String confusionMatrix = "";
-		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123" ) )
+		try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
+
 		{
 			Scanner in = new Scanner(System.in);
 
@@ -1711,7 +1737,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 		}
 
 	}
-    
+
 	public void connectNodes(final String nodeType, final String message, final String nodeCentroid, final String nodeCluster, final double distance)
     {
     	final String name = "kmean";
@@ -1726,15 +1752,15 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
             		Result result = tx.run( "MERGE (a"+":ClusteringNodeType" +" {" + nodeCentroid +"}) " +
             				"MERGE (b "+":ClusteringNodeType" + " {" + nodeCluster +"}) " +
             				"MERGE (a)-[r:link]->(b) "  +
-                            "SET r.distance = " + distance + " " + 
+                            "SET r.distance = " + distance + " " +
             				"RETURN a.message");
 				    return result.single().get( 0 ).asString();
                 }
             } );
 		}
 	}
-	
-    private static void displayMatrix(RealMatrix matrix, String matrixName) 
+
+    private static void displayMatrix(RealMatrix matrix, String matrixName)
     {
         System.out.println(matrixName + ": ");
         int rows = matrix.getRowDimension();
@@ -1746,7 +1772,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
             System.out.println();
         }
     }
-	
+
 	public void connectNodes(final String nodeType, final String message, final String nodeCentroid, final String nodeCluster)
     {
     	final String name = "kmean";
@@ -1767,13 +1793,13 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
             } );
         }
     }
-	
+
 	@UserFunction
 	public String mapNodes(@Name("nodeSet") String nodeSet, @Name("overlook") String overLook) throws Exception {
 	    String listOfData = "";
 	    String[] overLookArray = new String[0];
 	    mapNodeList.clear();
-	    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+	    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password)) {
 	        if (!overLook.isEmpty()) {
 	            overLookArray = overLook.split(",");
 	        }
@@ -1793,7 +1819,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	    }
 	    return "Map all node data: " + listOfData;
 	}
-	
+
 	private String getNodeValues(Value value, String[] overLookArray) {
 	    StringBuilder valueOfNode = new StringBuilder();
 	    for (String nodeKey : value.keys()) {
@@ -1813,15 +1839,15 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	    }
 	    return valueOfNode.toString();
 	}
-	
+
 	private String getStringValue(StringBuilder valueOfNode) {
 	    return valueOfNode.length() > 0 ? ", " : "";
 	}
-	
+
 	 /**
      * Procedure for k-means clustering and visualization in neo4j
      * @param nodeSet type of node
-     * @param numberOfCentroid 
+     * @param numberOfCentroid
      * @param numberOfInteration
      * @return cluster result and visualize
      * @throws Exception
@@ -1831,7 +1857,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
     public String kmean(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
 	{
     	predictedNodeLabels.clear();
-    	try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j( "bolt://localhost:7687", "neo4j", "123412345" ) )
+    	try ( OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password) )
         {
 			String averageSilhouetteCoefficientString = "The average Silhouette Coefficient value is: ";
 			HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
@@ -1860,7 +1886,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 			return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue + " predicted labels: " + predictedNodeLabels;
 		}
 	}
-    
+
     @UserFunction
     @Description("Calculate the mean of the Silhouette Coefficients for all point")
 	public String averageSilhouetteCoefficient(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
@@ -1880,7 +1906,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
     		return null;
     	}
 	}
-    
+
     public static List<Double> convertStringLabels(List<String> strings) {
         Map<String, Double> labelMap = new HashMap<>();
         List<Double> labels = new ArrayList<>();
@@ -1895,12 +1921,12 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 
         return labels;
     }
-    
+
     @UserFunction
 	public String adjustedRandIndex(@Name("nodeSet") String nodeSet, @Name("trueLabels") String trueLabel) throws Exception {
 	    if(predictedNodeLabels.size()==0)
 	    {
-	    	
+
 	    	return " predicted Labels is null, please run kmean clustering to add the predicted labels";
 	    }
 	    else {
@@ -1908,7 +1934,7 @@ public class OutputDecisionTreeNeo4j implements AutoCloseable{
 	    	Double adjustedRandIndexValue = 0.0;
 		    trueNodeLabels.clear();
 		    List<String> stringTrueNodeLabelsList = new ArrayList<String>();
-		    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
+		    try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j(OutputDecisionTreeNeo4j.uri, OutputDecisionTreeNeo4j.username, OutputDecisionTreeNeo4j.password)) {
 		        queryData(nodeSet);
 		        for (Record key : dataKey) {
 		            List<Pair<String, Value>> values = key.fields();
