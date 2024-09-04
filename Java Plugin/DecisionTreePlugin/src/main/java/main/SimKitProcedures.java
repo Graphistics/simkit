@@ -83,7 +83,7 @@ public class SimKitProcedures implements AutoCloseable{
 	}
 
 	@UserFunction
-	public String createGraphFromCsv(@Name("data_path") String data_path, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("parameter") String epsilon,@Name("remove_column") String remove_columns) throws Exception {
+	public String createGraphFromCsv(@Name("data_path") String data_path, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("parameter") String parameter,@Name("remove_column") String remove_columns) throws Exception {
 
 
 		String confusionMatrix = "";
@@ -104,24 +104,24 @@ public class SimKitProcedures implements AutoCloseable{
 				Double[][] DistanceMatrix = getDistanceMatrixFromNodes(distance_measure,nodePropertiesList,removeListNew);
 
 				if(graph_type.equals("full")) {
-					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,epsilon);
+					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graph_type.concat("_"+parameter);
 				}
 				if(graph_type.equals("eps")) {
-					Double espilonValue = Double.parseDouble(epsilon);
+					Double espilonValue = Double.parseDouble(parameter);
 					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,espilonValue);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graph_type.concat("_"+parameter);
 				}
 				if(graph_type.equals("knn")) {
-					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graph_type.concat("_"+parameter);
 				}
 				if(graph_type.equals("mknn")) {
-					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graph_type.concat("_"+parameter);
 				}
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
 
@@ -147,7 +147,7 @@ public class SimKitProcedures implements AutoCloseable{
 	}
 	
 	@UserFunction
-	public String createGraphFromNodes(@Name("label") String label,@Name("distance_measure") String distanceMeasure,@Name("graph_type") String graphType,@Name("parameter") String epsilon,@Name("remove_column") String remove_columns) throws Exception {
+	public String createGraphFromNodes(@Name("label") String label,@Name("distance_measure") String distanceMeasure,@Name("graph_type") String graphType,@Name("parameter") String parameter,@Name("remove_column") String remove_columns) throws Exception {
 
 		String confusionMatrix = "";
 		try ( SimKitProcedures connector = new SimKitProcedures( "bolt://localhost:7687", "neo4j", "123412345" ) )
@@ -169,26 +169,26 @@ public class SimKitProcedures implements AutoCloseable{
 				Double[][] adj_mat = null;
 
 				if(graphType.equals("full")) {
-					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,epsilon);
+					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-					graphName = graphType.concat("_"+epsilon);
+					graphName = graphType.concat("_"+parameter);
 				}
 				if(graphType.equals("eps")) {
-					Double espilonValue = Double.parseDouble(epsilon);
+					Double espilonValue = Double.parseDouble(parameter);
 					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,espilonValue);
-					graphName = graphType.concat("_"+epsilon);
+					graphName = graphType.concat("_"+parameter);
 
 				}
 				if(graphType.equals("knn")) {
-					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
-					graphName = graphType.concat("_"+epsilon);
+					graphName = graphType.concat("_"+parameter);
 
 				}
 				if(graphType.equals("mknn")) {
-					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
-					graphName = graphType.concat("_"+epsilon);
+					graphName = graphType.concat("_"+parameter);
 				}
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
 
@@ -589,7 +589,7 @@ public class SimKitProcedures implements AutoCloseable{
      */
 
 	@UserFunction
-	public String spectralClusteringFromNeo4j(@Name("node_label") String node_label, @Name("distance_measure") String distance_measure,@Name("graph_type") String graph_type,@Name("parameter") String epsilon,@Name("remove_column") String remove_columns, @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors, @Name("number_of_iteration") String number_of_iteration, @Name("distance_measure_kmean") String distance_measure_kmean) throws Exception {
+	public String spectralClusteringFromNeo4j(@Name("node_label") String node_label, @Name("distance_measure") String distance_measure,@Name("graph_type") String graph_type,@Name("parameter") String parameter,@Name("remove_column") String remove_columns, @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors, @Name("number_of_iteration") String number_of_iteration, @Name("distance_measure_kmean") String distance_measure_kmean) throws Exception {
 		
 		try (SimKitProcedures connector = new SimKitProcedures("bolt://localhost:7687", "neo4j", "123412345")) {
 			if(node_label == null && distance_measure == null) {
@@ -607,26 +607,26 @@ public class SimKitProcedures implements AutoCloseable{
 				Double[][] adj_mat = null;
 
 				if(graph_type.equals("full")) {
-					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,epsilon);
+					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graph_type.concat("_"+parameter);
 				}
 				if(graph_type.equals("eps")) {
-					Double espilonValue = Double.parseDouble(epsilon);
+					Double espilonValue = Double.parseDouble(parameter);
 					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,espilonValue);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graph_type.concat("_"+parameter);
 
 				}
 				if(graph_type.equals("knn")) {
-					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graph_type.concat("_"+parameter);
 
 				}
 				if(graph_type.equals("mknn")) {
-					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
+					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
-					graphName = graph_type.concat("_"+epsilon);
+					graphName = graph_type.concat("_"+parameter);
 				}
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
 
@@ -662,7 +662,7 @@ public class SimKitProcedures implements AutoCloseable{
 		            
 		            EigenCalculation.EigenResult eigen_result = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
 		            ArrayList<NodeList2> node_list_eigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(graphName.concat("new"), connector.getDriver());
-		            ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_list_eigen, eigen_result.X, edgeList);
+		            ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_list_eigen, eigen_result.X, edge_list);
 	
 		            
 		            String graph_name = "eigenGraph_" + laplacian_type + "_" + graphName.concat("new") + "_" + Math.round(number_of_eigenvectors);
@@ -705,7 +705,7 @@ public class SimKitProcedures implements AutoCloseable{
 	 * @throws Exception
 	 */
     @UserFunction
-    public String displayGraphList(@Name("node_label") String node_label, @Name("numberOfEigenvectors") Double number_of_eigenvectors) throws Exception {
+    public String displayGraphList(@Name("node_label") String node_label, @Name("numberOfEigenvectors") Double number_of_eigenvectors, @Name("laplacian_type") String laplacian_type) throws Exception {
         try (SimKitProcedures connector = new SimKitProcedures("bolt://localhost:7687", "neo4j", "123412345")) {
             if (node_label == null) {
                 return "Missing nodeType";
@@ -727,13 +727,13 @@ public class SimKitProcedures implements AutoCloseable{
                 outputString.append("\n\nDegree Matrix:\n").append(matrixToString(degree_matrix));
 
                 // Display Laplacian matrix
-                RealMatrix laplacian_matrix = MatrixCalculation.calculateLaplacianMatrix(degree_matrix, adjacency_matrix, "sym");
+                RealMatrix laplacian_matrix = MatrixCalculation.calculateLaplacianMatrix(degree_matrix, adjacency_matrix, laplacian_type);
                 outputString.append("\n\nLaplacian Matrix:\n").append(matrixToString(laplacian_matrix));
 
                 // Display Eigenvalues, Eigenvectors, and X
-                EigenCalculation.EigenResult eigen_result = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
-                outputString.append("\n\nEigenvectors Matrix:\n").append(matrixToString(eigen_result.eigenvectors));
-				outputString.append("\n\nX Matrix:\n").append(matrixToString(eigen_result.X));
+//                EigenCalculation.EigenResult eigen_result = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
+//                outputString.append("\n\nEigenvectors Matrix:\n").append(matrixToString(eigen_result.eigenvectors));
+//				outputString.append("\n\nX Matrix:\n").append(matrixToString(eigen_result.X));
 				
                 return outputString.toString();
             }
@@ -743,7 +743,7 @@ public class SimKitProcedures implements AutoCloseable{
     }
 
 	@UserFunction
-	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("method") String method, @Name("parameter") String epsilon,@Name("remove_column") String remove_columns) throws Exception {
+	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("method") String method, @Name("parameter") String parameter,@Name("remove_column") String remove_columns) throws Exception {
 		
 		try (SimKitProcedures connector = new SimKitProcedures("bolt://localhost:7687", "neo4j", "123412345")) {
 		
@@ -776,24 +776,24 @@ public class SimKitProcedures implements AutoCloseable{
 			
 			
 			if(graph_type.equals("full")) {
-				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,epsilon);
+				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,parameter);
 				adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-				graphName = graph_type.concat("_"+epsilon);
+				graphName = graph_type.concat("_"+parameter);
 			}
 			if(graph_type.equals("eps")) {
-				Double espilonValue = Double.parseDouble(epsilon);
+				Double espilonValue = Double.parseDouble(parameter);
 				adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,espilonValue);
-				graphName = graph_type.concat("_"+epsilon);
+				graphName = graph_type.concat("_"+parameter);
 			}
 			if(graph_type.equals("knn")) {
-				Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
+				Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 				adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
-				graphName = graph_type.concat("_"+epsilon);
+				graphName = graph_type.concat("_"+parameter);
 			}
 			if(graph_type.equals("mknn")) {
-				Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,epsilon);
+				Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 				adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
-				graphName = graph_type.concat("_"+epsilon);
+				graphName = graph_type.concat("_"+parameter);
 			}
 			
 			outputString.append("\n\nAdjacency Matrix:\n").append(doubleToString(adj_mat));

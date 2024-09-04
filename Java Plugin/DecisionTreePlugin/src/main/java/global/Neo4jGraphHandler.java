@@ -247,7 +247,8 @@ public class Neo4jGraphHandler {
     public static void createRelationshipGraph(String graph_type, String message, EdgeList2 edge_list_detail, Driver driver) {
         final String source = edge_list_detail.getSource();
         final String target = edge_list_detail.getTarget();
-        double weightValue = (double) Math.round(edge_list_detail.getWeight() * 10000000d) / 10000000d;
+//        double weightValue = (double) Math.round(edge_list_detail.getWeight() * 10000000d) / 10000000d;
+        double weightValue = edge_list_detail.getWeight();
         
         try (Session session = driver.session()) {
             session.writeTransaction(new TransactionWork<Void>() {
