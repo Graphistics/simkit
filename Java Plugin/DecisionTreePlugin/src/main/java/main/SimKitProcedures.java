@@ -32,6 +32,10 @@ import graph.DistanceMeasureNodes;
 import graph.GraphTransform;
 import graph.ReadCsvTestData;
 
+import org.neo4j.logging.Log;
+import org.neo4j.procedure.Context;
+import org.neo4j.procedure.Procedure;
+
 /**
  *
  * This class is used to fetch nodes from graph database or from csv and call the functions to generate decision tree
@@ -48,6 +52,9 @@ public class SimKitProcedures implements AutoCloseable{
 	private static ArrayList<String> mapNodeList =  new ArrayList<String>();
 	private static List<Double> trueNodeLabels =  new ArrayList<Double>();
 	private static List<Double> predictedNodeLabels =  new ArrayList<Double>();
+
+	@Context
+    public Log log;
 
 	/**
 	 * Creation of driver object using bolt protocol
@@ -327,19 +334,67 @@ public class SimKitProcedures implements AutoCloseable{
      */
     @UserFunction
     @Description("Kmean clustering function")
-    public String kmean(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
+    public String kmean(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure, @Name("originalSet") String originalNodeSet, @Name("overlook") String overLook, @Name("overlook Original") String overlook_original, @Name("use kmean for Siluete Coeficient") boolean kmean_bool) throws Exception
 	{
     	predictedNodeLabels.clear();
     	try ( SimKitProcedures connector = new SimKitProcedures( "bolt://localhost:7687", "neo4j", "123412345" ) )
         {
 			String averageSilhouetteCoefficientString = "The average Silhouette Coefficient value is: ";
 			HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
+			HashMap<String, ArrayList<String>> map = new HashMap<String, ArrayList<String>>();
 			int numberOfCentroidInt = Integer.parseInt(numberOfCentroid);
 			int numberOfInterationInt = Integer.parseInt(numberOfInteration);
 			double centroidNumber = 1.0;
+			ArrayList<String> mapNodeOriginalList =  new ArrayList<String>();
 
-			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure);
-			double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
+			String listOfData = "";
+			String[] overLookArray = new String[0];
+			mapNodeList.clear();
+				if (!overLook.isEmpty()) {
+	            overLookArray = overLook.split(",");
+	        }
+	        queryData(nodeSet);
+	        for (Record key : dataKey) {
+	            List<Pair<String, Value>> values = key.fields();
+	            for (Pair<String, Value> nodeValues : values) {
+	                if ("n".equals(nodeValues.key())) {
+	                    Value value = nodeValues.value();
+	                    String valueOfNode = getNodeValues(value, overLookArray);
+	                    mapNodeList.add(valueOfNode);
+//	                    listOfData = listOfData + valueOfNode + " | ";
+	                    listOfData = mapNodeList.toString();
+	                }
+	            }
+	        }
+			String[] overLookArrayOriginal = new String[0];
+			if (!overlook_original.isEmpty()) {
+	            overLookArrayOriginal = overlook_original.split(",");
+	        }
+	        queryData(nodeSet);
+				queryData(originalNodeSet);
+				for (Record key : dataKey) {
+					List<Pair<String, Value>> values = key.fields();
+					for (Pair<String, Value> originalNodeValues : values) {
+						if ("n".equals(originalNodeValues.key())) {
+							Value value = originalNodeValues.value();
+							String valueOfNode = getNodeValues(value, overLookArrayOriginal);
+							mapNodeOriginalList.add(valueOfNode);
+						}
+					}
+				}
+			ArrayList<String> debug = new ArrayList<>();
+			//map = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, true, mapNodeOriginalList);
+
+			double averageSilhouetteCoefficientValue;
+			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, false, debug);
+
+			if (kmean_bool) {
+				averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
+			}
+			else {
+				map = Unsupervised.replaceValuesWithOriginalSet(kmeanAssign, mapNodeOriginalList, log);
+				averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(map, distanceMeasure);
+			}
 
 			for (String centroid : kmeanAssign.keySet()) {
 			    ArrayList<String> clusterNode = kmeanAssign.get(centroid);
@@ -355,6 +410,8 @@ public class SimKitProcedures implements AutoCloseable{
 
 //			        connector.connectNodes(nodeSet, "create relationship in kmean node", centroid, clusterNode.get(i), roundedDistance);
 			    }
+				//double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(map, distanceMeasure);
+
 			    centroidNumber = centroidNumber + 1;
 			}
 
@@ -427,7 +484,8 @@ public class SimKitProcedures implements AutoCloseable{
 			HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
 			int numberOfCentroidInt = Integer.parseInt(numberOfCentroid);
 			int numberOfInterationInt = Integer.parseInt(numberOfInteration);
-			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure);
+			ArrayList<String> debug = new ArrayList<>();
+			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, false, debug);
 			double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
 	        return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue ;
 		}
@@ -681,7 +739,7 @@ public class SimKitProcedures implements AutoCloseable{
 		            
 		            String number_of_clusters = Integer.toString(number_of_eigenvectors.intValue());
 		            
-		            String kmeanResult = kmean(graph_name,number_of_clusters,number_of_iteration,distance_measure_kmean);
+		            String kmeanResult = kmean(graph_name,number_of_clusters,number_of_iteration,distance_measure_kmean, String.valueOf(0), "id,index, target,sepal_length,sepal_width,petal_length,petal_width", "id,index", false);
 		            
 
 			        return "Created similarity graph, eigendecomposed graph successful!" + kmeanResult;
@@ -829,8 +887,8 @@ public class SimKitProcedures implements AutoCloseable{
 			int numberOfInterationInt = Integer.parseInt(numberOfInteration);
 			double centroidNumber = 1.0;
 
-			
-			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure);
+			ArrayList<String> debug = new ArrayList<>();
+			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, false, debug);
 			double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
 			outputString.append(averageSilhouetteCoefficientValue);
 

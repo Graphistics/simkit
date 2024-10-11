@@ -6,6 +6,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.HashSet;
+import org.neo4j.logging.Log;
+import org.neo4j.procedure.Context;
+import org.neo4j.procedure.Procedure;
+
 
 import scala.util.Random;
 
@@ -37,8 +45,9 @@ public class Unsupervised {
 	
 	public static void main(String[] args)
 	{
-		  ArrayList<String> inputData = dummyData(); 
-		  HashMap<String, ArrayList<String>> dbAssign = KmeanClust(inputData, 2, 20, "Euclidean");		  
+		  ArrayList<String> inputData = dummyData();
+		  ArrayList<String> debug = new ArrayList<>();
+		  HashMap<String, ArrayList<String>> dbAssign = KmeanClust(inputData, 2, 20, "Euclidean", false, debug);
 		  for (String centroid: dbAssign.keySet()) {
 			  System.out.println("1");
       		ArrayList<String> clusterNode = dbAssign.get(centroid);
@@ -171,43 +180,152 @@ public class Unsupervised {
 	/**
 	-------------------------------------------------------------------------------K-MEANS Clustering ------------------------------------------------------------------------------------------
 	*/
+
+
+static HashMap<String, ArrayList<String>> replaceValuesWithOriginalSet(
+        HashMap<String, ArrayList<String>> clusterAssign,
+        ArrayList<String> originalNodeSet,
+		Log log
+) {
+    // Create a mapping from ID to original node (without 'eigenvector' attributes)
+    HashMap<String, String> idToOriginalNode = new HashMap<>();
+    for (String originalNode : originalNodeSet) {
+        // Remove attributes starting with 'eigenvector'
+        String cleanedNode = removeEigenvectorAttributes(originalNode);
+
+        String id = extractID(cleanedNode);
+        if (id != null) {
+            idToOriginalNode.put(id, cleanedNode);
+        }
+    }
+	log.info(String.valueOf(idToOriginalNode));
+
+    // Initialize the updated cluster assignments
+    HashMap<String, ArrayList<String>> updatedClusterAssign = new HashMap<>();
+
+    // Keep track of all node IDs that have been assigned to clusters
+    Set<String> assignedNodeIDs = new HashSet<>();
+
+    // Replace centroids and cluster nodes with values from originalNodeSet
+    for (Map.Entry<String, ArrayList<String>> entry : clusterAssign.entrySet()) {
+        String centroid = entry.getKey();
+        ArrayList<String> clusterNodes = entry.getValue();
+
+        // Replace centroid
+        String centroidID = extractID(centroid);
+		 float floatCentroidID = Float.parseFloat(centroidID);
+		int centroidIDInt = (int) floatCentroidID;
+        String originalCentroid = idToOriginalNode.getOrDefault(String.valueOf(centroidIDInt), centroid);
+        log.info(String.valueOf(centroidIDInt));
+		log.info(originalCentroid);
+
+        // Replace cluster nodes
+        ArrayList<String> updatedClusterNodes = new ArrayList<>();
+        for (String node : clusterNodes) {
+            String nodeID = extractID(node);
+            String originalNode = idToOriginalNode.getOrDefault(nodeID, node);
+			log.info(nodeID);
+			log.info(originalNode);
+            updatedClusterNodes.add(originalNode);
+            assignedNodeIDs.add(nodeID);
+        }
+
+        updatedClusterAssign.put(originalCentroid, updatedClusterNodes);
+        assignedNodeIDs.add(centroidID);
+    }
+
+    // Add all original nodes to the clusters if they haven't been assigned yet
+    ArrayList<String> unassignedNodes = new ArrayList<>();
+    for (String originalNode : idToOriginalNode.values()) {
+        String nodeID = extractID(originalNode);
+        if (!assignedNodeIDs.contains(nodeID)) {
+            unassignedNodes.add(originalNode);
+        }
+    }
+
+    // Optionally, assign unassigned nodes to a separate cluster or distribute them
+    if (!unassignedNodes.isEmpty()) {
+        updatedClusterAssign.put("Unassigned", unassignedNodes);
+    }
+    return updatedClusterAssign;
+}
+
+/**
+ * Removes attributes starting with 'eigenvector' from a node string.
+ * @param node The node string
+ * @return The node string without 'eigenvector' attributes
+ */
+private static String removeEigenvectorAttributes(String node) {
+    String[] attributes = node.split(",");
+    ArrayList<String> filteredAttributes = new ArrayList<>();
+    for (String attr : attributes) {
+        String key = attr.split(":")[0].trim();
+        if (!key.startsWith("eigenvector")) {
+            filteredAttributes.add(attr);
+        }
+    }
+    return String.join(",", filteredAttributes);
+}
+
+/**
+ * Extracts the ID from a node string.
+ * Assumes the ID is in the format "ID:value"
+ * @param node The node string
+ * @return The extracted ID, or null if not found
+ */
+private static String extractID(String node) {
+    String[] attributes = node.split(",");
+    for (String attr : attributes) {
+        String[] keyValue = attr.split(":");
+        if (keyValue.length == 2 && keyValue[0].trim().equalsIgnoreCase("index")) {
+            return keyValue[1].trim();
+        }
+    }
+    return null; // ID not found
+}
 	 
 	/**
 	 * This is the main method to perform k-means clustering.
 	 * @param inputData is a variable where the nodes from Neo4j are stored
 	 * @param numberOfCentroids store the number of centroids specified by user for clustering
 	 * @param numberOfInteration saves user specified iteration to find convergence
-	 * @return
+	 * @param distanceMeasure the distance measure to use
+	 * @param useOriginalNodeSet boolean to control whether to replace values with originalNodeSet
+	 * @param originalNodeSet the original nodes to replace in the output
+	 * @return HashMap with centroids and their assigned nodes
 	 */
-	public static HashMap<String, ArrayList<String>> KmeanClust (ArrayList<String> inputData, int numberOfCentroids, int numberOfInteration, String distanceMeasure)
-	{
-		HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
-		ArrayList<String> listOfCentroid = new ArrayList<String>();
-		ArrayList<String> listOfRemain = new ArrayList<String>(inputData);
-		
-		// Initializing centroid by random choice
-	    java.util.Random rand = new java.util.Random();
+	public static HashMap<String, ArrayList<String>> KmeanClust(
+		ArrayList<String> inputData,
+		int numberOfCentroids,
+		int numberOfInteration,
+		String distanceMeasure,
+		boolean useOriginalNodeSet,
+		ArrayList<String> originalNodeSet
+	) {
+		HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<>();
+		ArrayList<String> listOfCentroid = new ArrayList<>();
+		ArrayList<String> listOfRemain = new ArrayList<>(inputData);
 
-	    while (listOfCentroid.size() < numberOfCentroids) {
-	        int randomIndex = rand.nextInt(inputData.size());
-	        String potentialCentroid = inputData.get(randomIndex);
+		// Initializing centroids by random choice
+		java.util.Random rand = new java.util.Random();
 
-	        if (!listOfCentroid.contains(potentialCentroid)) {
-	        	listOfCentroid.add(potentialCentroid);
-	        }
-	    }
-	    for(int i = 0; i < listOfRemain.size(); i ++)
-	    {
-	    	if(listOfCentroid.contains(listOfRemain.get(i)))
-	    	{
-	    		listOfRemain.remove(i);
-	    	}
-	    }
-	    
+		while (listOfCentroid.size() < numberOfCentroids) {
+			int randomIndex = rand.nextInt(inputData.size());
+			String potentialCentroid = inputData.get(randomIndex);
+
+			if (!listOfCentroid.contains(potentialCentroid)) {
+				listOfCentroid.add(potentialCentroid);
+			}
+		}
+
+		// Remove centroids from the remaining list
+		listOfRemain.removeAll(listOfCentroid);
+
 		// First clusters
-		HashMap<String, ArrayList<String>> hashClusterAssign = distanceAssign(listOfCentroid,listOfRemain, distanceMeasure);
+		HashMap<String, ArrayList<String>> hashClusterAssign = distanceAssign(listOfCentroid, listOfRemain, distanceMeasure);
 		// All iterations
-		kmeanAssign = kmeanIteration(hashClusterAssign,numberOfInteration,inputData, distanceMeasure);
+		kmeanAssign = kmeanIteration(hashClusterAssign, numberOfInteration, inputData, distanceMeasure);
+
 		return kmeanAssign;
 	}
 	
