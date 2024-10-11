@@ -63,18 +63,19 @@ public class EigenCalculation {
             int dimension = laplacian_matrix.getColumnDimension();
             int k = (int) ((number_of_eigenvectors > 0) ? number_of_eigenvectors : calculateOptimalK(sorted_eigenvalues));
             
-            // Round eigenvalues to 7 decimal places
-            DecimalFormat decimal_format = new DecimalFormat("#.#######");
-            for (int i = 0; i < sorted_eigenvalues.length; i++) {
-                sorted_eigenvalues[i] = Double.parseDouble(decimal_format.format(sorted_eigenvalues[i]));
-            }
-
-            // Round eigenvectors to 7 decimal places
-            for (int i = 0; i < sorted_eigenvectors.getRowDimension(); i++) {
-                for (int j = 0; j < sorted_eigenvectors.getColumnDimension(); j++) {
-                    sorted_eigenvectors.setEntry(i, j, Double.parseDouble(decimal_format.format(sorted_eigenvectors.getEntry(i, j))));
-                }
-            }
+//            // Round eigenvalues to 7 decimal places
+//            DecimalFormat decimal_format = new DecimalFormat("#.#######");
+//            for (int i = 0; i < sorted_eigenvalues.length; i++) {
+//                sorted_eigenvalues[i] = Double.parseDouble(decimal_format.format(sorted_eigenvalues[i]));
+//            }
+//
+//            // Round eigenvectors to 7 decimal places
+//            for (int i = 0; i < sorted_eigenvectors.getRowDimension(); i++) {
+//                for (int j = 0; j < sorted_eigenvectors.getColumnDimension(); j++) {
+//                    sorted_eigenvectors.setEntry(i, j, Double.parseDouble(decimal_format.format(sorted_eigenvectors.getEntry(i, j))));
+//                }
+//            }
+            
             RealMatrix X = sorted_eigenvectors.getSubMatrix(0, dimension - 1, dimension - k, dimension - 1);
             return new EigenResult(sorted_eigenvalues, sorted_eigenvectors, X);
         } catch (Exception e) {

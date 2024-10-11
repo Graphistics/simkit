@@ -62,9 +62,10 @@ public class MatrixCalculation {
             int i = Integer.parseInt(edge.getSource());
             int j = Integer.parseInt(edge.getTarget());
             
-            double weight = Math.round(edge.getWeight() * 10000.0) / 10000.0;
+            double weight = edge.getWeight();
             
-//            double weight = edge.getWeight();
+            // double weight = Math.round(edge.getWeight() * 10000.0) / 10000.0;
+            
             adjacency_matrix_data[i][j] = weight;
             adjacency_matrix_data[j][i] = weight;
         }
@@ -116,7 +117,8 @@ public class MatrixCalculation {
             columnSum[col] = adjacency_matrix.getColumnVector(col).getL1Norm();
         }
 
-        return round4Digits(MatrixUtils.createRealDiagonalMatrix(columnSum));
+        return MatrixUtils.createRealDiagonalMatrix(columnSum);
+        // return round4Digits(MatrixUtils.createRealDiagonalMatrix(columnSum));
     }
 
     /**
@@ -137,15 +139,17 @@ public class MatrixCalculation {
 
         RealMatrix laplacian_matrix_normalized = dHalf.multiply(adjacency_matrix).multiply(dHalf);
         
-        // Round the elements to the 4th digit
-        for (int i = 0; i < dimension; i++) {
-            for (int j = 0; j < dimension; j++) {
-                double value = Precision.round(laplacian_matrix_normalized.getEntry(i, j), 4);
-                laplacian_matrix_normalized.setEntry(i, j, value);
-            }
-        }
+//        // Round the elements to the 4th digit
+//        for (int i = 0; i < dimension; i++) {
+//            for (int j = 0; j < dimension; j++) {
+//            	double value = laplacian_matrix_normalized.getEntry(i, j);
+//                //double value = Precision.round(laplacian_matrix_normalized.getEntry(i, j), 4);
+//                laplacian_matrix_normalized.setEntry(i, j, value);
+//            }
+//        }
         
-        return round4Digits(laplacian_matrix_normalized);
+        return laplacian_matrix_normalized;
+        // return round4Digits(laplacian_matrix_normalized);
     }
 
     /**
@@ -160,8 +164,8 @@ public class MatrixCalculation {
         RealMatrix random_walk_laplacian_matrix = inverse_degree_matrix.multiply(adjacency_matrix);
         
         
-
-        return round4Digits(random_walk_laplacian_matrix);
+        return random_walk_laplacian_matrix;
+//        return round4Digits(random_walk_laplacian_matrix);
     }
     
     public static RealMatrix round4Digits(RealMatrix matrix) {
