@@ -247,7 +247,67 @@ static HashMap<String, ArrayList<String>> replaceValuesWithOriginalSet(
     if (!unassignedNodes.isEmpty()) {
         updatedClusterAssign.put("Unassigned", unassignedNodes);
     }
+
+	// Define the prefixes of attributes to remove
+	String[] prefixesToRemove = new String[]{"index", "id"};
+
+	// Create a new HashMap to store the cleaned entries
+	HashMap<String, ArrayList<String>> cleanedClusterAssign = new HashMap<>();
+
+	for (Map.Entry<String, ArrayList<String>> entry : updatedClusterAssign.entrySet()) {
+		String key = entry.getKey();
+		ArrayList<String> valueList = entry.getValue();
+
+		// Remove 'index' and 'id' attributes from the key
+		String cleanedKey = removeAttributes(key, prefixesToRemove);
+
+		// Create a new list to store cleaned values
+		ArrayList<String> cleanedValueList = new ArrayList<>();
+
+		// Iterate over the values in the valueList
+		for (String value : valueList) {
+			// Remove 'index' and 'id' attributes from the value
+			String cleanedValue = removeAttributes(value, prefixesToRemove);
+			// Add the cleaned value to the cleanedValueList
+			cleanedValueList.add(cleanedValue);
+		}
+
+		// Put the cleaned key and cleaned value list into the cleanedClusterAssign
+		cleanedClusterAssign.put(cleanedKey, cleanedValueList);
+	}
+
+	// Replace the original updatedClusterAssign with the cleaned version
+	updatedClusterAssign = cleanedClusterAssign;
+
     return updatedClusterAssign;
+}
+
+/**
+ * Removes attributes starting with specified prefixes from a node string.
+ * @param node The node string
+ * @param prefixes The array of prefixes to remove
+ * @return The node string without the specified attributes
+ */
+private static String removeAttributes(String node, String[] prefixes) {
+    String[] attributes = node.split(",");
+    ArrayList<String> filteredAttributes = new ArrayList<>();
+    for (String attr : attributes) {
+        String[] keyValue = attr.split(":");
+        if (keyValue.length < 2) continue; // Skip malformed attributes
+
+        String key = keyValue[0].trim().toLowerCase();
+        boolean remove = false;
+        for (String prefix : prefixes) {
+            if (key.startsWith(prefix.toLowerCase())) {
+                remove = true;
+                break;
+            }
+        }
+        if (!remove) {
+            filteredAttributes.add(attr);
+        }
+    }
+    return String.join(",", filteredAttributes);
 }
 
 /**
