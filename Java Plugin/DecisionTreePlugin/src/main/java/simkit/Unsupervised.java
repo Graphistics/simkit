@@ -1,13 +1,8 @@
-package main;
+package simkit;
 
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
-
-import scala.util.Random;
 
 /**
  * @author 49171

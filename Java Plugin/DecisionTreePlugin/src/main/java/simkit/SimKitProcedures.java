@@ -1,4 +1,4 @@
-package main;
+package simkit;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,7 +17,9 @@ import org.neo4j.driver.Session;
 import org.neo4j.driver.Transaction;
 import org.neo4j.driver.TransactionWork;
 import org.neo4j.driver.Value;
+import org.neo4j.driver.exceptions.AuthenticationException;
 import org.neo4j.driver.exceptions.Neo4jException;
+import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.util.Pair;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
@@ -31,6 +33,7 @@ import global.Neo4jGraphHandler;
 import graph.DistanceMeasureNodes;
 import graph.GraphTransform;
 import graph.ReadCsvTestData;
+import simkit.SimKitProcedures;
 
 /**
  *
@@ -48,6 +51,10 @@ public class SimKitProcedures implements AutoCloseable{
 	private static ArrayList<String> mapNodeList =  new ArrayList<String>();
 	private static List<Double> trueNodeLabels =  new ArrayList<Double>();
 	private static List<Double> predictedNodeLabels =  new ArrayList<Double>();
+
+	private static String uri;
+    private static String username;
+    private static String password;
 
 	/**
 	 * Creation of driver object using bolt protocol
@@ -69,6 +76,40 @@ public class SimKitProcedures implements AutoCloseable{
 		driver = null;
 	}
 	
+	/**
+	 * This function is used to initialize the SimKit
+	 * @param uri The URI of DB
+	 * @param user The Username for DB
+	 * @param pass The Password for DB
+	 * @throws Exception if connection to Neo4j fails
+	 * @author Jonas Heinzmann
+	 */
+	@UserFunction
+	public String initSimKit(@Name("URI") String uri, @Name("User") String user, @Name("Password") String pass) {
+        String output;
+        try {
+            driver = GraphDatabase.driver(uri, AuthTokens.basic(user, pass));
+            // Attempt to establish a connection to verify credentials and availability
+            driver.verifyConnectivity();
+            output = "Initialization succesfull";
+            // Store credentials if needed
+            SimKitProcedures.uri = uri;
+            SimKitProcedures.username = user;
+            SimKitProcedures.password = pass;
+        } catch (ServiceUnavailableException e) {
+            output = "Connection error: Service unavailable";
+        } catch (AuthenticationException e) {
+            output = "Connection error: Authentication failed";
+        } catch (Neo4jException e) {
+            output = "Connection error: " + e.getMessage();
+        } finally {
+            if (driver != null) {
+                driver.close();
+            }
+        }
+        return output;
+    }
+	
     public Driver getDriver() {
         return driver;
     }
@@ -81,13 +122,15 @@ public class SimKitProcedures implements AutoCloseable{
 	{
 		driver.close();
 	}
+	
+	
 
 	@UserFunction
 	public String createGraphFromCsv(@Name("data_path") String data_path, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("parameter") String parameter,@Name("remove_column") String remove_columns) throws Exception {
 
 
 		String confusionMatrix = "";
-		try ( SimKitProcedures connector = new SimKitProcedures( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		try ( SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password) )
 		{
 
 			if(data_path == null && distance_measure == null) {
@@ -150,7 +193,7 @@ public class SimKitProcedures implements AutoCloseable{
 	public String createGraphFromNodes(@Name("label") String label,@Name("distance_measure") String distanceMeasure,@Name("graph_type") String graphType,@Name("parameter") String parameter,@Name("remove_column") String remove_columns) throws Exception {
 
 		String confusionMatrix = "";
-		try ( SimKitProcedures connector = new SimKitProcedures( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		try ( SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password) )
 		{
 
 
@@ -252,13 +295,13 @@ public class SimKitProcedures implements AutoCloseable{
 	 * @param node_label            The label of the nodes in the graph.
 	 * @param laplacian_type        The type of Laplacian matrix to be used.
 	 * @param number_of_eigenvectors The number of desired eigenvectors to compute during eigen decomposition.
-	 * @return String indicating the success of the graph creation and create Graph with Nodes and Relationships in Neo4j.
-	 * @throws Exception.
+	 * @return String indicating the success of the graph creation and creates Graph with Nodes and Relationships in Neo4j.
+	 * @throws RuntimeException If an error occurs while creating the Laplacian graph in Neo4j.
 	 */
 	@UserFunction
 	public String createEigenGraph(@Name("node_label") String node_label,  @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors) throws Exception {
-		
-		try (SimKitProcedures connector = new SimKitProcedures("bolt://localhost:7687", "neo4j", "123412345")) {
+
+		try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password) ) {
 	        if (node_label == null) {
 	            return "Missing node label";
 	        } else {
@@ -296,7 +339,7 @@ public class SimKitProcedures implements AutoCloseable{
 	    String listOfData = "";
 	    String[] overLookArray = new String[0];
 	    mapNodeList.clear();
-	    try (SimKitProcedures connector = new SimKitProcedures("bolt://localhost:7687", "neo4j", "123412345")) {
+	    try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 	        if (!overLook.isEmpty()) {
 	            overLookArray = overLook.split(",");
 	        }
@@ -330,7 +373,7 @@ public class SimKitProcedures implements AutoCloseable{
     public String kmean(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
 	{
     	predictedNodeLabels.clear();
-    	try ( SimKitProcedures connector = new SimKitProcedures( "bolt://localhost:7687", "neo4j", "123412345" ) )
+    	try ( SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password) )
         {
 			String averageSilhouetteCoefficientString = "The average Silhouette Coefficient value is: ";
 			HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
@@ -366,7 +409,6 @@ public class SimKitProcedures implements AutoCloseable{
 	public String adjustedRandIndex(@Name("nodeSet") String nodeSet, @Name("trueLabels") String trueLabel) throws Exception {
 	    if(predictedNodeLabels.size()==0)
 	    {
-	    	
 	    	return " predicted Labels is null, please run kmean clustering to add the predicted labels";
 	    }
 	    else {
@@ -374,7 +416,7 @@ public class SimKitProcedures implements AutoCloseable{
 	    	Double adjustedRandIndexValue = 0.0;
 		    trueNodeLabels.clear();
 		    List<String> stringTrueNodeLabelsList = new ArrayList<String>();
-		    try (SimKitProcedures connector = new SimKitProcedures("bolt://localhost:7687", "neo4j", "123412345")) {
+		    try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 		        queryData(nodeSet);
 		        for (Record key : dataKey) {
 		            List<Pair<String, Value>> values = key.fields();
@@ -591,7 +633,7 @@ public class SimKitProcedures implements AutoCloseable{
 	@UserFunction
 	public String spectralClusteringFromNeo4j(@Name("node_label") String node_label, @Name("distance_measure") String distance_measure,@Name("graph_type") String graph_type,@Name("parameter") String parameter,@Name("remove_column") String remove_columns, @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors, @Name("number_of_iteration") String number_of_iteration, @Name("distance_measure_kmean") String distance_measure_kmean) throws Exception {
 		
-		try (SimKitProcedures connector = new SimKitProcedures("bolt://localhost:7687", "neo4j", "123412345")) {
+		try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 			if(node_label == null && distance_measure == null) {
 				return "Missing dataPath or distance measure type";
 			}else {
@@ -706,7 +748,7 @@ public class SimKitProcedures implements AutoCloseable{
 	 */
     @UserFunction
     public String displayGraphList(@Name("node_label") String node_label, @Name("numberOfEigenvectors") Double number_of_eigenvectors, @Name("laplacian_type") String laplacian_type) throws Exception {
-        try (SimKitProcedures connector = new SimKitProcedures("bolt://localhost:7687", "neo4j", "123412345")) {
+        try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
             if (node_label == null) {
                 return "Missing nodeType";
             } else {
@@ -745,7 +787,7 @@ public class SimKitProcedures implements AutoCloseable{
 	@UserFunction
 	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("method") String method, @Name("parameter") String parameter,@Name("remove_column") String remove_columns) throws Exception {
 		
-		try (SimKitProcedures connector = new SimKitProcedures("bolt://localhost:7687", "neo4j", "123412345")) {
+		try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 		
 		if(dataPath == null && distance_measure == null) {
 			return "Missing data_path or distance measure type";
@@ -816,7 +858,7 @@ public class SimKitProcedures implements AutoCloseable{
 	public String displayFinalResults(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception {
 		
     	predictedNodeLabels.clear();
-		    	try ( SimKitProcedures connector = new SimKitProcedures( "bolt://localhost:7687", "neo4j", "123412345" ) )
+		    	try ( SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password))
         {
 		    		
 		    		if(nodeSet == null && distanceMeasure == null) {

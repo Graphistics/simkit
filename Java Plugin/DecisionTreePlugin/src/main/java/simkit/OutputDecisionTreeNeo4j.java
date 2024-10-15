@@ -100,7 +100,7 @@
 //	{
 //		driver = null;
 //	}
-//	
+//
 //    public Driver getDriver() {
 //        return driver;
 //    }
@@ -181,7 +181,7 @@
 //	public void createNodeConnectedGraph(final String GraphType, final String message, final String nodeDetail,final int index)
 //	{
 //		final String name = "Index" + index;
-// 
+//
 //		try ( Session session = driver.session() )
 //		{
 //			String greeting = session.writeTransaction( new TransactionWork<String>()
@@ -231,7 +231,7 @@
 //			} );
 //		}
 //	}
-//	
+//
 //	public void createRelationshipConnectedGraph( final String dtType, final String message, final EdgeList edgeListDetail)
 //	{
 //		final long bid = edgeListDetail.getTarget();
@@ -254,7 +254,7 @@
 //			} );
 //		}
 //	}
-//	
+//
 //
 //	/**
 //	 * Create relationship between nodes in Java
@@ -331,11 +331,11 @@
 //		return dataPath;
 //	}
 //	private void loadCsvConnector(String dataPath, String Name,ArrayList<String> arrayListHeaders,ArrayList<String> arrayListFirst) throws Exception {
-//		 
+//
 //		// LOAD CSV with headers FROM 'file:///test.csv' AS row
 //		//merge (:csvdata8 {points: row.points,x_cordinate: toFloat(row.x_coordinate),y_cordinate: toFloat(row.y_coordinate),class: toFloat(row.class)})
 //		String proerties = OutputDecisionTreeNeo4j.getHeadersList(arrayListHeaders,arrayListFirst);
-// 
+//
 //		String FileName = Name.substring(0,Name.indexOf("."));
 //		try ( Session session = driver.session() )
 //		{
@@ -349,7 +349,7 @@
 //				}
 //			} );
 //		}
-// 
+//
 //	}
 //
 //	private static String getHeadersList(ArrayList<String> arrayListHeaders,ArrayList<String> arrayListFirst) {
@@ -587,7 +587,7 @@
 //	 */
 //	@UserFunction
 //	public String createEigenGraph(@Name("node_label") String node_label,  @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors) throws Exception {
-//		
+//
 //		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
 //	        if (node_label == null) {
 //	            return "Missing node label";
@@ -603,9 +603,9 @@
 //	            ArrayList<NodeList2> node_list_eigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(node_label, connector.getDriver());
 //	            ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_list_eigen, eigen_result.X, edge_list);
 //
-//	            
+//
 //	            String graph_name = "eigenGraph_" + laplacian_type + "_" + node_label + "_" + Math.round(number_of_eigenvectors);
-//	            
+//
 //	            for (NodeList2 node : node_list_eigen) {
 //	            	Neo4jGraphHandler.createNodeGraphEigenTransform(graph_name, "created nodes in neo4j", node, eigen_result.X, connector.getDriver());
 //	            }
@@ -666,7 +666,7 @@
 //    }
 //
 //	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath,@Name("method") String method, @Name("epsilon") Double epsilon) throws Exception {
-//		
+//
 //    	String outputString = "";
 //		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
 //	        if (nodeType == null) {
@@ -677,16 +677,16 @@
 //	        	List<NodeList2> nodelist2 = new ArrayList<>();
 //	        	edgeList = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(nodeType, connector.getDriver());
 //	        	nodeList = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph2(nodeType, connector.getDriver());
-//	        	
+//
 //	            Double[][] distanceMatrix = GraphTransform.euclideanDistance(nodeList);
 //	            Double[][] adjMatrix = GraphTransform.calculateAdjMatrix(distanceMatrix, method, epsilon);
 //	            nodelist2 = ReadCsvFile.retrieveNodeListFromCSV(dataPath);
 //				ArrayList<EdgeList2> edgeList2 = GraphTransform.calculateEdgeList(nodeList,adjMatrix);
-//	        	
+//
 //	        	if(edgeList.size()>0)
 //	        	{
-//	        		for(int i = 0; i < edgeList.size(); i++) {   
-//		        		outputString = outputString + " | " + edgeList.get(i).toString(); 
+//	        		for(int i = 0; i < edgeList.size(); i++) {
+//		        		outputString = outputString + " | " + edgeList.get(i).toString();
 //	        		}
 //	        	}
 //        		else
@@ -697,19 +697,19 @@
 //	        return "Node List Data:  " + outputString;
 //        }
 //    }
-//	
+//
 //	@UserFunction
 //	public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("method") String method, @Name("parameter") String epsilon,@Name("remove_column") String remove_columns) throws Exception {
-//		
+//
 //		try (OutputDecisionTreeNeo4j connector = new OutputDecisionTreeNeo4j("bolt://localhost:7687", "neo4j", "123412345")) {
-//		
+//
 //		if(dataPath == null && distance_measure == null) {
 //			return "Missing data_path or distance measure type";
 //		}else {
-//			
+//
 //            // Display edge list
 //
-//			
+//
 //			String graphName = null;
 //			Double[][] adj_mat = null;
 //			String[] removeList = remove_columns.split(",");
@@ -722,8 +722,8 @@
 //
 //            StringBuilder outputString = new StringBuilder("Graph Data: ");
 //            outputString.append("\n\nDistance Matrix:\n").append(DistanceMatrix);
-//			
-//			
+//
+//
 //			if(graph_type.equals("full")) {
 //				Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,epsilon);
 //				adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
@@ -744,17 +744,17 @@
 //				adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
 //				graphName = graph_type.concat("_"+epsilon);
 //			}
-//			
+//
 //			outputString.append("\n\nAdjacency Matrix:\n").append(adj_mat);
-//			
+//
 //			ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
-//			
+//
 //			outputString.append("\n\nEdge List:\n");
 //            for (EdgeList2 edge : edgeList) {
 //                outputString.append(" | ").append(edge.toString());
 //            }
-//			
-//			
+//
+//
 //			return outputString.toString();
 //		}
 //		}
@@ -770,7 +770,7 @@
 //        }
 //        return result.toString();
 //    }
-//  
+//
 //
 //
 //
@@ -1711,7 +1711,7 @@
 //		}
 //
 //	}
-//    
+//
 //	public void connectNodes(final String nodeType, final String message, final String nodeCentroid, final String nodeCluster, final double distance)
 //    {
 //    	final String name = "kmean";
@@ -1726,15 +1726,15 @@
 //            		Result result = tx.run( "MERGE (a"+":ClusteringNodeType" +" {" + nodeCentroid +"}) " +
 //            				"MERGE (b "+":ClusteringNodeType" + " {" + nodeCluster +"}) " +
 //            				"MERGE (a)-[r:link]->(b) "  +
-//                            "SET r.distance = " + distance + " " + 
+//                            "SET r.distance = " + distance + " " +
 //            				"RETURN a.message");
 //				    return result.single().get( 0 ).asString();
 //                }
 //            } );
 //		}
 //	}
-//	
-//    private static void displayMatrix(RealMatrix matrix, String matrixName) 
+//
+//    private static void displayMatrix(RealMatrix matrix, String matrixName)
 //    {
 //        System.out.println(matrixName + ": ");
 //        int rows = matrix.getRowDimension();
@@ -1746,7 +1746,7 @@
 //            System.out.println();
 //        }
 //    }
-//	
+//
 //	public void connectNodes(final String nodeType, final String message, final String nodeCentroid, final String nodeCluster)
 //    {
 //    	final String name = "kmean";
@@ -1767,7 +1767,7 @@
 //            } );
 //        }
 //    }
-//	
+//
 //	@UserFunction
 //	public String mapNodes(@Name("nodeSet") String nodeSet, @Name("overlook") String overLook) throws Exception {
 //	    String listOfData = "";
@@ -1793,7 +1793,7 @@
 //	    }
 //	    return "Map all node data: " + listOfData;
 //	}
-//	
+//
 //	private String getNodeValues(Value value, String[] overLookArray) {
 //	    StringBuilder valueOfNode = new StringBuilder();
 //	    for (String nodeKey : value.keys()) {
@@ -1813,15 +1813,15 @@
 //	    }
 //	    return valueOfNode.toString();
 //	}
-//	
+//
 //	private String getStringValue(StringBuilder valueOfNode) {
 //	    return valueOfNode.length() > 0 ? ", " : "";
 //	}
-//	
+//
 //	 /**
 //     * Procedure for k-means clustering and visualization in neo4j
 //     * @param nodeSet type of node
-//     * @param numberOfCentroid 
+//     * @param numberOfCentroid
 //     * @param numberOfInteration
 //     * @return cluster result and visualize
 //     * @throws Exception
@@ -1860,7 +1860,7 @@
 //			return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue + " predicted labels: " + predictedNodeLabels;
 //		}
 //	}
-//    
+//
 //    @UserFunction
 //    @Description("Calculate the mean of the Silhouette Coefficients for all point")
 //	public String averageSilhouetteCoefficient(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
@@ -1880,7 +1880,7 @@
 //    		return null;
 //    	}
 //	}
-//    
+//
 //    public static List<Double> convertStringLabels(List<String> strings) {
 //        Map<String, Double> labelMap = new HashMap<>();
 //        List<Double> labels = new ArrayList<>();
@@ -1895,12 +1895,12 @@
 //
 //        return labels;
 //    }
-//    
+//
 //    @UserFunction
 //	public String adjustedRandIndex(@Name("nodeSet") String nodeSet, @Name("trueLabels") String trueLabel) throws Exception {
 //	    if(predictedNodeLabels.size()==0)
 //	    {
-//	    	
+//
 //	    	return " predicted Labels is null, please run kmean clustering to add the predicted labels";
 //	    }
 //	    else {
@@ -1937,7 +1937,7 @@
 //		        {
 //		        	trueNodeLabels =  convertStringLabels(stringTrueNodeLabelsList);
 //		        }
-//		        
+//
 //		        if(trueNodeLabels.size() != predictedNodeLabels.size())
 //		        {
 //		        	return "true labels size: " + trueNodeLabels +" and predicted labels:" + predictedNodeLabels + " does not have the same size";
@@ -1949,7 +1949,7 @@
 //		    return "ajusted rand index of " + nodeSet + " is: " + adjustedRandIndexValue ;
 //	    }
 //	}
-//    
+//
 //    public static double calculateAdjustedRandIndex(List<Double> trueLabels, List<Double> predictedLabels) {
 //        if (trueLabels.size() != predictedLabels.size()) {
 //            throw new IllegalArgumentException("Input lists must have the same length");
