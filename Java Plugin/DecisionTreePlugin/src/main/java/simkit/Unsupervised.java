@@ -1,4 +1,4 @@
-package main;
+package simkit;
 
 
 import java.util.ArrayList;
@@ -343,7 +343,7 @@ private static String extractID(String node) {
     }
     return null; // ID not found
 }
-	 
+
 	/**
 	 * This is the main method to perform k-means clustering.
 	 * @param inputData is a variable where the nodes from Neo4j are stored

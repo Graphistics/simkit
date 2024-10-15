@@ -1,7 +1,7 @@
 package graph;
 
 import definition.NodeList2;
-import main.SimKitProcedures;
+import simkit.SimKitProcedures;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class DistanceMeasureNodesTest {
 
-    String dataPath = "./data/test.csv";
+    String dataPath = "././././data/test.csv";
     ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
     ArrayList<NodeList2> nodePropertiesList = readCsvTestData.readCsvFileToMap(dataPath);
     ArrayList<String> removeListNew = new ArrayList<>();

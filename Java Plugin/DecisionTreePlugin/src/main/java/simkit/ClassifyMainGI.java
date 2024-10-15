@@ -1,13 +1,9 @@
-package main;
+package simkit;
 
-import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Scanner;
 
-import cv.CrossValidation;
 import gini.EvaluateTreeGI;
-import input.ProcessInputData;
 import output.PrintTree;
 
 /**

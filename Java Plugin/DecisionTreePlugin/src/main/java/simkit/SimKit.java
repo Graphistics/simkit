@@ -1,13 +1,11 @@
-package main;
+package simkit;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Scanner;
 
 import cv.CrossValidation;
-import input.ProcessInputData;
-import output.PrintTree;
+
 /**
  * This class is used to run cross validation on the entire sample 
  * Dataset1 - heart_failure_original.csv . Target - 'DEATH_EVENT'
@@ -20,8 +18,8 @@ import output.PrintTree;
  *
  */
 
-public class Main {
-    public static void main(String[] args) throws IOException {
+public class SimKit {
+    public static void simkit(String[] args) throws IOException {
 
 		Scanner in = new Scanner(System.in);
 		System.out.println("===============================================================");
