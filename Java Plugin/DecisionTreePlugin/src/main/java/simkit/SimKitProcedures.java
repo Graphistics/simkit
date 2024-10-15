@@ -390,7 +390,7 @@ public String kmean(@Name("nodeSet") String nodeSet,
                     @Name("useKmeanForSilhouette") boolean kmeanBool) throws Exception {
     predictedNodeLabels.clear();
 
-    try (SimKitProcedures connector = new SimKitProcedures("bolt://localhost:7687", "neo4j", "123412345")) {
+    try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
         int numCentroids = Integer.parseInt(numberOfCentroid);
         int numIterations = Integer.parseInt(numberOfInteration);
         double centroidNumber = 1.0;
