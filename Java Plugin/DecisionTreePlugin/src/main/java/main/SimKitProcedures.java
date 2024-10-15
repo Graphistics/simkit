@@ -325,99 +325,97 @@ public class SimKitProcedures implements AutoCloseable{
 	}
 	
 	 /**
-     * Procedure for k-means clustering and visualization in neo4j
-     * @param nodeSet type of node
-     * @param numberOfCentroid 
-     * @param numberOfInteration
-     * @return cluster result and visualize
-     * @throws Exception
-     */
-    @UserFunction
-    @Description("Kmean clustering function")
-    public String kmean(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure, @Name("originalSet") String originalNodeSet, @Name("overlook") String overLook, @Name("overlook Original") String overlook_original, @Name("use kmean for Siluete Coeficient") boolean kmean_bool) throws Exception
-	{
-    	predictedNodeLabels.clear();
-    	try ( SimKitProcedures connector = new SimKitProcedures( "bolt://localhost:7687", "neo4j", "123412345" ) )
-        {
-			String averageSilhouetteCoefficientString = "The average Silhouette Coefficient value is: ";
-			HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
-			HashMap<String, ArrayList<String>> map = new HashMap<String, ArrayList<String>>();
-			int numberOfCentroidInt = Integer.parseInt(numberOfCentroid);
-			int numberOfInterationInt = Integer.parseInt(numberOfInteration);
-			double centroidNumber = 1.0;
-			ArrayList<String> mapNodeOriginalList =  new ArrayList<String>();
+ * Procedure for k-means clustering and visualization in neo4j
+ * @param nodeSet Type of node
+ * @param numberOfCentroid Number of centroids
+ * @param numberOfInteration Number of iterations
+ * @param distanceMeasure Distance measure method
+ * @param originalNodeSet Original node set
+ * @param overLook Comma-separated list of fields to overlook
+ * @param overlookOriginal Comma-separated list of fields to overlook in the original set
+ * @param kmeanBool Flag to use k-means for Silhouette Coefficient
+ * @return Cluster result and visualization
+ * @throws Exception
+ */
+@UserFunction
+@Description("K-means clustering function")
+public String kmean(@Name("nodeSet") String nodeSet,
+                    @Name("numberOfCentroid") String numberOfCentroid,
+                    @Name("numberOfInteration") String numberOfInteration,
+                    @Name("distanceMeasure") String distanceMeasure,
+                    @Name("originalSet") String originalNodeSet,
+                    @Name("overlook") String overLook,
+                    @Name("overlookOriginal") String overlookOriginal,
+                    @Name("useKmeanForSilhouette") boolean kmeanBool) throws Exception {
+    predictedNodeLabels.clear();
 
-			String listOfData = "";
-			String[] overLookArray = new String[0];
-			mapNodeList.clear();
-				if (!overLook.isEmpty()) {
-	            overLookArray = overLook.split(",");
-	        }
-	        queryData(nodeSet);
-	        for (Record key : dataKey) {
-	            List<Pair<String, Value>> values = key.fields();
-	            for (Pair<String, Value> nodeValues : values) {
-	                if ("n".equals(nodeValues.key())) {
-	                    Value value = nodeValues.value();
-	                    String valueOfNode = getNodeValues(value, overLookArray);
-	                    mapNodeList.add(valueOfNode);
-//	                    listOfData = listOfData + valueOfNode + " | ";
-	                    listOfData = mapNodeList.toString();
-	                }
-	            }
-	        }
-			String[] overLookArrayOriginal = new String[0];
-			if (!overlook_original.isEmpty()) {
-	            overLookArrayOriginal = overlook_original.split(",");
-	        }
-	        queryData(nodeSet);
-				queryData(originalNodeSet);
-				for (Record key : dataKey) {
-					List<Pair<String, Value>> values = key.fields();
-					for (Pair<String, Value> originalNodeValues : values) {
-						if ("n".equals(originalNodeValues.key())) {
-							Value value = originalNodeValues.value();
-							String valueOfNode = getNodeValues(value, overLookArrayOriginal);
-							mapNodeOriginalList.add(valueOfNode);
-						}
-					}
-				}
-			ArrayList<String> debug = new ArrayList<>();
-			//map = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, true, mapNodeOriginalList);
+    try (SimKitProcedures connector = new SimKitProcedures("bolt://localhost:7687", "neo4j", "123412345")) {
+        int numCentroids = Integer.parseInt(numberOfCentroid);
+        int numIterations = Integer.parseInt(numberOfInteration);
+        double centroidNumber = 1.0;
 
-			double averageSilhouetteCoefficientValue;
-			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, false, debug);
+        ArrayList<String> mapNodeList = parseNodeValues(nodeSet, overLook.split(","));
+        ArrayList<String> mapNodeOriginalList = parseNodeValues(originalNodeSet, overlookOriginal.split(","));
 
-			if (kmean_bool) {
-				averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
-			}
-			else {
-				map = Unsupervised.replaceValuesWithOriginalSet(kmeanAssign, mapNodeOriginalList, log);
-				averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(map, distanceMeasure);
-			}
+        HashMap<String, ArrayList<String>> kmeanAssign = Unsupervised.KmeanClust(
+            mapNodeList, numCentroids, numIterations, distanceMeasure, false, new ArrayList<>()
+        );
 
-			for (String centroid : kmeanAssign.keySet()) {
-			    ArrayList<String> clusterNode = kmeanAssign.get(centroid);
-			    for (int i = 0; i < clusterNode.size(); i++) {
-			    	//Add predict labels
-		    		predictedNodeLabels.add(centroidNumber);
+        double averageSilhouetteCoefficientValue;
+        if (kmeanBool) {
+            averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
+        } else {
+            HashMap<String, ArrayList<String>> mappedNodes = Unsupervised.replaceValuesWithOriginalSet(kmeanAssign, mapNodeOriginalList, log);
+            averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(mappedNodes, distanceMeasure);
+        }
 
-			    	DecimalFormat decimalFormat = new DecimalFormat("#.###");
-			        double distance = Unsupervised.calculateDistance(clusterNode.get(i), centroid, distanceMeasure);
-			        String formattedDistance = decimalFormat.format(distance);
-			        double roundedDistance = Double.parseDouble(formattedDistance);
-			        connector.connectNodes(nodeSet, "create relationship in kmean node", centroid, clusterNode.get(i), distance);
+        processClusters(connector, nodeSet, kmeanAssign, centroidNumber, distanceMeasure);
 
-//			        connector.connectNodes(nodeSet, "create relationship in kmean node", centroid, clusterNode.get(i), roundedDistance);
-			    }
-				//double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(map, distanceMeasure);
+        return "The average Silhouette Coefficient value is: " + averageSilhouetteCoefficientValue +
+               " predicted labels: " + predictedNodeLabels;
+    }
+}
 
-			    centroidNumber = centroidNumber + 1;
-			}
+/**
+ * Parses node values from the dataset based on overlook fields.
+ */
+private ArrayList<String> parseNodeValues(String nodeSet, String[] overlookFields) throws Exception {
+    ArrayList<String> nodeList = new ArrayList<>();
+    queryData(nodeSet);
 
-			return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue + " predicted labels: " + predictedNodeLabels;
-		}
-	}
+    for (Record record : dataKey) {
+        for (Pair<String, Value> pair : record.fields()) {
+            if ("n".equals(pair.key())) {
+                String value = getNodeValues(pair.value(), overlookFields);
+                nodeList.add(value);
+            }
+        }
+    }
+    return nodeList;
+}
+
+/**
+ * Processes clusters and connects nodes based on the k-means result.
+ */
+private void processClusters(SimKitProcedures connector, String nodeSet,
+                             HashMap<String, ArrayList<String>> kmeanAssign,
+                             double centroidNumber, String distanceMeasure) throws Exception {
+    DecimalFormat decimalFormat = new DecimalFormat("#.###");
+
+    for (String centroid : kmeanAssign.keySet()) {
+        ArrayList<String> clusterNodes = kmeanAssign.get(centroid);
+
+        for (String clusterNode : clusterNodes) {
+            predictedNodeLabels.add(centroidNumber);
+
+            double distance = Unsupervised.calculateDistance(clusterNode, centroid, distanceMeasure);
+            String formattedDistance = decimalFormat.format(distance);
+
+            connector.connectNodes(nodeSet, "create relationship in kmean node", centroid, clusterNode, Double.parseDouble(formattedDistance));
+        }
+        centroidNumber += 1.0;
+    }
+}
     
     @UserFunction
 	public String adjustedRandIndex(@Name("nodeSet") String nodeSet, @Name("trueLabels") String trueLabel) throws Exception {
