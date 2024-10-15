@@ -1,7 +1,7 @@
 package graph;
 
 import definition.NodeList2;
-import simkit.OutputDecisionTreeNeo4j;
+import simkit.SimKitProcedures;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,7 +24,7 @@ class DistanceMeasureNodesTest {
     @Test
     void euclideanDistance(){
         String distance_measure = "euclidean";
-        Double[][] DistanceMatrix = OutputDecisionTreeNeo4j.getDistanceMatrixFromNodes(distance_measure,nodePropertiesList,removeListNew);
+        Double[][] DistanceMatrix = SimKitProcedures.getDistanceMatrixFromNodes(distance_measure,nodePropertiesList,removeListNew);
 
         // round the values to 2 decimal places
         roundMatrixTwoDecimalPlaces(DistanceMatrix);
@@ -44,7 +44,7 @@ class DistanceMeasureNodesTest {
     @Test
     void manhattanDistance(){
         String distance_measure = "manhattan";
-        Double[][] DistanceMatrix = OutputDecisionTreeNeo4j.getDistanceMatrixFromNodes(distance_measure,nodePropertiesList,removeListNew);
+        Double[][] DistanceMatrix = SimKitProcedures.getDistanceMatrixFromNodes(distance_measure,nodePropertiesList,removeListNew);
         
         // round the values to 2 decimal places
         roundMatrixTwoDecimalPlaces(DistanceMatrix);
@@ -62,7 +62,7 @@ class DistanceMeasureNodesTest {
     @Test
     void canberraDistance(){
         String distance_measure = "canberra";
-        Double[][] DistanceMatrix = OutputDecisionTreeNeo4j.getDistanceMatrixFromNodes(distance_measure,nodePropertiesList,removeListNew);
+        Double[][] DistanceMatrix = SimKitProcedures.getDistanceMatrixFromNodes(distance_measure,nodePropertiesList,removeListNew);
 
         // round the values to 2 decimal places
         roundMatrixTwoDecimalPlaces(DistanceMatrix);
@@ -81,7 +81,7 @@ class DistanceMeasureNodesTest {
     @Test
     void cosineSimilarity() {
         String distance_measure = "cosine";
-        Double[][] DistanceMatrix = OutputDecisionTreeNeo4j.getDistanceMatrixFromNodes(distance_measure, nodePropertiesList, removeListNew);
+        Double[][] DistanceMatrix = SimKitProcedures.getDistanceMatrixFromNodes(distance_measure, nodePropertiesList, removeListNew);
 
         // round the values to 2 decimal places
         roundMatrixTwoDecimalPlaces(DistanceMatrix);
@@ -98,7 +98,7 @@ class DistanceMeasureNodesTest {
     @Test
     void brayCurtisDistance(){
         String distance_measure = "bray_curtis";
-        Double[][] DistanceMatrix = OutputDecisionTreeNeo4j.getDistanceMatrixFromNodes(distance_measure, nodePropertiesList, removeListNew);
+        Double[][] DistanceMatrix = SimKitProcedures.getDistanceMatrixFromNodes(distance_measure, nodePropertiesList, removeListNew);
 
         // round the values to 2 decimal places
         roundMatrixTwoDecimalPlaces(DistanceMatrix);
