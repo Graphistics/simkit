@@ -367,28 +367,25 @@ public class SimKitProcedures implements AutoCloseable{
 	
 	 /**
  * Procedure for k-means clustering and visualization in neo4j
- * @param nodeSet Type of node
- * @param numberOfCentroid Number of centroids
- * @param numberOfInteration Number of iterations
- * @param distanceMeasure Distance measure method
- * @param originalNodeSet Original node set
- * @param overLook Comma-separated list of fields to overlook
- * @param overlookOriginal Comma-separated list of fields to overlook in the original set
- * @param kmeanBool Flag to use k-means for Silhouette Coefficient
+ * @param params Type of node
  * @return Cluster result and visualization
  * @throws Exception
  */
 @UserFunction
 @Description("K-means clustering function")
-public String kmean(@Name("nodeSet") String nodeSet,
-                    @Name("numberOfCentroid") String numberOfCentroid,
-                    @Name("numberOfInteration") String numberOfInteration,
-                    @Name("distanceMeasure") String distanceMeasure,
-                    @Name("originalSet") String originalNodeSet,
-                    @Name("overlook") String overLook,
-                    @Name("overlookOriginal") String overlookOriginal,
-                    @Name("useKmeanForSilhouette") boolean kmeanBool) throws Exception {
+public String kmean(@Name("params") Map<String, Object> params) throws Exception {
+
     predictedNodeLabels.clear();
+
+	String nodeSet = (String) params.getOrDefault("nodeSet", "defaultNodeSet");
+	String numberOfCentroid = (String) params.getOrDefault("numberOfCentroid", "defaultCentroid");
+	String numberOfInteration = (String) params.getOrDefault("numberOfInteration", "defaultInteration");
+	String distanceMeasure = (String) params.getOrDefault("distanceMeasure", "defaultMeasure");
+	String originalNodeSet = (String) params.getOrDefault("originalSet", "defaultSet");
+	String overLook = (String) params.getOrDefault("overlook", "defaultOverlook");
+	String overlookOriginal = (String) params.getOrDefault("overlookOriginal", "defaultOverlookOriginal");
+	boolean kmeanBool = (Boolean) params.getOrDefault("useKmeanForSilhouette", false);
+
 
     try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
         int numCentroids = Integer.parseInt(numberOfCentroid);
@@ -404,7 +401,11 @@ public String kmean(@Name("nodeSet") String nodeSet,
 
         double averageSilhouetteCoefficientValue;
         if (kmeanBool) {
-            averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
+			// Remove index and id from kmeanAssign
+			HashMap<String, ArrayList<String>> cleanedKmeanAssign = Unsupervised.removeIndexAndId(kmeanAssign);
+			System.out.println("cleanedKmeanAssign");
+			System.out.println(cleanedKmeanAssign);
+            averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(cleanedKmeanAssign, distanceMeasure);
         } else {
             HashMap<String, ArrayList<String>> mappedNodes = Unsupervised.replaceValuesWithOriginalSet(kmeanAssign, mapNodeOriginalList, log);
             averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(mappedNodes, distanceMeasure);
@@ -777,8 +778,8 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 		            
 		            String number_of_clusters = Integer.toString(number_of_eigenvectors.intValue());
 		            
-		            String kmeanResult = kmean(graph_name,number_of_clusters,number_of_iteration,distance_measure_kmean, String.valueOf(0), "id,index, target,sepal_length,sepal_width,petal_length,petal_width", "id,index", false);
-		            
+		            //String kmeanResult = kmean(graph_name,number_of_clusters,number_of_iteration,distance_measure_kmean, String.valueOf(0), "id,index, target,sepal_length,sepal_width,petal_length,petal_width", "id,index", false);
+					String kmeanResult = "test";
 
 			        return "Created similarity graph, eigendecomposed graph successful!" + kmeanResult;
 		            

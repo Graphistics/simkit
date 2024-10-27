@@ -446,6 +446,9 @@ private static String extractID(String node) {
 	            newCentroid.append(",");
 	        }
 	    }
+		// Log the new centroid
+    	System.out.println("New centroid: " + newCentroid.toString());
+
 	    return newCentroid.toString();
 	}
 	
@@ -476,12 +479,18 @@ private static String extractID(String node) {
 	        String closestCentroid = null;
 
 	        for (int j = 0; j < listOfCentroid.size(); j++) {
-	            double distance = calculateDistance(listOfRemain.get(i), listOfCentroid.get(j), distanceMeasure);
-	            
+				System.out.println("distanceAssign");
+				System.out.println(listOfRemain.get(i));
+				System.out.println(removeIndexAndIdEntries(listOfRemain.get(i)));
+				System.out.println(listOfCentroid.get(j));
+				System.out.println(removeIndexAndIdEntries(listOfCentroid.get(j)));
+	            double distance = calculateDistance(removeIndexAndIdEntries(listOfRemain.get(i)), removeIndexAndIdEntries(listOfCentroid.get(j)), distanceMeasure);
+	            System.out.println(distance);
 	            if (distance < minDistance) {
 	                minDistance = distance;
 	                closestCentroid = listOfCentroid.get(j);
 	            }
+				System.out.println(closestCentroid);
 	        }
 	        hashClusterAssign.computeIfAbsent(closestCentroid, k -> new ArrayList<>()).add(listOfRemain.get(i));
 	    }
@@ -492,6 +501,34 @@ private static String extractID(String node) {
 
 	    return hashClusterAssign;
 	}
+
+        public static String removeIndexAndIdEntries(String centroidString) {
+        // Split the string by commas to get individual key-value pairs
+        String[] entries = centroidString.split(",");
+
+        // Use a StringBuilder to collect entries that don't contain "index" or "id"
+        StringBuilder result = new StringBuilder();
+
+        for (String entry : entries) {
+            // Check if the entry contains a key-value pair
+            if (entry.contains(":")) {
+                String[] keyValue = entry.split(":");
+                if (keyValue.length > 1) {
+                    String key = keyValue[0].trim();
+                    // Only append the entry if it doesn't contain "index" or "id"
+                    if (!key.contains("index") && !key.contains("id") && !key.contains(" index") && !key.contains(" id")) {
+                        if (result.length() > 0) {
+                            result.append(", ");
+                        }
+                        result.append(entry);
+                    }
+                }
+            }
+        }
+
+        return result.toString();
+    }
+
 
 	static double calculateDistance(String point1, String point2, String distanceMeasure) {
 	    switch (distanceMeasure.toLowerCase()) {
@@ -655,6 +692,10 @@ private static String extractID(String node) {
 	    	ArrayList<String> cluster = allCluster.get(key);
 	    	for (String point : cluster)
 	    	{
+				System.out.println("averageSilhouetteCoefficient");
+				System.out.println(point);
+				System.out.println(cluster);
+				System.out.println(allCluster);
 	    		sumSilhouette += silhouetteCoefficient(point, cluster, allCluster, distanceMeasure);
 	    		numPoints++;
 	    	}
@@ -662,5 +703,48 @@ private static String extractID(String node) {
 	    System.out.println("Sum " + sumSilhouette);
 	    return sumSilhouette / numPoints;
 	}
-	
+	    // Function to remove "index" and "id" attributes from centroid keys and cluster points
+    public static HashMap<String, ArrayList<String>> removeIndexAndId(HashMap<String, ArrayList<String>> kmeanAssign) {
+        HashMap<String, ArrayList<String>> cleanedKmeanAssign = new HashMap<>();
+
+        // Iterate over the original kmeanAssign map
+        for (Map.Entry<String, ArrayList<String>> entry : kmeanAssign.entrySet()) {
+            // Clean the centroid by removing index and id
+            String cleanedCentroid = removeIndexAndIdFromString(entry.getKey());
+
+            // Clean the cluster points
+            ArrayList<String> cleanedCluster = new ArrayList<>();
+            for (String point : entry.getValue()) {
+                cleanedCluster.add(removeIndexAndIdFromString(point));
+            }
+
+            // Add the cleaned centroid and cleaned cluster to the new map
+            cleanedKmeanAssign.put(cleanedCentroid, cleanedCluster);
+        }
+
+        return cleanedKmeanAssign;
+    }
+
+    // Helper function to remove "index" and "id" from the string
+    private static String removeIndexAndIdFromString(String input) {
+        StringBuilder cleanedString = new StringBuilder();
+        String[] attributes = input.split(",");
+
+        for (String attribute : attributes) {
+            String[] parts = attribute.split(":");
+            if (parts.length == 2) {
+                String attributeName = parts[0].trim();
+                if (!attributeName.equals("index") && !attributeName.equals("id")) {
+                    if (cleanedString.length() > 0) {
+                        cleanedString.append(", ");
+                    }
+                    cleanedString.append(attribute.trim());
+                }
+            }
+        }
+
+        return cleanedString.toString();
+    }
+
+
 }
