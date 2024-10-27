@@ -479,18 +479,11 @@ private static String extractID(String node) {
 	        String closestCentroid = null;
 
 	        for (int j = 0; j < listOfCentroid.size(); j++) {
-				System.out.println("distanceAssign");
-				System.out.println(listOfRemain.get(i));
-				System.out.println(removeIndexAndIdEntries(listOfRemain.get(i)));
-				System.out.println(listOfCentroid.get(j));
-				System.out.println(removeIndexAndIdEntries(listOfCentroid.get(j)));
 	            double distance = calculateDistance(removeIndexAndIdEntries(listOfRemain.get(i)), removeIndexAndIdEntries(listOfCentroid.get(j)), distanceMeasure);
-	            System.out.println(distance);
 	            if (distance < minDistance) {
 	                minDistance = distance;
 	                closestCentroid = listOfCentroid.get(j);
 	            }
-				System.out.println(closestCentroid);
 	        }
 	        hashClusterAssign.computeIfAbsent(closestCentroid, k -> new ArrayList<>()).add(listOfRemain.get(i));
 	    }
@@ -692,10 +685,6 @@ private static String extractID(String node) {
 	    	ArrayList<String> cluster = allCluster.get(key);
 	    	for (String point : cluster)
 	    	{
-				System.out.println("averageSilhouetteCoefficient");
-				System.out.println(point);
-				System.out.println(cluster);
-				System.out.println(allCluster);
 	    		sumSilhouette += silhouetteCoefficient(point, cluster, allCluster, distanceMeasure);
 	    		numPoints++;
 	    	}

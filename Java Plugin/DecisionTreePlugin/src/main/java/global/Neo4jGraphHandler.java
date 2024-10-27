@@ -254,6 +254,9 @@ public class Neo4jGraphHandler {
             session.writeTransaction(new TransactionWork<Void>() {
                 @Override
                 public Void execute(Transaction tx) {
+                    String deleteQuery = "MATCH (n:" + graph_type + " {id: $source})-[r:`link`]->(m:" + graph_type + " {id: $target}) " + "DELETE r";
+                    tx.run(deleteQuery, parameters("source", source, "target", target));
+
                     Result result = tx.run(
                             "MATCH (n:" + graph_type + " {id: $source}), (m:" + graph_type + " {id: $target}) " +
                                     "CREATE (n)-[r:`link` {value: $weightValue}]->(m)",

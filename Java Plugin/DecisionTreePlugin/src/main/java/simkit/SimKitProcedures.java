@@ -403,8 +403,6 @@ public String kmean(@Name("params") Map<String, Object> params) throws Exception
         if (kmeanBool) {
 			// Remove index and id from kmeanAssign
 			HashMap<String, ArrayList<String>> cleanedKmeanAssign = Unsupervised.removeIndexAndId(kmeanAssign);
-			System.out.println("cleanedKmeanAssign");
-			System.out.println(cleanedKmeanAssign);
             averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(cleanedKmeanAssign, distanceMeasure);
         } else {
             HashMap<String, ArrayList<String>> mappedNodes = Unsupervised.replaceValuesWithOriginalSet(kmeanAssign, mapNodeOriginalList, log);
@@ -566,13 +564,19 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
                 @Override
                 public String execute( Transaction tx )
                 {
-                	//a is present for the node
-            		Result result = tx.run( "MERGE (a:Clustering_" + nodeType +" {" + nodeCentroid +"}) " +
-            				"MERGE (b:Clustering_" + nodeType + " {" + nodeCluster +"}) " +
-            				"MERGE (a)-[r:link]->(b) "  +
-                            "SET r.distance = " + distance + " " + 
-            				"RETURN a.message");
-				    return result.single().get( 0 ).asString();
+					// First, find and delete the existing node if it exists
+					String deleteQuery = "MATCH (a:Clustering_" + nodeType + " {" + nodeCentroid + "}) " +
+										 "DETACH DELETE a";
+					tx.run(deleteQuery);
+					// Then create the new nodes and relationship
+					String createQuery = "MERGE (a:Clustering_" + nodeType + " {" + nodeCentroid + "}) " +
+										 "MERGE (b:Clustering_" + nodeType + " {" + nodeCluster + "}) " +
+										 "MERGE (a)-[r:link]->(b) " +
+										 "SET r.distance = " + distance + " " +
+										 "RETURN a.message";
+
+					Result result = tx.run(createQuery);
+					return result.single().get(0).asString();
                 }
             } );
 		}
@@ -687,7 +691,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 
 	@UserFunction
 	public String spectralClusteringFromNeo4j(@Name("node_label") String node_label, @Name("distance_measure") String distance_measure,@Name("graph_type") String graph_type,@Name("parameter") String parameter,@Name("remove_column") String remove_columns, @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors, @Name("number_of_iteration") String number_of_iteration, @Name("distance_measure_kmean") String distance_measure_kmean) throws Exception {
-		
+		predictedNodeLabels.clear();
 		try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 			if(node_label == null && distance_measure == null) {
 				return "Missing dataPath or distance measure type";
@@ -778,8 +782,17 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 		            
 		            String number_of_clusters = Integer.toString(number_of_eigenvectors.intValue());
 		            
-		            //String kmeanResult = kmean(graph_name,number_of_clusters,number_of_iteration,distance_measure_kmean, String.valueOf(0), "id,index, target,sepal_length,sepal_width,petal_length,petal_width", "id,index", false);
-					String kmeanResult = "test";
+		            String kmeanResult = kmean(Map.of(
+        "nodeSet", graph_name,
+        "numberOfCentroid", "3",
+        "numberOfInteration", "100",
+        "distanceMeasure", "euclidean",
+        "originalSet", "Iris",
+        "overlook", "target,sepal_length,sepal_width,petal_length,petal_width",
+        "overlookOriginal", "target",
+        "useKmeanForSilhouette", false
+    ));
+					//String kmeanResult = "test";
 
 			        return "Created similarity graph, eigendecomposed graph successful!" + kmeanResult;
 		            

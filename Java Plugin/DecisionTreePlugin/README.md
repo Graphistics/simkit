@@ -24,5 +24,14 @@ return simkit.createEigenGraph('full_7new', 'sym', 3)
 
 ### Kmean Clustering
 ```java
-return simkit.kmean('eigenGraph_sym_full_7new_3', '3', '100', 'euclidean', 'Iris','target,sepal_length,sepal_width,petal_length,petal_width', 'id,index', false)
+return simkit.kmean({
+    nodeSet: "eigenGraph_rw_full_7new_3",
+    numberOfCentroid: "3",
+    numberOfInteration: "100",
+    distanceMeasure: "euclidean",
+    originalSet: "Iris",
+    overlook: "target,sepal_length,sepal_width,petal_length,petal_width",
+    overlookOriginal: "target",
+    useKmeanForSilhouette: false
+})
 ```
