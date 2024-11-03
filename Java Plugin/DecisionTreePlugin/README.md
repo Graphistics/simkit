@@ -22,12 +22,21 @@ return simkit.createGraphFromNodes('Iris', 'euclidean', 'full', '7', 'index, tar
 return simkit.createEigenGraph('full_7new', 'sym', 3)
 ```
 
-### Map Nodes
-```java
-return simkit.mapNodes('eigendecomposedGraph_sym_full_7new_3','id,index, target,sepal_length,sepal_width,petal_length,petal_width')
-```
-
 ### Kmean Clustering
 ```java
-return simkit.kmean('eigendecomposedGraph_sym_full_7new_3', '3', '100', 'euclidean')
+return simkit.kmean({
+    nodeSet: "eigenGraph_rw_full_7new_3",
+    numberOfCentroid: "3",
+    numberOfInteration: "100",
+    distanceMeasure: "euclidean",
+    originalSet: "Iris",
+    overlook: "target,sepal_length,sepal_width,petal_length,petal_width",
+    overlookOriginal: "target",
+    useKmeanForSilhouette: false
+})
+```
+
+### Run full spectral clustering
+```java
+return simkit.spectralClusteringFromNeo4j('Iris','euclidean','full', '7','index,target','sym',3,'100','euclidean','target', false)
 ```
