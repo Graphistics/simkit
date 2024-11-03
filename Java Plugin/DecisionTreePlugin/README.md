@@ -35,3 +35,8 @@ return simkit.kmean({
     useKmeanForSilhouette: false
 })
 ```
+
+### Run full spectral clustering
+```java
+return simkit.spectralClusteringFromNeo4j('Iris','euclidean','full', '7','index,target','sym',3,'100','euclidean','target', false)
+```

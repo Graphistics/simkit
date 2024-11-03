@@ -377,13 +377,13 @@ public String kmean(@Name("params") Map<String, Object> params) throws Exception
 
     predictedNodeLabels.clear();
 
-	String nodeSet = (String) params.getOrDefault("nodeSet", "defaultNodeSet");
-	String numberOfCentroid = (String) params.getOrDefault("numberOfCentroid", "defaultCentroid");
-	String numberOfInteration = (String) params.getOrDefault("numberOfInteration", "defaultInteration");
-	String distanceMeasure = (String) params.getOrDefault("distanceMeasure", "defaultMeasure");
-	String originalNodeSet = (String) params.getOrDefault("originalSet", "defaultSet");
-	String overLook = (String) params.getOrDefault("overlook", "defaultOverlook");
-	String overlookOriginal = (String) params.getOrDefault("overlookOriginal", "defaultOverlookOriginal");
+	String nodeSet = (String) params.getOrDefault("nodeSet", "eigenGraph_sym_full_7new_3");
+	String numberOfCentroid = (String) params.getOrDefault("numberOfCentroid", "3");
+	String numberOfInteration = (String) params.getOrDefault("numberOfInteration", "100");
+	String distanceMeasure = (String) params.getOrDefault("distanceMeasure", "euclidean");
+	String originalNodeSet = (String) params.getOrDefault("originalSet", "Iris");
+	String overLook = (String) params.getOrDefault("overlook", "target,sepal_length,sepal_width,petal_length,petal_width");
+	String overlookOriginal = (String) params.getOrDefault("overlookOriginal", "target");
 	boolean kmeanBool = (Boolean) params.getOrDefault("useKmeanForSilhouette", false);
 
 
@@ -690,7 +690,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
      */
 
 	@UserFunction
-	public String spectralClusteringFromNeo4j(@Name("node_label") String node_label, @Name("distance_measure") String distance_measure,@Name("graph_type") String graph_type,@Name("parameter") String parameter,@Name("remove_column") String remove_columns, @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors, @Name("number_of_iteration") String number_of_iteration, @Name("distance_measure_kmean") String distance_measure_kmean) throws Exception {
+	public String spectralClusteringFromNeo4j(@Name("node_label") String node_label, @Name("distance_measure") String distance_measure,@Name("graph_type") String graph_type,@Name("parameter") String parameter,@Name("remove_column") String remove_columns, @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors, @Name("number_of_iteration") String number_of_iteration, @Name("distance_measure_kmean") String distance_measure_kmean, @Name("target Column on original Data") String target_column, @Name("Use kmean for Silhouette calculation") Boolean use_kmean_for_silhouette) throws Exception {
 		predictedNodeLabels.clear();
 		try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 			if(node_label == null && distance_measure == null) {
@@ -778,20 +778,33 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 		            
 		            Neo4jGraphHandler.exportCSVFile(graph_name,graph_name,connector.getDriver());
 		            
-		            mapNodes(graph_name,propertyNames);
+		            //mapNodes(graph_name,propertyNames);
 		            
 		            String number_of_clusters = Integer.toString(number_of_eigenvectors.intValue());
-		            
+					// Split the string into an array
+					String[] propertiesArray = propertyNames.split(",");
+
+					// Use a StringBuilder to build the new string without 'index' and 'target'
+					StringBuilder filteredProperties = new StringBuilder();
+
+					for (String property : propertiesArray) {
+						if (!property.equals("index") && !property.equals("target")) {
+							if (filteredProperties.length() > 0) {
+								filteredProperties.append(",");
+							}
+							filteredProperties.append(property);
+						}
+					}
 		            String kmeanResult = kmean(Map.of(
-        "nodeSet", graph_name,
-        "numberOfCentroid", "3",
-        "numberOfInteration", "100",
-        "distanceMeasure", "euclidean",
-        "originalSet", "Iris",
-        "overlook", "target,sepal_length,sepal_width,petal_length,petal_width",
-        "overlookOriginal", "target",
-        "useKmeanForSilhouette", false
-    ));
+						"nodeSet", graph_name,
+						"numberOfCentroid", number_of_clusters,
+						"numberOfInteration", number_of_iteration,
+						"distanceMeasure", distance_measure_kmean,
+						"originalSet", node_label,
+						"overlook", target_column + filteredProperties.toString(),
+						"overlookOriginal", target_column,
+						"useKmeanForSilhouette", use_kmean_for_silhouette
+					));
 					//String kmeanResult = "test";
 
 			        return "Created similarity graph, eigendecomposed graph successful!" + kmeanResult;
