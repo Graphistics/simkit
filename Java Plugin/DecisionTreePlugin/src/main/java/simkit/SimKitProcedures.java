@@ -398,18 +398,18 @@ public String kmean(@Name("params") Map<String, Object> params) throws Exception
         HashMap<String, ArrayList<String>> kmeanAssign = Unsupervised.KmeanClust(
             mapNodeList, numCentroids, numIterations, distanceMeasure, false, new ArrayList<>()
         );
+		HashMap<String, ArrayList<String>> cleanedKmeanAssign = Unsupervised.removeIndexAndId(kmeanAssign);
 
         double averageSilhouetteCoefficientValue;
         if (kmeanBool) {
 			// Remove index and id from kmeanAssign
-			HashMap<String, ArrayList<String>> cleanedKmeanAssign = Unsupervised.removeIndexAndId(kmeanAssign);
             averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(cleanedKmeanAssign, distanceMeasure);
         } else {
             HashMap<String, ArrayList<String>> mappedNodes = Unsupervised.replaceValuesWithOriginalSet(kmeanAssign, mapNodeOriginalList, log);
             averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(mappedNodes, distanceMeasure);
         }
 
-        processClusters(connector, nodeSet, kmeanAssign, centroidNumber, distanceMeasure);
+        processClusters(connector, nodeSet, cleanedKmeanAssign, centroidNumber, distanceMeasure);
 
         return "The average Silhouette Coefficient value is: " + averageSilhouetteCoefficientValue +
                " predicted labels: " + predictedNodeLabels;
@@ -567,7 +567,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 					// First, find and delete the existing node if it exists
 					String deleteQuery = "MATCH (a:Clustering_" + nodeType + " {" + nodeCentroid + "}) " +
 										 "DETACH DELETE a";
-					tx.run(deleteQuery);
+					//tx.run(deleteQuery);
 					// Then create the new nodes and relationship
 					String createQuery = "MERGE (a:Clustering_" + nodeType + " {" + nodeCentroid + "}) " +
 										 "MERGE (b:Clustering_" + nodeType + " {" + nodeCluster + "}) " +
@@ -801,7 +801,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 						"numberOfInteration", number_of_iteration,
 						"distanceMeasure", distance_measure_kmean,
 						"originalSet", node_label,
-						"overlook", target_column + filteredProperties.toString(),
+						"overlook", target_column + "," + filteredProperties.toString(),
 						"overlookOriginal", target_column,
 						"useKmeanForSilhouette", use_kmean_for_silhouette
 					));
