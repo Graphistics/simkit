@@ -239,7 +239,7 @@ public class SimKitProcedures implements AutoCloseable{
 					graphName = graphType.concat("_"+parameter);
 				}
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
-
+				Neo4jGraphHandler.deleteExistingNodeLabels(graphName.concat("new"), connector.getDriver());
 
 
 				//for (EdgeList edgeListDetail : edgeList) {
@@ -376,7 +376,6 @@ public class SimKitProcedures implements AutoCloseable{
 public String kmean(@Name("params") Map<String, Object> params) throws Exception {
 
     predictedNodeLabels.clear();
-
 	String nodeSet = (String) params.getOrDefault("nodeSet", "eigenGraph_sym_full_7new_3");
 	String numberOfCentroid = (String) params.getOrDefault("numberOfCentroid", "3");
 	String numberOfInteration = (String) params.getOrDefault("numberOfInteration", "100");
@@ -391,6 +390,9 @@ public String kmean(@Name("params") Map<String, Object> params) throws Exception
         int numCentroids = Integer.parseInt(numberOfCentroid);
         int numIterations = Integer.parseInt(numberOfInteration);
         double centroidNumber = 1.0;
+		//Clear Existing node Labels
+		String nodeLabel = "Clustering_" + nodeSet;
+		Neo4jGraphHandler.deleteExistingNodeLabels(nodeLabel, connector.getDriver());
 
         ArrayList<String> mapNodeList = parseNodeValues(nodeSet, overLook.split(","));
         ArrayList<String> mapNodeOriginalList = parseNodeValues(originalNodeSet, overlookOriginal.split(","));
@@ -398,18 +400,18 @@ public String kmean(@Name("params") Map<String, Object> params) throws Exception
         HashMap<String, ArrayList<String>> kmeanAssign = Unsupervised.KmeanClust(
             mapNodeList, numCentroids, numIterations, distanceMeasure, false, new ArrayList<>()
         );
+		HashMap<String, ArrayList<String>> cleanedKmeanAssign = Unsupervised.removeIndexAndId(kmeanAssign);
 
         double averageSilhouetteCoefficientValue;
         if (kmeanBool) {
 			// Remove index and id from kmeanAssign
-			HashMap<String, ArrayList<String>> cleanedKmeanAssign = Unsupervised.removeIndexAndId(kmeanAssign);
             averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(cleanedKmeanAssign, distanceMeasure);
         } else {
             HashMap<String, ArrayList<String>> mappedNodes = Unsupervised.replaceValuesWithOriginalSet(kmeanAssign, mapNodeOriginalList, log);
             averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(mappedNodes, distanceMeasure);
         }
 
-        processClusters(connector, nodeSet, kmeanAssign, centroidNumber, distanceMeasure);
+        processClusters(connector, nodeSet, cleanedKmeanAssign, centroidNumber, distanceMeasure);
 
         return "The average Silhouette Coefficient value is: " + averageSilhouetteCoefficientValue +
                " predicted labels: " + predictedNodeLabels;
@@ -567,7 +569,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 					// First, find and delete the existing node if it exists
 					String deleteQuery = "MATCH (a:Clustering_" + nodeType + " {" + nodeCentroid + "}) " +
 										 "DETACH DELETE a";
-					tx.run(deleteQuery);
+					//tx.run(deleteQuery);
 					// Then create the new nodes and relationship
 					String createQuery = "MERGE (a:Clustering_" + nodeType + " {" + nodeCentroid + "}) " +
 										 "MERGE (b:Clustering_" + nodeType + " {" + nodeCluster + "}) " +
@@ -730,7 +732,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 					graphName = graph_type.concat("_"+parameter);
 				}
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
-
+				Neo4jGraphHandler.deleteExistingNodeLabels(graphName.concat("new"), connector.getDriver());
 				try (Session session = connector.getDriver().session();
 			             Transaction tx = session.beginTransaction()) {
 
@@ -767,7 +769,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 	
 		            
 		            String graph_name = "eigenGraph_" + laplacian_type + "_" + graphName.concat("new") + "_" + Math.round(number_of_eigenvectors);
-		            
+					Neo4jGraphHandler.deleteExistingNodeLabels(graph_name, connector.getDriver());
 		            for (NodeList2 node : node_list_eigen) {
 		            	Neo4jGraphHandler.createNodeGraphEigenTransform(graph_name, "created nodes in neo4j", node, eigen_result.X, connector.getDriver());
 		            }
@@ -801,7 +803,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 						"numberOfInteration", number_of_iteration,
 						"distanceMeasure", distance_measure_kmean,
 						"originalSet", node_label,
-						"overlook", target_column + filteredProperties.toString(),
+						"overlook", target_column + "," + filteredProperties.toString(),
 						"overlookOriginal", target_column,
 						"useKmeanForSilhouette", use_kmean_for_silhouette
 					));
