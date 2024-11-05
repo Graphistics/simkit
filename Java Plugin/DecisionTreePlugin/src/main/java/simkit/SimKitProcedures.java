@@ -239,7 +239,7 @@ public class SimKitProcedures implements AutoCloseable{
 					graphName = graphType.concat("_"+parameter);
 				}
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
-
+				Neo4jGraphHandler.deleteExistingNodeLabels(graphName.concat("new"), connector.getDriver());
 
 
 				//for (EdgeList edgeListDetail : edgeList) {
@@ -376,7 +376,6 @@ public class SimKitProcedures implements AutoCloseable{
 public String kmean(@Name("params") Map<String, Object> params) throws Exception {
 
     predictedNodeLabels.clear();
-
 	String nodeSet = (String) params.getOrDefault("nodeSet", "eigenGraph_sym_full_7new_3");
 	String numberOfCentroid = (String) params.getOrDefault("numberOfCentroid", "3");
 	String numberOfInteration = (String) params.getOrDefault("numberOfInteration", "100");
@@ -391,6 +390,9 @@ public String kmean(@Name("params") Map<String, Object> params) throws Exception
         int numCentroids = Integer.parseInt(numberOfCentroid);
         int numIterations = Integer.parseInt(numberOfInteration);
         double centroidNumber = 1.0;
+		//Clear Existing node Labels
+		String nodeLabel = "Clustering_" + nodeSet;
+		Neo4jGraphHandler.deleteExistingNodeLabels(nodeLabel, connector.getDriver());
 
         ArrayList<String> mapNodeList = parseNodeValues(nodeSet, overLook.split(","));
         ArrayList<String> mapNodeOriginalList = parseNodeValues(originalNodeSet, overlookOriginal.split(","));
@@ -730,7 +732,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 					graphName = graph_type.concat("_"+parameter);
 				}
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
-
+				Neo4jGraphHandler.deleteExistingNodeLabels(graphName.concat("new"), connector.getDriver());
 				try (Session session = connector.getDriver().session();
 			             Transaction tx = session.beginTransaction()) {
 
@@ -767,7 +769,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 	
 		            
 		            String graph_name = "eigenGraph_" + laplacian_type + "_" + graphName.concat("new") + "_" + Math.round(number_of_eigenvectors);
-		            
+					Neo4jGraphHandler.deleteExistingNodeLabels(graph_name, connector.getDriver());
 		            for (NodeList2 node : node_list_eigen) {
 		            	Neo4jGraphHandler.createNodeGraphEigenTransform(graph_name, "created nodes in neo4j", node, eigen_result.X, connector.getDriver());
 		            }

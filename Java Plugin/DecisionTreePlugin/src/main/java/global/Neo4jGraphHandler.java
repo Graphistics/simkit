@@ -255,7 +255,7 @@ public class Neo4jGraphHandler {
                 @Override
                 public Void execute(Transaction tx) {
                     String deleteQuery = "MATCH (n:" + graph_type + " {id: $source})-[r:`link`]->(m:" + graph_type + " {id: $target}) " + "DELETE r";
-                    tx.run(deleteQuery, parameters("source", source, "target", target));
+                    //tx.run(deleteQuery, parameters("source", source, "target", target));
 
                     Result result = tx.run(
                             "MATCH (n:" + graph_type + " {id: $source}), (m:" + graph_type + " {id: $target}) " +
@@ -267,6 +267,27 @@ public class Neo4jGraphHandler {
             });
         } catch (Neo4jException e) {
             throw new RuntimeException("Error creating relationship in Neo4j: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Creates relationships in Neo4j for the transformed graph after Laplacian Eigen Transform.
+     *
+     * @param name        Node Label name.
+     * @param driver      The Neo4j Driver instance.
+     */
+    public static void deleteExistingNodeLabels(String name, Driver driver) {
+        try (Session session = driver.session()) {
+            session.writeTransaction(new TransactionWork<Void>() {
+                @Override
+                public Void execute(Transaction tx) {
+                    String deleteQuery = "MATCH (n:" + name + ") DETACH DELETE n";
+                    tx.run(deleteQuery);
+                    return null;
+                }
+            });
+        } catch (Neo4jException e) {
+            throw new RuntimeException("Error deleting Extisting Node Labels in Neo4j: " + e.getMessage());
         }
     }
 
