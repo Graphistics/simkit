@@ -1,6 +1,4 @@
-package main;
-
-import java.util.List;
+package simkit;
 
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;

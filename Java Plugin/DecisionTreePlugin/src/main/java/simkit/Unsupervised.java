@@ -1,4 +1,4 @@
-package main;
+package simkit;
 
 
 import java.util.ArrayList;
@@ -6,6 +6,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.HashSet;
+import org.neo4j.logging.Log;
+import org.neo4j.procedure.Context;
+import org.neo4j.procedure.Procedure;
+
 
 import scala.util.Random;
 
@@ -37,8 +45,9 @@ public class Unsupervised {
 	
 	public static void main(String[] args)
 	{
-		  ArrayList<String> inputData = dummyData(); 
-		  HashMap<String, ArrayList<String>> dbAssign = KmeanClust(inputData, 2, 20, "Euclidean");		  
+		  ArrayList<String> inputData = dummyData();
+		  ArrayList<String> debug = new ArrayList<>();
+		  HashMap<String, ArrayList<String>> dbAssign = KmeanClust(inputData, 2, 20, "Euclidean", false, debug);
 		  for (String centroid: dbAssign.keySet()) {
 			  System.out.println("1");
       		ArrayList<String> clusterNode = dbAssign.get(centroid);
@@ -171,43 +180,212 @@ public class Unsupervised {
 	/**
 	-------------------------------------------------------------------------------K-MEANS Clustering ------------------------------------------------------------------------------------------
 	*/
-	 
+
+
+static HashMap<String, ArrayList<String>> replaceValuesWithOriginalSet(
+        HashMap<String, ArrayList<String>> clusterAssign,
+        ArrayList<String> originalNodeSet,
+		Log log
+) {
+    // Create a mapping from ID to original node (without 'eigenvector' attributes)
+    HashMap<String, String> idToOriginalNode = new HashMap<>();
+    for (String originalNode : originalNodeSet) {
+        // Remove attributes starting with 'eigenvector'
+        String cleanedNode = removeEigenvectorAttributes(originalNode);
+
+        String id = extractID(cleanedNode);
+        if (id != null) {
+            idToOriginalNode.put(id, cleanedNode);
+        }
+    }
+	log.info(String.valueOf(idToOriginalNode));
+
+    // Initialize the updated cluster assignments
+    HashMap<String, ArrayList<String>> updatedClusterAssign = new HashMap<>();
+
+    // Keep track of all node IDs that have been assigned to clusters
+    Set<String> assignedNodeIDs = new HashSet<>();
+
+    // Replace centroids and cluster nodes with values from originalNodeSet
+    for (Map.Entry<String, ArrayList<String>> entry : clusterAssign.entrySet()) {
+        String centroid = entry.getKey();
+        ArrayList<String> clusterNodes = entry.getValue();
+
+        // Replace centroid
+        String centroidID = extractID(centroid);
+		 float floatCentroidID = Float.parseFloat(centroidID);
+		int centroidIDInt = (int) floatCentroidID;
+        String originalCentroid = idToOriginalNode.getOrDefault(String.valueOf(centroidIDInt), centroid);
+        log.info(String.valueOf(centroidIDInt));
+		log.info(originalCentroid);
+
+        // Replace cluster nodes
+        ArrayList<String> updatedClusterNodes = new ArrayList<>();
+        for (String node : clusterNodes) {
+            String nodeID = extractID(node);
+            String originalNode = idToOriginalNode.getOrDefault(nodeID, node);
+			log.info(nodeID);
+			log.info(originalNode);
+            updatedClusterNodes.add(originalNode);
+            assignedNodeIDs.add(nodeID);
+        }
+
+        updatedClusterAssign.put(originalCentroid, updatedClusterNodes);
+        assignedNodeIDs.add(centroidID);
+    }
+
+    // Add all original nodes to the clusters if they haven't been assigned yet
+    ArrayList<String> unassignedNodes = new ArrayList<>();
+    for (String originalNode : idToOriginalNode.values()) {
+        String nodeID = extractID(originalNode);
+        if (!assignedNodeIDs.contains(nodeID)) {
+            unassignedNodes.add(originalNode);
+        }
+    }
+
+    // Optionally, assign unassigned nodes to a separate cluster or distribute them
+    if (!unassignedNodes.isEmpty()) {
+        updatedClusterAssign.put("Unassigned", unassignedNodes);
+    }
+
+	// Define the prefixes of attributes to remove
+	String[] prefixesToRemove = new String[]{"index", "id"};
+
+	// Create a new HashMap to store the cleaned entries
+	HashMap<String, ArrayList<String>> cleanedClusterAssign = new HashMap<>();
+
+	for (Map.Entry<String, ArrayList<String>> entry : updatedClusterAssign.entrySet()) {
+		String key = entry.getKey();
+		ArrayList<String> valueList = entry.getValue();
+
+		// Remove 'index' and 'id' attributes from the key
+		String cleanedKey = removeAttributes(key, prefixesToRemove);
+
+		// Create a new list to store cleaned values
+		ArrayList<String> cleanedValueList = new ArrayList<>();
+
+		// Iterate over the values in the valueList
+		for (String value : valueList) {
+			// Remove 'index' and 'id' attributes from the value
+			String cleanedValue = removeAttributes(value, prefixesToRemove);
+			// Add the cleaned value to the cleanedValueList
+			cleanedValueList.add(cleanedValue);
+		}
+
+		// Put the cleaned key and cleaned value list into the cleanedClusterAssign
+		cleanedClusterAssign.put(cleanedKey, cleanedValueList);
+	}
+
+	// Replace the original updatedClusterAssign with the cleaned version
+	updatedClusterAssign = cleanedClusterAssign;
+
+    return updatedClusterAssign;
+}
+
+/**
+ * Removes attributes starting with specified prefixes from a node string.
+ * @param node The node string
+ * @param prefixes The array of prefixes to remove
+ * @return The node string without the specified attributes
+ */
+private static String removeAttributes(String node, String[] prefixes) {
+    String[] attributes = node.split(",");
+    ArrayList<String> filteredAttributes = new ArrayList<>();
+    for (String attr : attributes) {
+        String[] keyValue = attr.split(":");
+        if (keyValue.length < 2) continue; // Skip malformed attributes
+
+        String key = keyValue[0].trim().toLowerCase();
+        boolean remove = false;
+        for (String prefix : prefixes) {
+            if (key.startsWith(prefix.toLowerCase())) {
+                remove = true;
+                break;
+            }
+        }
+        if (!remove) {
+            filteredAttributes.add(attr);
+        }
+    }
+    return String.join(",", filteredAttributes);
+}
+
+/**
+ * Removes attributes starting with 'eigenvector' from a node string.
+ * @param node The node string
+ * @return The node string without 'eigenvector' attributes
+ */
+private static String removeEigenvectorAttributes(String node) {
+    String[] attributes = node.split(",");
+    ArrayList<String> filteredAttributes = new ArrayList<>();
+    for (String attr : attributes) {
+        String key = attr.split(":")[0].trim();
+        if (!key.startsWith("eigenvector")) {
+            filteredAttributes.add(attr);
+        }
+    }
+    return String.join(",", filteredAttributes);
+}
+
+/**
+ * Extracts the ID from a node string.
+ * Assumes the ID is in the format "ID:value"
+ * @param node The node string
+ * @return The extracted ID, or null if not found
+ */
+private static String extractID(String node) {
+    String[] attributes = node.split(",");
+    for (String attr : attributes) {
+        String[] keyValue = attr.split(":");
+        if (keyValue.length == 2 && keyValue[0].trim().equalsIgnoreCase("index")) {
+            return keyValue[1].trim();
+        }
+    }
+    return null; // ID not found
+}
+
 	/**
 	 * This is the main method to perform k-means clustering.
 	 * @param inputData is a variable where the nodes from Neo4j are stored
 	 * @param numberOfCentroids store the number of centroids specified by user for clustering
 	 * @param numberOfInteration saves user specified iteration to find convergence
-	 * @return
+	 * @param distanceMeasure the distance measure to use
+	 * @param useOriginalNodeSet boolean to control whether to replace values with originalNodeSet
+	 * @param originalNodeSet the original nodes to replace in the output
+	 * @return HashMap with centroids and their assigned nodes
 	 */
-	public static HashMap<String, ArrayList<String>> KmeanClust (ArrayList<String> inputData, int numberOfCentroids, int numberOfInteration, String distanceMeasure)
-	{
-		HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
-		ArrayList<String> listOfCentroid = new ArrayList<String>();
-		ArrayList<String> listOfRemain = new ArrayList<String>(inputData);
-		
-		// Initializing centroid by random choice
-	    java.util.Random rand = new java.util.Random();
+	public static HashMap<String, ArrayList<String>> KmeanClust(
+		ArrayList<String> inputData,
+		int numberOfCentroids,
+		int numberOfInteration,
+		String distanceMeasure,
+		boolean useOriginalNodeSet,
+		ArrayList<String> originalNodeSet
+	) {
+		HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<>();
+		ArrayList<String> listOfCentroid = new ArrayList<>();
+		ArrayList<String> listOfRemain = new ArrayList<>(inputData);
 
-	    while (listOfCentroid.size() < numberOfCentroids) {
-	        int randomIndex = rand.nextInt(inputData.size());
-	        String potentialCentroid = inputData.get(randomIndex);
+		// Initializing centroids by random choice
+		java.util.Random rand = new java.util.Random();
 
-	        if (!listOfCentroid.contains(potentialCentroid)) {
-	        	listOfCentroid.add(potentialCentroid);
-	        }
-	    }
-	    for(int i = 0; i < listOfRemain.size(); i ++)
-	    {
-	    	if(listOfCentroid.contains(listOfRemain.get(i)))
-	    	{
-	    		listOfRemain.remove(i);
-	    	}
-	    }
-	    
+		while (listOfCentroid.size() < numberOfCentroids) {
+			int randomIndex = rand.nextInt(inputData.size());
+			String potentialCentroid = inputData.get(randomIndex);
+
+			if (!listOfCentroid.contains(potentialCentroid)) {
+				listOfCentroid.add(potentialCentroid);
+			}
+		}
+
+		// Remove centroids from the remaining list
+		listOfRemain.removeAll(listOfCentroid);
+
 		// First clusters
-		HashMap<String, ArrayList<String>> hashClusterAssign = distanceAssign(listOfCentroid,listOfRemain, distanceMeasure);
+		HashMap<String, ArrayList<String>> hashClusterAssign = distanceAssign(listOfCentroid, listOfRemain, distanceMeasure);
 		// All iterations
-		kmeanAssign = kmeanIteration(hashClusterAssign,numberOfInteration,inputData, distanceMeasure);
+		kmeanAssign = kmeanIteration(hashClusterAssign, numberOfInteration, inputData, distanceMeasure);
+
 		return kmeanAssign;
 	}
 	
@@ -268,6 +446,9 @@ public class Unsupervised {
 	            newCentroid.append(",");
 	        }
 	    }
+		// Log the new centroid
+    	System.out.println("New centroid: " + newCentroid.toString());
+
 	    return newCentroid.toString();
 	}
 	
@@ -298,8 +479,7 @@ public class Unsupervised {
 	        String closestCentroid = null;
 
 	        for (int j = 0; j < listOfCentroid.size(); j++) {
-	            double distance = calculateDistance(listOfRemain.get(i), listOfCentroid.get(j), distanceMeasure);
-	            
+	            double distance = calculateDistance(removeIndexAndIdEntries(listOfRemain.get(i)), removeIndexAndIdEntries(listOfCentroid.get(j)), distanceMeasure);
 	            if (distance < minDistance) {
 	                minDistance = distance;
 	                closestCentroid = listOfCentroid.get(j);
@@ -314,6 +494,34 @@ public class Unsupervised {
 
 	    return hashClusterAssign;
 	}
+
+        public static String removeIndexAndIdEntries(String centroidString) {
+        // Split the string by commas to get individual key-value pairs
+        String[] entries = centroidString.split(",");
+
+        // Use a StringBuilder to collect entries that don't contain "index" or "id"
+        StringBuilder result = new StringBuilder();
+
+        for (String entry : entries) {
+            // Check if the entry contains a key-value pair
+            if (entry.contains(":")) {
+                String[] keyValue = entry.split(":");
+                if (keyValue.length > 1) {
+                    String key = keyValue[0].trim();
+                    // Only append the entry if it doesn't contain "index" or "id"
+                    if (!key.contains("index") && !key.contains("id") && !key.contains(" index") && !key.contains(" id")) {
+                        if (result.length() > 0) {
+                            result.append(", ");
+                        }
+                        result.append(entry);
+                    }
+                }
+            }
+        }
+
+        return result.toString();
+    }
+
 
 	static double calculateDistance(String point1, String point2, String distanceMeasure) {
 	    switch (distanceMeasure.toLowerCase()) {
@@ -484,5 +692,48 @@ public class Unsupervised {
 	    System.out.println("Sum " + sumSilhouette);
 	    return sumSilhouette / numPoints;
 	}
-	
+	    // Function to remove "index" and "id" attributes from centroid keys and cluster points
+    public static HashMap<String, ArrayList<String>> removeIndexAndId(HashMap<String, ArrayList<String>> kmeanAssign) {
+        HashMap<String, ArrayList<String>> cleanedKmeanAssign = new HashMap<>();
+
+        // Iterate over the original kmeanAssign map
+        for (Map.Entry<String, ArrayList<String>> entry : kmeanAssign.entrySet()) {
+            // Clean the centroid by removing index and id
+            String cleanedCentroid = removeIndexAndIdFromString(entry.getKey());
+
+            // Clean the cluster points
+            ArrayList<String> cleanedCluster = new ArrayList<>();
+            for (String point : entry.getValue()) {
+                cleanedCluster.add(removeIndexAndIdFromString(point));
+            }
+
+            // Add the cleaned centroid and cleaned cluster to the new map
+            cleanedKmeanAssign.put(cleanedCentroid, cleanedCluster);
+        }
+
+        return cleanedKmeanAssign;
+    }
+
+    // Helper function to remove "index" and "id" from the string
+    private static String removeIndexAndIdFromString(String input) {
+        StringBuilder cleanedString = new StringBuilder();
+        String[] attributes = input.split(",");
+
+        for (String attribute : attributes) {
+            String[] parts = attribute.split(":");
+            if (parts.length == 2) {
+                String attributeName = parts[0].trim();
+                if (!attributeName.equals("index") && !attributeName.equals("id")) {
+                    if (cleanedString.length() > 0) {
+                        cleanedString.append(", ");
+                    }
+                    cleanedString.append(attribute.trim());
+                }
+            }
+        }
+
+        return cleanedString.toString();
+    }
+
+
 }

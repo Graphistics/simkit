@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.math4.legacy.linear.RealMatrix;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.Record;
@@ -58,9 +59,57 @@ public class Neo4jGraphHandler {
         }
         return edge_list;
     }
+    
+    // correct - generate and export csv
+    public static void exportCSVFile(final String node_label, final String csvFileName, Driver driver) {
+        try (Session session = driver.session()) {
+            String cypher_query = "CALL apoc.export.csv.query("
+                + "'MATCH (n:" + node_label + ")-[r]->(m:" + node_label + ") "
+                + "WHERE r.value IS NOT NULL "
+                + "RETURN toString(n.id) AS source, toString(m.id) AS target, r.value AS weight', "
+                + "'" + csvFileName + "', "
+                + "{}"
+                + ")";
+            session.run(cypher_query);
+        } catch (Neo4jException e) {
+            throw new RuntimeException("Error exporting CSV from Neo4j: " + e.getMessage());
+        }
+    }
 
 
-    public static ArrayList<NodeList2> retrieveNodeListFromNeo4jSimilarityGraph(final String nodeType, Driver driver) {
+    
+    public static Pair<ArrayList<NodeList2>, String> retrieveNodeListFromNeo4jSimilarityGraph(final String nodeType, Driver driver) {
+        ArrayList<NodeList2> nodeList = new ArrayList<>();
+        String propertyKeys = "";
+
+        try (Session session = driver.session()) {
+            String cypherQuery = "MATCH (n:" + nodeType + ") RETURN n, n.id AS index";
+            Result result = session.run(cypherQuery);
+            String index;
+            int count = 0;
+
+
+            while (result.hasNext()) {
+                Record record = result.next();
+                Node node = record.get("n").asNode();
+                index = String.valueOf(count);
+                Map<String, Object> nodeProperties = extractPropertiesFromNode(node);
+                NodeList2 nodeObject = new NodeList2(index, nodeProperties);
+                nodeList.add(nodeObject);
+                
+                if (count == 0) {
+                    propertyKeys = String.join(",", node.keys());
+                }
+                
+                count++;
+            }
+        } catch (Neo4jException e) {
+            throw new RuntimeException("Error retrieving node data from Neo4j for label: " + nodeType + ", Error: " + e.getMessage());
+        }
+        return Pair.of(nodeList, propertyKeys);
+    }
+
+    public static ArrayList<NodeList2> retrieveNodeListFromNeo4jSimilarityGraph2(final String nodeType, Driver driver) {
         ArrayList<NodeList2> nodeList = new ArrayList<>();
 
         try (Session session = driver.session()) {
@@ -84,6 +133,8 @@ public class Neo4jGraphHandler {
         }
         return nodeList;
     }
+    
+    
 
     /**
      * Retrieves the node list from Neo4j for a specified node type.
@@ -196,12 +247,16 @@ public class Neo4jGraphHandler {
     public static void createRelationshipGraph(String graph_type, String message, EdgeList2 edge_list_detail, Driver driver) {
         final String source = edge_list_detail.getSource();
         final String target = edge_list_detail.getTarget();
-        double weightValue = (double) Math.round(edge_list_detail.getWeight() * 100000d) / 100000d;
+//        double weightValue = (double) Math.round(edge_list_detail.getWeight() * 10000000d) / 10000000d;
+        double weightValue = edge_list_detail.getWeight();
         
         try (Session session = driver.session()) {
             session.writeTransaction(new TransactionWork<Void>() {
                 @Override
                 public Void execute(Transaction tx) {
+                    String deleteQuery = "MATCH (n:" + graph_type + " {id: $source})-[r:`link`]->(m:" + graph_type + " {id: $target}) " + "DELETE r";
+                    tx.run(deleteQuery, parameters("source", source, "target", target));
+
                     Result result = tx.run(
                             "MATCH (n:" + graph_type + " {id: $source}), (m:" + graph_type + " {id: $target}) " +
                                     "CREATE (n)-[r:`link` {value: $weightValue}]->(m)",
