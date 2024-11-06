@@ -205,7 +205,7 @@ public class SimKitProcedures implements AutoCloseable{
 			if(label == null && distanceMeasure == null) {
 				return "Missing dataPath or distance measure type";
 			}else {
-				String graphName = null;
+				String graphName = "affinity_";
 				//ArrayList<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
 				org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> nodeData = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
 				ArrayList<NodeList2> nodePropertiesList = nodeData.getLeft();
@@ -219,32 +219,33 @@ public class SimKitProcedures implements AutoCloseable{
 				if(graphType.equals("full")) {
 					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-					graphName = graphType.concat("_"+parameter);
+					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
 				}
 				if(graphType.equals("eps")) {
 					Double espilonValue = Double.parseDouble(parameter);
 					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,espilonValue);
-					graphName = graphType.concat("_"+parameter);
+					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
 
 				}
 				if(graphType.equals("knn")) {
 					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
-					graphName = graphType.concat("_"+parameter);
+					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
 
 				}
 				if(graphType.equals("mknn")) {
 					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
-					graphName = graphType.concat("_"+parameter);
+					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
 				}
+				
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
-				Neo4jGraphHandler.deleteExistingNodeLabels(graphName.concat("new"), connector.getDriver());
+				Neo4jGraphHandler.deleteExistingNodeLabels(graphName, connector.getDriver());
 
 
 				//for (EdgeList edgeListDetail : edgeList) {
 				for (NodeList2 node : nodePropertiesList) {
-					Neo4jGraphHandler.createNodeGraph(graphName.concat("new"), "created nodes in neo4j", node, connector.getDriver());
+					Neo4jGraphHandler.createNodeGraph(graphName, "created nodes in neo4j", node, connector.getDriver());
 				}
 
 				for (int i = 0; i < edgeList.size(); i++) {
@@ -252,7 +253,7 @@ public class SimKitProcedures implements AutoCloseable{
 					if(edgeListDetail.getWeight()==0.0){
 						continue;
 					}
-					Neo4jGraphHandler.createRelationshipGraph(graphName.concat("new"), "created relationship in neo4j \n", edgeListDetail, connector.getDriver());
+					Neo4jGraphHandler.createRelationshipGraph(graphName, "created relationship in neo4j \n", edgeListDetail, connector.getDriver());
 
 				}
 
@@ -376,6 +377,7 @@ public class SimKitProcedures implements AutoCloseable{
 public String kmean(@Name("params") Map<String, Object> params) throws Exception {
 
     predictedNodeLabels.clear();
+
 	String nodeSet = (String) params.getOrDefault("nodeSet", "eigenGraph_sym_full_7new_3");
 	String numberOfCentroid = (String) params.getOrDefault("numberOfCentroid", "3");
 	String numberOfInteration = (String) params.getOrDefault("numberOfInteration", "100");
@@ -698,7 +700,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 			if(node_label == null && distance_measure == null) {
 				return "Missing dataPath or distance measure type";
 			}else {
-				String graphName = null;
+				String graphName = "affinity_";
 				org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> nodeData = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(node_label, connector.getDriver());
 				ArrayList<NodeList2> nodePropertiesList = nodeData.getLeft();
 	            String propertyNames = nodeData.getRight(); 
@@ -712,33 +714,36 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 				if(graph_type.equals("full")) {
 					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-					graphName = graph_type.concat("_"+parameter);
+					graphName = graphName.concat(graph_type + "_" + parameter.replace(".", "_"));
+
 				}
 				if(graph_type.equals("eps")) {
 					Double espilonValue = Double.parseDouble(parameter);
 					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,espilonValue);
-					graphName = graph_type.concat("_"+parameter);
+					graphName = graphName.concat(graph_type + "_" + parameter.replace(".", "_"));
 
 				}
 				if(graph_type.equals("knn")) {
 					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
-					graphName = graph_type.concat("_"+parameter);
+					graphName = graphName.concat(graph_type + "_" + parameter.replace(".", "_"));
 
 				}
 				if(graph_type.equals("mknn")) {
 					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
-					graphName = graph_type.concat("_"+parameter);
+					graphName = graphName.concat(graph_type + "_" + parameter.replace(".", "_"));
 				}
+				
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
-				Neo4jGraphHandler.deleteExistingNodeLabels(graphName.concat("new"), connector.getDriver());
+				Neo4jGraphHandler.deleteExistingNodeLabels(graphName, connector.getDriver());
+				
 				try (Session session = connector.getDriver().session();
 			             Transaction tx = session.beginTransaction()) {
 
 					//for (EdgeList edgeListDetail : edgeList) {
 					for (NodeList2 node : nodePropertiesList) {
-						Neo4jGraphHandler.createNodeGraph(graphName.concat("new"), "created nodes in neo4j", node, connector.getDriver());
+						Neo4jGraphHandler.createNodeGraph(graphName, "created nodes in neo4j", node, connector.getDriver());
 					}
 	
 					for (int i = 0; i < edgeList.size(); i++) {
@@ -746,17 +751,15 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 						if(edgeListDetail.getWeight()==0.0){
 							continue;
 						}
-						Neo4jGraphHandler.createRelationshipGraph(graphName.concat("new"), "created relationship in neo4j \n", edgeListDetail, connector.getDriver());
+						Neo4jGraphHandler.createRelationshipGraph(graphName, "created relationship in neo4j \n", edgeListDetail, connector.getDriver());
 	
 					}
-					
-					Neo4jGraphHandler.exportCSVFile(graphName.concat("new"),graphName.concat("new"),connector.getDriver());
 					
 					tx.commit();
 				}
 				try (Session session = connector.getDriver().session()) {
 		            ArrayList<EdgeList2> edge_list = new ArrayList<>();
-		            edge_list = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(graphName.concat("new"), connector.getDriver());
+		            edge_list = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(graphName, connector.getDriver());
 	
 		            RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list);
 		            RealMatrix degree_matrix = MatrixCalculation.calculateDegreeMatrix(adjacency_matrix);
@@ -764,12 +767,12 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 	
 		            
 		            EigenCalculation.EigenResult eigen_result = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
-		            ArrayList<NodeList2> node_list_eigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(graphName.concat("new"), connector.getDriver());
+		            ArrayList<NodeList2> node_list_eigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(graphName, connector.getDriver());
 		            ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_list_eigen, eigen_result.X, edge_list);
-	
-		            
-		            String graph_name = "eigenGraph_" + laplacian_type + "_" + graphName.concat("new") + "_" + Math.round(number_of_eigenvectors);
+
+		            String graph_name = "eigen_" + laplacian_type + "_" + graphName + "_" + Math.round(number_of_eigenvectors);
 					Neo4jGraphHandler.deleteExistingNodeLabels(graph_name, connector.getDriver());
+		            
 		            for (NodeList2 node : node_list_eigen) {
 		            	Neo4jGraphHandler.createNodeGraphEigenTransform(graph_name, "created nodes in neo4j", node, eigen_result.X, connector.getDriver());
 		            }
@@ -777,9 +780,6 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 						EdgeList2 edge_list_detail = edge_list_eigen.get(i);
 		            	Neo4jGraphHandler.createRelationshipGraph(graph_name, "created relationship in neo4j \n", edge_list_detail, connector.getDriver());
 		            }
-		            
-		            Neo4jGraphHandler.exportCSVFile(graph_name,graph_name,connector.getDriver());
-		            
 		            //mapNodes(graph_name,propertyNames);
 		            
 		            String number_of_clusters = Integer.toString(number_of_eigenvectors.intValue());
@@ -935,6 +935,24 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 		}
 		}
     }
+	
+	@UserFunction
+	public String getAdjacencyMatrix(@Name("node_label") String node_label) throws Exception{
+		try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
+            if (node_label == null) {
+                return "Missing nodeType";
+            } else {
+				StringBuilder outputString = new StringBuilder("Adjacency matrix:\n");
+				ArrayList<EdgeList2> edge_list = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(node_label, connector.getDriver());
+				RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list);
+				outputString.append(matrixToString(adjacency_matrix));
+				Neo4jGraphHandler.exportCSVFile(node_label,connector.getDriver());
+		        return outputString.toString();
+		    }
+		} catch (Neo4jException e) {
+		    throw new RuntimeException("Error displaying edge list in Neo4j: " + e.getMessage());
+		}
+	}
 
 	
 	@UserFunction

@@ -1,12 +1,14 @@
 package eigendecomposed;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 import org.apache.commons.math4.legacy.linear.BlockRealMatrix;
 import org.apache.commons.math4.legacy.linear.MatrixUtils;
@@ -93,8 +95,11 @@ public class MatrixCalculation {
                 case "rw":
                     laplacian_matrix = calculateRandomWalkLaplacianMatrix(degree_matrix, adjacency_matrix);
                     break;
+                case "ad":
+                    laplacian_matrix = calculateAdaptiveLaplacianMatrix(degree_matrix, adjacency_matrix);
+                    break;
                 default:
-                    throw new IllegalArgumentException("Invalid Laplacian algorithm choice.");
+                	laplacian_matrix = calculateSymmetricLaplacianMatrix(degree_matrix, adjacency_matrix);
             }
 
             return laplacian_matrix;
@@ -166,6 +171,48 @@ public class MatrixCalculation {
         
         return random_walk_laplacian_matrix;
 //        return round4Digits(random_walk_laplacian_matrix);
+    }
+    
+    public static RealMatrix calculateAdaptiveLaplacianMatrix(RealMatrix degreeMatrix, RealMatrix adjacencyMatrix) {
+        int dimension = degreeMatrix.getRowDimension();
+        
+        // Extract degree vector from the diagonal of degree matrix
+        double[] degreeVector = new double[dimension];
+        for (int i = 0; i < dimension; i++) {
+            degreeVector[i] = degreeMatrix.getEntry(i, i);
+        }
+        
+        double[] D_local = new double[dimension];
+
+        // Calculate D_local based on neighbors
+        for (int i = 0; i < dimension; i++) {
+            // Collect neighbor indices of node i
+            double sumNeighbors = 0.0;
+            int neighborCount = 0;
+            for (int j = 0; j < adjacencyMatrix.getColumnDimension(); j++) {
+                if (adjacencyMatrix.getEntry(i, j) > 0) {
+                    sumNeighbors += degreeVector[j];
+                    neighborCount++;
+                }
+            }
+
+            // Only calculate if there are neighbors
+            if (neighborCount > 0) {
+                D_local[i] = sumNeighbors / degreeVector[i];
+            } else {
+                D_local[i] = 0;
+            }
+        }
+
+        // Construct D_local_matrix with inverse square roots on the diagonal
+        double[] D_local_inv_sqrt = new double[dimension];
+        for (int i = 0; i < dimension; i++) {
+            D_local_inv_sqrt[i] = D_local[i] > 0 ? 1.0 / Math.sqrt(D_local[i]) : 0;
+        }
+        RealMatrix D_local_inv_sqrt_matrix = MatrixUtils.createRealDiagonalMatrix(D_local_inv_sqrt);
+
+        // Calculate the adaptive Laplacian matrix
+        return D_local_inv_sqrt_matrix.multiply(adjacencyMatrix).multiply(D_local_inv_sqrt_matrix);
     }
     
     public static RealMatrix round4Digits(RealMatrix matrix) {
