@@ -61,13 +61,13 @@ public class Neo4jGraphHandler {
     }
     
     // correct - generate and export csv
-    public static void exportCSVFile(final String node_label, final String csvFileName, Driver driver) {
+    public static void exportCSVFile(final String node_label, Driver driver) {
         try (Session session = driver.session()) {
             String cypher_query = "CALL apoc.export.csv.query("
                 + "'MATCH (n:" + node_label + ")-[r]->(m:" + node_label + ") "
                 + "WHERE r.value IS NOT NULL "
                 + "RETURN toString(n.id) AS source, toString(m.id) AS target, r.value AS weight', "
-                + "'" + csvFileName + "', "
+                + "'" + node_label + ".csv', "
                 + "{}"
                 + ")";
             session.run(cypher_query);

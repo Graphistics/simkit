@@ -777,9 +777,6 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 						EdgeList2 edge_list_detail = edge_list_eigen.get(i);
 		            	Neo4jGraphHandler.createRelationshipGraph(graph_name, "created relationship in neo4j \n", edge_list_detail, connector.getDriver());
 		            }
-		            
-		            Neo4jGraphHandler.exportCSVFile(graph_name,graph_name,connector.getDriver());
-		            
 		            //mapNodes(graph_name,propertyNames);
 		            
 		            String number_of_clusters = Integer.toString(number_of_eigenvectors.intValue());
@@ -935,6 +932,24 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 		}
 		}
     }
+	
+	@UserFunction
+	public String getAdjacencyMatrix(@Name("node_label") String node_label) throws Exception{
+		try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
+            if (node_label == null) {
+                return "Missing nodeType";
+            } else {
+				StringBuilder outputString = new StringBuilder("Adjacency matrix:\n");
+				ArrayList<EdgeList2> edge_list = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(node_label, connector.getDriver());
+				RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list);
+				outputString.append(matrixToString(adjacency_matrix));
+				Neo4jGraphHandler.exportCSVFile(node_label,connector.getDriver());
+		        return outputString.toString();
+		    }
+		} catch (Neo4jException e) {
+		    throw new RuntimeException("Error displaying edge list in Neo4j: " + e.getMessage());
+		}
+	}
 
 	
 	@UserFunction
