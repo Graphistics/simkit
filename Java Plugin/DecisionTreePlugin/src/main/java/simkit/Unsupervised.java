@@ -14,6 +14,15 @@ import org.neo4j.logging.Log;
 import org.neo4j.procedure.Context;
 import org.neo4j.procedure.Procedure;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 
 import scala.util.Random;
 
@@ -43,11 +52,10 @@ public class Unsupervised {
 		return data;
 	}
 	
-	public static void main(String[] args)
-	{
+	public static void main(String[] args) throws Exception {
 		  ArrayList<String> inputData = dummyData();
 		  ArrayList<String> debug = new ArrayList<>();
-		  HashMap<String, ArrayList<String>> dbAssign = KmeanClust(inputData, 2, 20, "Euclidean", false, debug);
+		  HashMap<String, ArrayList<String>> dbAssign = KmeanClust(inputData, 2, 20, "Euclidean", false, debug, 42);
 		  for (String centroid: dbAssign.keySet()) {
 			  System.out.println("1");
       		ArrayList<String> clusterNode = dbAssign.get(centroid);
@@ -344,6 +352,38 @@ private static String extractID(String node) {
     return null; // ID not found
 }
 
+// Initialize the random generator on the FastAPI server with a specific seed
+    private static void initializeRandomGenerator(int seed) throws Exception {
+        String urlString = "http://91.107.235.104:8000/init?seed=" + seed;
+        URL url = new URL(urlString);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.getResponseCode();  // Ensure the request completes
+        connection.disconnect();
+    }
+
+    // Fetch the next random integer from the FastAPI server
+    private static int getNextRandomInt(int maxValue) throws Exception {
+        String urlString = "http://91.107.235.104:8000/next-int?max_value=" + maxValue;
+        URL url = new URL(urlString);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+
+        BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+        String inputLine;
+        StringBuilder content = new StringBuilder();
+
+        while ((inputLine = in.readLine()) != null) {
+            content.append(inputLine);
+        }
+
+        in.close();
+        connection.disconnect();
+
+        JSONObject jsonResponse = new JSONObject(content.toString());
+        return jsonResponse.getInt("next_int");
+    }
+
 	/**
 	 * This is the main method to perform k-means clustering.
 	 * @param inputData is a variable where the nodes from Neo4j are stored
@@ -360,17 +400,21 @@ private static String extractID(String node) {
 		int numberOfInteration,
 		String distanceMeasure,
 		boolean useOriginalNodeSet,
-		ArrayList<String> originalNodeSet
-	) {
+		ArrayList<String> originalNodeSet,
+		int seed
+	) throws Exception {
 		HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<>();
 		ArrayList<String> listOfCentroid = new ArrayList<>();
 		ArrayList<String> listOfRemain = new ArrayList<>(inputData);
 
 		// Initializing centroids by random choice
-		java.util.Random rand = new java.util.Random();
+		//java.util.Random rand = new java.util.Random();
+		initializeRandomGenerator(seed);
+
 
 		while (listOfCentroid.size() < numberOfCentroids) {
-			int randomIndex = rand.nextInt(inputData.size());
+			//int randomIndex = rand.nextInt(inputData.size());
+			int randomIndex = getNextRandomInt(inputData.size());  // Fetch the next random index
 			String potentialCentroid = inputData.get(randomIndex);
 
 			if (!listOfCentroid.contains(potentialCentroid)) {
