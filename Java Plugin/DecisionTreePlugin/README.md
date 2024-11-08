@@ -32,11 +32,12 @@ return simkit.kmean({
     originalSet: "Iris",
     overlook: "target,sepal_length,sepal_width,petal_length,petal_width",
     overlookOriginal: "target",
-    useKmeanForSilhouette: false
+    useKmeanForSilhouette: false,
+    seed: 42
 })
 ```
 
 ### Run full spectral clustering
 ```java
-return simkit.spectralClusteringFromNeo4j('Iris','euclidean','full', '7','index,target','sym',3,'100','euclidean','target', false)
+return simkit.spectralClusteringFromNeo4j('Iris','euclidean','full', '7','index,target','sym',3,'100','euclidean','target', false, 42)
 ```

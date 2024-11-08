@@ -386,6 +386,7 @@ public String kmean(@Name("params") Map<String, Object> params) throws Exception
 	String overLook = (String) params.getOrDefault("overlook", "target,sepal_length,sepal_width,petal_length,petal_width");
 	String overlookOriginal = (String) params.getOrDefault("overlookOriginal", "target");
 	boolean kmeanBool = (Boolean) params.getOrDefault("useKmeanForSilhouette", false);
+	int seed = ((Number) params.getOrDefault("seed", 42)).intValue();
 
 
     try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
@@ -400,7 +401,7 @@ public String kmean(@Name("params") Map<String, Object> params) throws Exception
         ArrayList<String> mapNodeOriginalList = parseNodeValues(originalNodeSet, overlookOriginal.split(","));
 
         HashMap<String, ArrayList<String>> kmeanAssign = Unsupervised.KmeanClust(
-            mapNodeList, numCentroids, numIterations, distanceMeasure, false, new ArrayList<>()
+            mapNodeList, numCentroids, numIterations, distanceMeasure, false, new ArrayList<>(), seed
         );
 		HashMap<String, ArrayList<String>> cleanedKmeanAssign = Unsupervised.removeIndexAndId(kmeanAssign);
 
@@ -517,7 +518,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 
     @UserFunction
     @Description("Calculate the mean of the Silhouette Coefficients for all point")
-	public String averageSilhouetteCoefficient(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception
+	public String averageSilhouetteCoefficient(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure, @Name("Seed") Number seed) throws Exception
 	{
     	if(nodeSet != null)
     	{
@@ -526,7 +527,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 			int numberOfCentroidInt = Integer.parseInt(numberOfCentroid);
 			int numberOfInterationInt = Integer.parseInt(numberOfInteration);
 			ArrayList<String> debug = new ArrayList<>();
-			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, false, debug);
+			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, false, debug, (int) seed);
 			double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
 	        return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue ;
 		}
@@ -694,7 +695,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
      */
 
 	@UserFunction
-	public String spectralClusteringFromNeo4j(@Name("node_label") String node_label, @Name("distance_measure") String distance_measure,@Name("graph_type") String graph_type,@Name("parameter") String parameter,@Name("remove_column") String remove_columns, @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors, @Name("number_of_iteration") String number_of_iteration, @Name("distance_measure_kmean") String distance_measure_kmean, @Name("target Column on original Data") String target_column, @Name("Use kmean for Silhouette calculation") Boolean use_kmean_for_silhouette) throws Exception {
+	public String spectralClusteringFromNeo4j(@Name("node_label") String node_label, @Name("distance_measure") String distance_measure,@Name("graph_type") String graph_type,@Name("parameter") String parameter,@Name("remove_column") String remove_columns, @Name("laplacian_type") String laplacian_type, @Name("number_of_eigenvectors") Double number_of_eigenvectors, @Name("number_of_iteration") String number_of_iteration, @Name("distance_measure_kmean") String distance_measure_kmean, @Name("target Column on original Data") String target_column, @Name("Use kmean for Silhouette calculation") Boolean use_kmean_for_silhouette, @Name("Seed") Number seed) throws Exception {
 		predictedNodeLabels.clear();
 		try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 			if(node_label == null && distance_measure == null) {
@@ -805,7 +806,8 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 						"originalSet", node_label,
 						"overlook", target_column + "," + filteredProperties.toString(),
 						"overlookOriginal", target_column,
-						"useKmeanForSilhouette", use_kmean_for_silhouette
+						"useKmeanForSilhouette", use_kmean_for_silhouette,
+						"seed", seed
 					));
 					//String kmeanResult = "test";
 
@@ -953,10 +955,9 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 		    throw new RuntimeException("Error displaying edge list in Neo4j: " + e.getMessage());
 		}
 	}
-
 	
 	@UserFunction
-	public String displayFinalResults(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure) throws Exception {
+	public String displayFinalResults(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure, @Name("Seed") Number seed) throws Exception {
 		
     	predictedNodeLabels.clear();
 		    	try ( SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password))
@@ -973,7 +974,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 			double centroidNumber = 1.0;
 
 			ArrayList<String> debug = new ArrayList<>();
-			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, false, debug);
+			kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, false, debug, (int) seed);
 			double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
 			outputString.append(averageSilhouetteCoefficientValue);
 
