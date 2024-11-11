@@ -60,24 +60,6 @@ public class Neo4jGraphHandler {
         return edge_list;
     }
     
-    // correct - generate and export csv
-    public static void exportCSVFile(final String node_label, Driver driver) {
-        try (Session session = driver.session()) {
-            String cypher_query = "CALL apoc.export.csv.query("
-                + "'MATCH (n:" + node_label + ")-[r]->(m:" + node_label + ") "
-                + "WHERE r.value IS NOT NULL "
-                + "RETURN toString(n.id) AS source, toString(m.id) AS target, r.value AS weight', "
-                + "'" + node_label + ".csv', "
-                + "{}"
-                + ")";
-            session.run(cypher_query);
-        } catch (Neo4jException e) {
-            throw new RuntimeException("Error exporting CSV from Neo4j: " + e.getMessage());
-        }
-    }
-
-
-    
     public static Pair<ArrayList<NodeList2>, String> retrieveNodeListFromNeo4jSimilarityGraph(final String nodeType, Driver driver) {
         ArrayList<NodeList2> nodeList = new ArrayList<>();
         String propertyKeys = "";

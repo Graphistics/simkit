@@ -16,6 +16,7 @@ import org.apache.commons.math4.legacy.linear.RealMatrix;
 import org.apache.commons.numbers.core.Precision;
 
 import definition.EdgeList2;
+import definition.NodeList2;
 
 public class MatrixCalculation {
 	
@@ -74,6 +75,29 @@ public class MatrixCalculation {
         
         RealMatrix adjacency_matrix = new BlockRealMatrix(adjacency_matrix_data);
         return adjacency_matrix;
+    }
+    
+    public static RealMatrix convertToXMatrix(ArrayList<NodeList2> nodeList) {
+        int dimension = nodeList.size();
+        
+        // Determine the actual number of eigenvector properties
+        int vectorDimension = (int) nodeList.get(0).getProperties().keySet().stream()
+                                .filter(key -> key.startsWith("eigenvector_"))
+                                .count();
+
+        double[][] x_matrix_data = new double[dimension][vectorDimension];
+        
+        for (int i = 0; i < dimension; i++) {
+            Map<String, Object> properties = nodeList.get(i).getProperties();
+            for (int j = 0; j < vectorDimension; j++) {
+                String key = "eigenvector_" + j;
+                if (properties.containsKey(key)) {
+                    x_matrix_data[i][j] = (double) properties.get(key);
+                }
+            }
+        }
+        
+        return new BlockRealMatrix(x_matrix_data);
     }
    
     /**

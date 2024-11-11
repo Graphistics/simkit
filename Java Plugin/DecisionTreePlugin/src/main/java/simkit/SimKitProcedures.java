@@ -1,4 +1,6 @@
 package simkit;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -858,9 +860,9 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
                 outputString.append("\n\nLaplacian Matrix:\n").append(matrixToString(laplacian_matrix));
 
                 // Display Eigenvalues, Eigenvectors, and X
-//                EigenCalculation.EigenResult eigen_result = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
+                EigenCalculation.EigenResult eigen_result = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
 //                outputString.append("\n\nEigenvectors Matrix:\n").append(matrixToString(eigen_result.eigenvectors));
-//				outputString.append("\n\nX Matrix:\n").append(matrixToString(eigen_result.X));
+				outputString.append("\n\nX Matrix:\n").append(matrixToString(eigen_result.X));
 				
                 return outputString.toString();
             }
@@ -939,23 +941,56 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
     }
 	
 	@UserFunction
-	public String getAdjacencyMatrix(@Name("node_label") String node_label) throws Exception{
-		try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
-            if (node_label == null) {
-                return "Missing nodeType";
-            } else {
-				StringBuilder outputString = new StringBuilder("Adjacency matrix:\n");
-				ArrayList<EdgeList2> edge_list = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(node_label, connector.getDriver());
-				RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list);
-				outputString.append(matrixToString(adjacency_matrix));
-				Neo4jGraphHandler.exportCSVFile(node_label,connector.getDriver());
-		        return outputString.toString();
-		    }
-		} catch (Neo4jException e) {
-		    throw new RuntimeException("Error displaying edge list in Neo4j: " + e.getMessage());
-		}
+	public String getMatrix(@Name("node_label") String node_label, @Name("matrix_type") String matrix_type, @Name("savePath") String savePath) throws Exception {
+	    try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
+	        if (node_label == null) {
+	            return "Missing nodeType";
+	        } else {
+	            StringBuilder outputString = new StringBuilder();
+	            if ("adjacency".equals(matrix_type)) {
+	                ArrayList<EdgeList2> edge_list = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(node_label, connector.getDriver());
+	                RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list);
+	                outputString.append("Adjacency matrix:\n").append(matrixToString(adjacency_matrix));
+	                
+	                // Save adjacency matrix to CSV at user-defined or default path
+	                saveMatrixToCSV(adjacency_matrix, node_label + "_adjacency_matrix.csv", savePath);
+	            } else if ("x_matrix".equals(matrix_type)) {
+	                org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> nodes = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(node_label, connector.getDriver());
+	                RealMatrix x_matrix = MatrixCalculation.convertToXMatrix(nodes.getLeft());
+	                outputString.append("X matrix with eigenvectors:\n").append(matrixToString(x_matrix));
+	                
+	                // Save X matrix to CSV at user-defined or default path
+	                saveMatrixToCSV(x_matrix, node_label + "_x_matrix.csv", savePath);
+	            } else {
+	                return "Invalid matrix type specified";
+	            }
+	            return outputString.toString();
+	        }
+	    } catch (Neo4jException e) {
+	        throw new RuntimeException("Error in Neo4j operation: " + e.getMessage());
+	    }
 	}
+
 	
+	public void saveMatrixToCSV(RealMatrix matrix, String filename, String savePath) throws IOException {
+	    // Determine the file path based on user input or default to the current directory
+	    String filePath = (savePath == null || savePath.isEmpty()) ? "./" + filename : savePath + "/" + filename;
+
+	    // Write the matrix data to the CSV file
+	    try (FileWriter csvWriter = new FileWriter(filePath)) {
+	        for (int i = 0; i < matrix.getRowDimension(); i++) {
+	            for (int j = 0; j < matrix.getColumnDimension(); j++) {
+	                csvWriter.append(Double.toString(matrix.getEntry(i, j)));
+	                if (j < matrix.getColumnDimension() - 1) {
+	                    csvWriter.append(",");
+	                }
+	            }
+	            csvWriter.append("\n");
+	        }
+	    }
+	}
+
+
 	@UserFunction
 	public String displayFinalResults(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure, @Name("Seed") Number seed) throws Exception {
 		
