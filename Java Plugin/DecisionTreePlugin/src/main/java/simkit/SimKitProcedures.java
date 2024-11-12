@@ -139,7 +139,7 @@ public class SimKitProcedures implements AutoCloseable{
 		{
 
 			if(data_path == null && distance_measure == null) {
-				return "Missing data_path or distance measure type";
+                throw new Exception("Missing dataPath or distance measure type");
 			}else {
 				String graphName = null;
 				Double[][] adj_mat = null;
@@ -203,7 +203,7 @@ public class SimKitProcedures implements AutoCloseable{
 
 
 			if(label == null && distanceMeasure == null) {
-				return "Missing dataPath or distance measure type";
+                throw new Exception("Missing dataPath or distance measure type");
 			}else {
 				String graphName = "affinity_";
 				//ArrayList<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
@@ -310,7 +310,7 @@ public class SimKitProcedures implements AutoCloseable{
 	                               @Name("number_of_eigenvectors") Double number_of_eigenvectors) throws Exception {
 	    try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 	        if (node_label == null) {
-	            return "Error: Missing node label";
+                throw new Exception("No nodes found with the label: " + node_label);
 	        }
 
 	        // Retrieve edge list from Neo4j and compute matrices
@@ -694,6 +694,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
      * The function also generates CSV files for the similarity graph and eigendecomposed graph.
      *
      * @param node_label                 Label of the nodes in the Neo4j graph to be used for clustering.
+     * @param is_feature_based           Boolean flag to determine if feature-based spectral clustering should be used.
      * @param distance_measure           Method to calculate the similarity between nodes (e.g., Euclidean, cosine).
      * @param graph_type                 Type of graph to be created for clustering (e.g., k-nearest neighbors, epsilon-neighborhood).
      * @param parameter                  Parameter value for the graph type (e.g., epsilon value or number of neighbors).
@@ -709,7 +710,8 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
      * @throws Exception If any error occurs during the spectral clustering process.
      */
     @UserFunction
-    public String spectralClusteringFromNeo4j(@Name("node_label") String node_label,
+    public String spectralClustering(@Name("node_label") String node_label,
+    										  @Name("is_feature_based") Boolean is_feature_based,
                                               @Name("distance_measure") String distance_measure,
                                               @Name("graph_type") String graph_type,
                                               @Name("parameter") String parameter,
@@ -724,144 +726,177 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
         predictedNodeLabels.clear();
         
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
-            if (node_label == null || distance_measure == null) {
+            if (node_label == null) {
                 return "Missing node label or distance measure type";
             } else {
-            	// Start graph's name construction
-                String graph_name = "affinity_";
-                // Retrieve node with its properties
-                org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(node_label, connector.getDriver());
-                ArrayList<NodeList2> node_properties_list = node_data.getLeft();
-                String property_names = node_data.getRight();
+                String graph_name;
+                ArrayList<NodeList2> node_properties_list;
+                String property_names = "";
 
-                // Prepare list of parameters to not be included in calculation
-                String[] remove_list = remove_columns.split(",");
-                List<String> remove_list_new = Arrays.stream(remove_list).collect(Collectors.toList());
-
-                // Calculate distance matrix based on the specified distance measure
-                Double[][] distance_matrix = getDistanceMatrixFromNodes(distance_measure, node_properties_list, remove_list_new);
-                Double[][] adj_mat = null;
-
-                // Construct the similarity graph based on the specified graph type
-                if (graph_type.equals("full")) { // Fully-connected graph with local sigma hyper-parameter
-                    Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(distance_matrix, parameter);
-                    adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(distance_matrix, sigmas);
-                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
-                }
-                if (graph_type.equals("eps")) { // Epsilon graph with epsilon hyper-parameter
-                    Double epsilon_value = Double.parseDouble(parameter);
-                    adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(distance_matrix, epsilon_value);
-                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
-                }
-                if (graph_type.equals("knn")) { // K-nearest neighbour graph with k-nearest neighbour hyper-parameter
-                    Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix, parameter);
-                    adj_mat = ReadCsvTestData.calculateKNNGraph(distance_matrix, knn);
-                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
-                }
-                if (graph_type.equals("mknn")) { // Mutual K-nearest neighbour graph with k-nearest neighbour hyper-parameter
-                    Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix, parameter);
-                    adj_mat = ReadCsvTestData.calculateMutualKNNGraph(distance_matrix, knn);
-                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
-                }
-
-                // Calculate edge list from adjacency matrix
-                ArrayList<EdgeList2> edge_list = GraphTransform.calculateEdgeList(node_properties_list, adj_mat);
-
-                graph_name += "_" + node_label;
+                if (is_feature_based) {                
+                	if (distance_measure == null) {
+	                    return "Missing distance measure type";
+	                }
                 
-                // Delete existing nodes with the same graph name
-                Neo4jGraphHandler.deleteExistingNodeLabels(graph_name, connector.getDriver());
+	            	// Start graph's name construction
+	                graph_name = "affinity_";
+	                
+	                // Retrieve node with its properties
+	                org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(node_label, connector.getDriver());
+	                node_properties_list = node_data.getLeft();
+	                property_names = node_data.getRight();
+	
+	                // Prepare list of parameters to not be included in calculation
+	                String[] remove_list = remove_columns.split(",");
+	                List<String> remove_list_new = Arrays.stream(remove_list).collect(Collectors.toList());
+	
+	                // Calculate distance matrix based on the specified distance measure
+	                Double[][] distance_matrix = getDistanceMatrixFromNodes(distance_measure, node_properties_list, remove_list_new);
+	                Double[][] adj_mat = null;
+	
+	                // Construct the similarity graph based on the specified graph type
+	                if (graph_type.equals("full")) { // Fully-connected graph with local sigma hyper-parameter
+	                    Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(distance_matrix, parameter);
+	                    adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(distance_matrix, sigmas);
+	                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
+	                }
+	                else if (graph_type.equals("eps")) { // Epsilon graph with epsilon hyper-parameter
+	                    Double epsilon_value = Double.parseDouble(parameter);
+	                    adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(distance_matrix, epsilon_value);
+	                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
+	                }
+	                else if (graph_type.equals("knn")) { // K-nearest neighbour graph with k-nearest neighbour hyper-parameter
+	                    Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix, parameter);
+	                    adj_mat = ReadCsvTestData.calculateKNNGraph(distance_matrix, knn);
+	                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
+	                }
+	                else if (graph_type.equals("mknn")) { // Mutual K-nearest neighbour graph with k-nearest neighbour hyper-parameter
+	                    Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix, parameter);
+	                    adj_mat = ReadCsvTestData.calculateMutualKNNGraph(distance_matrix, knn);
+	                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
+	                } else {
+                        throw new Exception("Invalid graph_type specified.");
+	                }
+	
+	                // Calculate edge list from adjacency matrix
+	                ArrayList<EdgeList2> edge_list = GraphTransform.calculateEdgeList(node_properties_list, adj_mat);
+	
+	                graph_name += "_" + node_label;
+	                
+	                // Delete existing nodes with the same graph name
+	                Neo4jGraphHandler.deleteExistingNodeLabels(graph_name, connector.getDriver());
+	
+	                // Insert nodes and edges into Neo4j
+	                try (Session session = connector.getDriver().session();
+	                     Transaction tx = session.beginTransaction()) {
+	
+	                    for (NodeList2 node : node_properties_list) {
+	                        Neo4jGraphHandler.createNodeGraph(graph_name, "Created nodes succesfully!\n", node, connector.getDriver());
+	                    }
+	
+	                    for (EdgeList2 edge_list_detail : edge_list) {
+	                        if (edge_list_detail.getWeight() == 0.0) {
+	                            continue; // Ignore not connected nodes
+	                        }
+	                        Neo4jGraphHandler.createRelationshipGraph(graph_name, "Created Similarity graph succesfully!\n", edge_list_detail, connector.getDriver());
+	                    }
+	
+	                    tx.commit();
+	                }
+	                
+            } else {
+		                // Proceed with graph-based clustering
+		                graph_name = node_label;
+		
+		                // Retrieve node properties
+		                node_properties_list = Neo4jGraphHandler.retrieveNodeListFromNeo4j(graph_name, connector.getDriver());
+		
+		                // Collect property names
+		                if (!node_properties_list.isEmpty()) {
+		                    property_names = String.join(",", node_properties_list.get(0).getProperties().keySet());
+		                } else {
+	                        throw new Exception("No nodes found with the label: " + graph_name);
+		                }
+		            }
+                	// Proceed with eigendecomposition, k-means clustering, etc.
 
-                // Insert nodes and edges into Neo4j
-                try (Session session = connector.getDriver().session();
-                     Transaction tx = session.beginTransaction()) {
-
-                    for (NodeList2 node : node_properties_list) {
-                        Neo4jGraphHandler.createNodeGraph(graph_name, "Created nodes succesfully!\n", node, connector.getDriver());
-                    }
-
-                    for (EdgeList2 edge_list_detail : edge_list) {
-                        if (edge_list_detail.getWeight() == 0.0) {
-                            continue; // Ignore not connected nodes
-                        }
-                        Neo4jGraphHandler.createRelationshipGraph(graph_name, "Created Similarity graph succesfully!\n", edge_list_detail, connector.getDriver());
-                    }
-
-                    tx.commit();
-                }
-
-                // Retrieve edge list and perform eigendecomposition
-                try (Session session = connector.getDriver().session()) {
-                	// Retrieve node and edge list with affinity's graph node label
-                    ArrayList<NodeList2> node_list_eigen = Neo4jGraphHandler.retrieveNodeListFromNeo4j(graph_name, connector.getDriver());
-                    ArrayList<EdgeList2> edge_list_2 = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(graph_name, connector.getDriver());
-
-                    // Calculate required matrices
-                    RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list_2);
-                    RealMatrix degree_matrix = MatrixCalculation.calculateDegreeMatrix(adjacency_matrix);
-                    RealMatrix laplacian_matrix = MatrixCalculation.calculateLaplacianMatrix(degree_matrix, adjacency_matrix, laplacian_type);
-
-                    // Attempt to calculate eigen decomposition
-                    Object eigen_result_obj = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
-
-                    // Check if the result is an error message
-                    if (eigen_result_obj instanceof String) {
-                        return (String) eigen_result_obj;  // Return the error message directly with failure
-                    }
-
-                    // Cast the result to EigenResult
-                    EigenCalculation.EigenResult eigen_result = (EigenCalculation.EigenResult) eigen_result_obj;
-
-                    // Create edge list based on the eigen decomposition result
-                    ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_list_eigen, eigen_result.X, edge_list_2);
-
-                    // Create a new graph name for the eigendecomposed graph and remove existing nodes with that label
-        	        String graph_name_eigen = "eigen_" + laplacian_type + "_" + Math.round(number_of_eigenvectors) + "_" + graph_name;
-                    Neo4jGraphHandler.deleteExistingNodeLabels(graph_name_eigen, connector.getDriver());
-
-                    // Insert nodes and edges into Neo4j
-                    for (NodeList2 node : node_list_eigen) {
-                        Neo4jGraphHandler.createNodeGraphEigenTransform(graph_name_eigen, "Created nodes succesfully!\n", node, eigen_result.X, connector.getDriver());
-                    }
-                    for (EdgeList2 edge_list_detail : edge_list_eigen) {
-                        Neo4jGraphHandler.createRelationshipGraph(graph_name_eigen, "Created Eigendecomposed graph succesfully!\n", edge_list_detail, connector.getDriver());
-                    }
-
-                    // Prepare properties for k-means clustering
-                    String number_of_clusters = Integer.toString(number_of_eigenvectors.intValue());
-                    String[] properties_array = property_names.split(",");
-
-                    // Build a string of properties excluding 'index' and 'target'
-                    StringBuilder filtered_properties = new StringBuilder();
-                    for (String property : properties_array) {
-                        if (!property.equals("index") && !property.equals("target")) {
-                            if (filtered_properties.length() > 0) {
-                                filtered_properties.append(",");
-                            }
-                            filtered_properties.append(property);
-                        }
-                    }
-
-                    // Perform k-means clustering
-                    String kmean_result = kmean(Map.of(
-                            "nodeSet", graph_name_eigen,
-                            "numberOfCentroid", number_of_clusters,
-                            "numberOfInteration", number_of_iterations,
-                            "distanceMeasure", distance_measure_kmean,
-                            "originalSet", node_label,
-                            "overlook", target_column + "," + filtered_properties.toString(),
-                            "overlookOriginal", target_column,
-                            "useKmeanForSilhouette", use_kmean_for_silhouette,
-                            "seed", seed
-                    ));
-
-                    return "Created similarity graph, eigendecomposed graph successful! " + kmean_result;
-
-                } catch (Neo4jException e) {
-                    throw new RuntimeException("Error creating Eigendecomposed graph: " + e.getMessage());
-                }
-
-            }
+	
+	                // Retrieve edge list and perform eigendecomposition
+	                try (Session session = connector.getDriver().session()) {
+	                	// Retrieve node and edge list with affinity's graph node label
+	                    ArrayList<EdgeList2> edge_list_2 = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(graph_name, connector.getDriver());
+	
+	                    // Check if edge list is empty when is_feature_based is false
+	                    if (!is_feature_based && edge_list_2.isEmpty()) {
+	                        throw new Exception("No adjacency data found for the graph: " + graph_name);
+	                    }
+	                    
+	                    // Calculate required matrices
+	                    RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list_2);
+	                    RealMatrix degree_matrix = MatrixCalculation.calculateDegreeMatrix(adjacency_matrix);
+	                    RealMatrix laplacian_matrix = MatrixCalculation.calculateLaplacianMatrix(degree_matrix, adjacency_matrix, laplacian_type);
+	
+	                    // Attempt to calculate eigen decomposition
+	                    Object eigen_result_obj = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
+	
+	                    // Check if the result is an error message
+	                    if (eigen_result_obj instanceof String) {
+	                        return (String) eigen_result_obj;  // Return the error message directly with failure
+	                    }
+	
+	                    // Cast the result to EigenResult
+	                    EigenCalculation.EigenResult eigen_result = (EigenCalculation.EigenResult) eigen_result_obj;
+	
+	                    // Create edge list based on the eigen decomposition result
+	                    ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_properties_list, eigen_result.X, edge_list_2);
+	
+	                    // Create a new graph name for the eigendecomposed graph and remove existing nodes with that label
+	        	        String graph_name_eigen = "eigen_" + laplacian_type + "_" + Math.round(number_of_eigenvectors) + "_" + graph_name;
+	                    Neo4jGraphHandler.deleteExistingNodeLabels(graph_name_eigen, connector.getDriver());
+	
+	                    // Insert nodes and edges into Neo4j
+	                    for (NodeList2 node : node_properties_list) {
+	                        Neo4jGraphHandler.createNodeGraphEigenTransform(graph_name_eigen, "Created nodes succesfully!\n", node, eigen_result.X, connector.getDriver());
+	                    }
+	                    for (EdgeList2 edge_list_detail : edge_list_eigen) {
+	                        Neo4jGraphHandler.createRelationshipGraph(graph_name_eigen, "Created Eigendecomposed graph succesfully!\n", edge_list_detail, connector.getDriver());
+	                    }
+	
+	                    // Prepare properties for k-means clustering
+	                    String number_of_clusters = Integer.toString(number_of_eigenvectors.intValue());
+	                    String[] properties_array = property_names.split(",");
+	
+	                    // Build a string of properties excluding 'index' and 'target'
+	                    StringBuilder filtered_properties = new StringBuilder();
+	                    for (String property : properties_array) {
+	                        if (!property.equals("index") && !property.equals("target")) {
+	                            if (filtered_properties.length() > 0) {
+	                                filtered_properties.append(",");
+	                            }
+	                            filtered_properties.append(property);
+	                        }
+	                    }
+	
+	                    // Perform k-means clustering
+	                    String kmean_result = kmean(Map.of(
+	                            "nodeSet", graph_name_eigen,
+	                            "numberOfCentroid", number_of_clusters,
+	                            "numberOfInteration", number_of_iterations,
+	                            "distanceMeasure", distance_measure_kmean,
+	                            "originalSet", node_label,
+	                            "overlook", target_column + "," + filtered_properties.toString(),
+	                            "overlookOriginal", target_column,
+	                            "useKmeanForSilhouette", use_kmean_for_silhouette,
+	                            "seed", seed
+	                    ));
+	
+	                    return "Created similarity graph, eigendecomposed graph successful! " + kmean_result;
+	
+	                } catch (Neo4jException e) {
+	                    throw new RuntimeException("Error creating Eigendecomposed graph: " + e.getMessage());
+	                }
+	
+	            }
         } catch (Neo4jException e) {
             throw new RuntimeException("Error performing Spectral Clustering: " + e.getMessage());
         }
