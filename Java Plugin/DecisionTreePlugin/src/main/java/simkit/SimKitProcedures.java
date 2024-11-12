@@ -131,7 +131,7 @@ public class SimKitProcedures implements AutoCloseable{
 	}
 
 	@UserFunction
-	public String createGraphFromCsv(@Name("data_path") String data_path, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("parameter") String parameter,@Name("remove_column") String remove_columns) throws Exception {
+	public String csvToGraph(@Name("data_path") String data_path, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("parameter") String parameter,@Name("remove_column") String remove_columns) throws Exception {
 
 
 		String confusionMatrix = "";
@@ -194,8 +194,20 @@ public class SimKitProcedures implements AutoCloseable{
 
 	}
 	
+	/**
+	 * Creates a Similarity Transform graph based on distance measure, affinity matrix type, hyperparameter, excluded columns.
+	 * @param  params Set of parameters
+	 * @return String indicating the success of the graph creation and creates Graph with Nodes and Relationships in Neo4j.
+	 * @throws Exception If an error occurs while creating the Laplacian graph in Neo4j.
+	 */
 	@UserFunction
-	public String createGraphFromNodes(@Name("label") String label,@Name("distance_measure") String distanceMeasure,@Name("graph_type") String graphType,@Name("parameter") String parameter,@Name("remove_column") String remove_columns) throws Exception {
+	public String nodePropertyToGraph(@Name("params") Map<String, Object> params) throws Exception {
+
+	    String label = (String) params.getOrDefault("label", "Iris");
+	    String distanceMeasure = (String) params.getOrDefault("distance_measure", "euclidean");
+	    String graphType = (String) params.getOrDefault("graph_type", "full");
+	    String parameter = (String) params.getOrDefault("parameter", "7");
+	    String remove_columns = (String) params.getOrDefault("remove_column", "index,target");
 
 		String confusionMatrix = "";
 		try ( SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password) )
@@ -221,25 +233,28 @@ public class SimKitProcedures implements AutoCloseable{
 					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
 					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
 				}
-				if(graphType.equals("eps")) {
+				else if(graphType.equals("eps")) {
 					Double espilonValue = Double.parseDouble(parameter);
 					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,espilonValue);
 					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
 
 				}
-				if(graphType.equals("knn")) {
+				else if(graphType.equals("knn")) {
 					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix,knn);
 					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
 
 				}
-				if(graphType.equals("mknn")) {
+				else if(graphType.equals("mknn")) {
 					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
 					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
 					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
+				} else {
+                    throw new Exception("Invalid graph_type specified.");
 				}
 				
 				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
+				graphName += "_" + label;
 				Neo4jGraphHandler.deleteExistingNodeLabels(graphName, connector.getDriver());
 
 
@@ -296,18 +311,18 @@ public class SimKitProcedures implements AutoCloseable{
 	}
 
 	/**
-	 * Creates a Laplacian Eigen Transform graph based on Laplacian matrix type and specified number of eigenvectors.
-	 *
-	 * @param node_label             The label of the nodes in the graph.
-	 * @param laplacian_type         The type of Laplacian matrix to be used.
-	 * @param number_of_eigenvectors The number of desired eigenvectors to compute during eigen decomposition.
+	 * Creates a Eigendecomposed graph based on Laplacian matrix type and specified number of eigenvectors.
+	 * @param  params TSet of parameters
 	 * @return String indicating the success of the graph creation and creates Graph with Nodes and Relationships in Neo4j.
-	 * @throws RuntimeException If an error occurs while creating the Laplacian graph in Neo4j.
+	 * @throws Exception If an error occurs while creating the Laplacian graph in Neo4j.
 	 */
 	@UserFunction
-	public String createEigenGraph(@Name("node_label") String node_label,
-	                               @Name("laplacian_type") String laplacian_type,
-	                               @Name("number_of_eigenvectors") Double number_of_eigenvectors) throws Exception {
+	public String nodePropertyEigen(@Name("params") Map<String, Object> params) throws Exception {
+
+	    String node_label = (String) params.getOrDefault("node_label", "affinity_full_7_Iris");
+	    String laplacian_type = (String) params.getOrDefault("laplacian_type", "sym");
+	    Double number_of_eigenvectors = ((Number) params.getOrDefault("number_of_eigenvectors", 3)).doubleValue();
+
 	    try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 	        if (node_label == null) {
                 throw new Exception("No nodes found with the label: " + node_label);
@@ -350,7 +365,7 @@ public class SimKitProcedures implements AutoCloseable{
 
 	        return "Create eigendecomposed graph successful!";
 	    } catch (Neo4jException e) {
-	        throw new RuntimeException("Error creating Eigendecomposed graph: " + e.getMessage());
+	        throw new Exception("Error creating Eigendecomposed graph: " + e.getMessage());
 	    }
 	}
 
@@ -381,103 +396,113 @@ public class SimKitProcedures implements AutoCloseable{
 	}
 	
 	 /**
- * Procedure for k-means clustering and visualization in neo4j
- * @param params Type of node
- * @return Cluster result and visualization
- * @throws Exception
- */
-@UserFunction
-@Description("K-means clustering function")
-public String kmean(@Name("params") Map<String, Object> params) throws Exception {
-
-    predictedNodeLabels.clear();
-
-	String nodeSet = (String) params.getOrDefault("nodeSet", "eigenGraph_sym_full_7new_3");
-	String numberOfCentroid = (String) params.getOrDefault("numberOfCentroid", "3");
-	String numberOfInteration = (String) params.getOrDefault("numberOfInteration", "100");
-	String distanceMeasure = (String) params.getOrDefault("distanceMeasure", "euclidean");
-	String originalNodeSet = (String) params.getOrDefault("originalSet", "Iris");
-	String overLook = (String) params.getOrDefault("overlook", "target,sepal_length,sepal_width,petal_length,petal_width");
-	String overlookOriginal = (String) params.getOrDefault("overlookOriginal", "target");
-	boolean kmeanBool = (Boolean) params.getOrDefault("useKmeanForSilhouette", false);
-	int seed = ((Number) params.getOrDefault("seed", 42)).intValue();
-
-
-    try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
-        int numCentroids = Integer.parseInt(numberOfCentroid);
-        int numIterations = Integer.parseInt(numberOfInteration);
-        double centroidNumber = 1.0;
-		//Clear Existing node Labels
-		String nodeLabel = "Clustering_" + nodeSet;
-		Neo4jGraphHandler.deleteExistingNodeLabels(nodeLabel, connector.getDriver());
-
-        ArrayList<String> mapNodeList = parseNodeValues(nodeSet, overLook.split(","));
-        ArrayList<String> mapNodeOriginalList = parseNodeValues(originalNodeSet, overlookOriginal.split(","));
-
-        HashMap<String, ArrayList<String>> kmeanAssign = Unsupervised.KmeanClust(
-            mapNodeList, numCentroids, numIterations, distanceMeasure, false, new ArrayList<>(), seed
-        );
-		HashMap<String, ArrayList<String>> cleanedKmeanAssign = Unsupervised.removeIndexAndId(kmeanAssign);
-
-        double averageSilhouetteCoefficientValue;
-        if (kmeanBool) {
-			// Remove index and id from kmeanAssign
-            averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(cleanedKmeanAssign, distanceMeasure);
-        } else {
-            HashMap<String, ArrayList<String>> mappedNodes = Unsupervised.replaceValuesWithOriginalSet(kmeanAssign, mapNodeOriginalList, log);
-            averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(mappedNodes, distanceMeasure);
-        }
-
-        processClusters(connector, nodeSet, cleanedKmeanAssign, centroidNumber, distanceMeasure);
-
-        return "The average Silhouette Coefficient value is: " + averageSilhouetteCoefficientValue +
-               " predicted labels: " + predictedNodeLabels;
-    }
-}
-
-/**
- * Parses node values from the dataset based on overlook fields.
- */
-private ArrayList<String> parseNodeValues(String nodeSet, String[] overlookFields) throws Exception {
-    ArrayList<String> nodeList = new ArrayList<>();
-    queryData(nodeSet);
-
-    for (Record record : dataKey) {
-        for (Pair<String, Value> pair : record.fields()) {
-            if ("n".equals(pair.key())) {
-                String value = getNodeValues(pair.value(), overlookFields);
-                nodeList.add(value);
-            }
-        }
-    }
-    return nodeList;
-}
-
-/**
- * Processes clusters and connects nodes based on the k-means result.
- */
-private void processClusters(SimKitProcedures connector, String nodeSet,
-                             HashMap<String, ArrayList<String>> kmeanAssign,
-                             double centroidNumber, String distanceMeasure) throws Exception {
-    DecimalFormat decimalFormat = new DecimalFormat("#.###");
-
-    for (String centroid : kmeanAssign.keySet()) {
-        ArrayList<String> clusterNodes = kmeanAssign.get(centroid);
-
-        for (String clusterNode : clusterNodes) {
-            predictedNodeLabels.add(centroidNumber);
-
-            double distance = Unsupervised.calculateDistance(clusterNode, centroid, distanceMeasure);
-            String formattedDistance = decimalFormat.format(distance);
-
-            connector.connectNodes(nodeSet, "create relationship in kmean node", centroid, clusterNode, Double.parseDouble(formattedDistance));
-        }
-        centroidNumber += 1.0;
-    }
-}
+	 * Procedure for k-means clustering and visualization in neo4j
+	 * @param params Type of node
+	 * @return Cluster result and visualization
+	 * @throws Exception
+	 */
+	@UserFunction
+	@Description("K-means clustering function")
+	public String kMeans(@Name("params") Map<String, Object> params) throws Exception {
+	
+	    predictedNodeLabels.clear();
+	
+		String nodeSet = (String) params.getOrDefault("nodeSet", "eigen_sym_3_affinity_full_7_Iris");
+		String numberOfCentroid = (String) params.getOrDefault("numberOfCentroid", "3");
+		String numberOfInteration = (String) params.getOrDefault("numberOfInteration", "100");
+		String distanceMeasure = (String) params.getOrDefault("distanceMeasure", "euclidean");
+		String originalNodeSet = (String) params.getOrDefault("originalSet", "Iris");
+		String overLook = (String) params.getOrDefault("overlook", "target,sepal_length,sepal_width,petal_length,petal_width");
+		String overlookOriginal = (String) params.getOrDefault("overlookOriginal", "target");
+		boolean kmeanBool = (Boolean) params.getOrDefault("useKmeanForSilhouette", false);
+		int seed = ((Number) params.getOrDefault("seed", 42)).intValue();
+	
+	
+	    try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
+	        int numCentroids = Integer.parseInt(numberOfCentroid);
+	        int numIterations = Integer.parseInt(numberOfInteration);
+	        double centroidNumber = 1.0;
+			//Clear Existing node Labels
+			String nodeLabel = "Clustering_" + nodeSet;
+			Neo4jGraphHandler.deleteExistingNodeLabels(nodeLabel, connector.getDriver());
+	
+	        ArrayList<String> mapNodeList = parseNodeValues(nodeSet, overLook.split(","));
+	        ArrayList<String> mapNodeOriginalList = parseNodeValues(originalNodeSet, overlookOriginal.split(","));
+	
+	        HashMap<String, ArrayList<String>> kmeanAssign = Unsupervised.KmeanClust(
+	            mapNodeList, numCentroids, numIterations, distanceMeasure, false, new ArrayList<>(), seed
+	        );
+			HashMap<String, ArrayList<String>> cleanedKmeanAssign = Unsupervised.removeIndexAndId(kmeanAssign);
+	
+	        double averageSilhouetteCoefficientValue;
+	        if (kmeanBool) {
+				// Remove index and id from kmeanAssign
+	            averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(cleanedKmeanAssign, distanceMeasure);
+	        } else {
+	            HashMap<String, ArrayList<String>> mappedNodes = Unsupervised.replaceValuesWithOriginalSet(kmeanAssign, mapNodeOriginalList, log);
+	            averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(mappedNodes, distanceMeasure);
+	        }
+	
+	        processClusters(connector, nodeSet, cleanedKmeanAssign, centroidNumber, distanceMeasure);
+	
+	        return "The average Silhouette Coefficient value is: " + averageSilhouetteCoefficientValue +
+	               " predicted labels: " + predictedNodeLabels;
+	    }
+	}
+	
+	/**
+	 * Parses node values from the dataset based on overlook fields.
+	 */
+	private ArrayList<String> parseNodeValues(String nodeSet, String[] overlookFields) throws Exception {
+	    ArrayList<String> nodeList = new ArrayList<>();
+	    queryData(nodeSet);
+	
+	    for (Record record : dataKey) {
+	        for (Pair<String, Value> pair : record.fields()) {
+	            if ("n".equals(pair.key())) {
+	                String value = getNodeValues(pair.value(), overlookFields);
+	                nodeList.add(value);
+	            }
+	        }
+	    }
+	    return nodeList;
+	}
+	
+	/**
+	 * Processes clusters and connects nodes based on the k-means result.
+	 */
+	private void processClusters(SimKitProcedures connector, String nodeSet,
+	                             HashMap<String, ArrayList<String>> kmeanAssign,
+	                             double centroidNumber, String distanceMeasure) throws Exception {
+	    DecimalFormat decimalFormat = new DecimalFormat("#.###");
+	
+	    for (String centroid : kmeanAssign.keySet()) {
+	        ArrayList<String> clusterNodes = kmeanAssign.get(centroid);
+	
+	        for (String clusterNode : clusterNodes) {
+	            predictedNodeLabels.add(centroidNumber);
+	
+	            double distance = Unsupervised.calculateDistance(clusterNode, centroid, distanceMeasure);
+	            String formattedDistance = decimalFormat.format(distance);
+	
+	            connector.connectNodes(nodeSet, "create relationship in kmean node", centroid, clusterNode, Double.parseDouble(formattedDistance));
+	        }
+	        centroidNumber += 1.0;
+	    }
+	}
     
+	 /**
+	 * Procedure for calculating adjusted rand index
+	 * @param params Set of parameters (node label, true label column's name)
+	 * @return Adjusted rand index score
+	 * @throws Exception
+	 */
     @UserFunction
-	public String adjustedRandIndex(@Name("nodeSet") String nodeSet, @Name("trueLabels") String trueLabel) throws Exception {
+	public String adjustedRandIndex(@Name("params") Map<String, Object> params) throws Exception {
+
+	    String nodeSet = (String) params.getOrDefault("nodeSet", "Iris");
+	    String trueLabels = (String) params.getOrDefault("trueLabels", "target");
+	    
 	    if(predictedNodeLabels.size()==0)
 	    {
 	    	return " predicted Labels is null, please run kmean clustering to add the predicted labels";
@@ -496,7 +521,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 		                    Value value = nodeValues.value();
 		                    StringBuilder nodeLabel = new StringBuilder();
 		                    for (String nodeKey : value.keys()) {
-		                    	if(nodeKey.equals(trueLabel))
+		                    	if(nodeKey.equals(trueLabels))
 		                    	{
 		                    		try {
 		                	            double num = Double.parseDouble(String.valueOf(value.get(nodeKey)));
@@ -687,42 +712,29 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
         return adjustedRandIndex;
     }
 	
-    /**
-     * Performs spectral clustering on graph data stored in a Neo4j database.
-     * It integrates the steps of the spectral clustering algorithm, including constructing the similarity graph,
-     * eigendecomposition of the graph, k-means clustering, and evaluation using silhouette score and adjusted rand index.
-     * The function also generates CSV files for the similarity graph and eigendecomposed graph.
-     *
-     * @param node_label                 Label of the nodes in the Neo4j graph to be used for clustering.
-     * @param is_feature_based           Boolean flag to determine if feature-based spectral clustering should be used.
-     * @param distance_measure           Method to calculate the similarity between nodes (e.g., Euclidean, cosine).
-     * @param graph_type                 Type of graph to be created for clustering (e.g., k-nearest neighbors, epsilon-neighborhood).
-     * @param parameter                  Parameter value for the graph type (e.g., epsilon value or number of neighbors).
-     * @param remove_columns             Columns to be removed before performing clustering.
-     * @param laplacian_type             Type of Laplacian matrix to be used (e.g., normalized, random walk).
-     * @param number_of_eigenvectors     Number of eigenvectors to be considered in the eigendecomposition step.
-     * @param number_of_iterations       Number of iterations for the k-means clustering.
-     * @param distance_measure_kmean     Distance measure to be used in the k-means clustering step.
-     * @param target_column              Target column in the original data for evaluation.
-     * @param use_kmean_for_silhouette   Boolean flag to determine if k-means should be used for silhouette calculation.
-     * @param seed                       Seed value for random number generation.
+	 /**
+	 * Procedure for spectral clustering and visualization in neo4j
+	 * @param params Set of parameters
      * @return String indicating the successful creation of graphs and results of clustering.
      * @throws Exception If any error occurs during the spectral clustering process.
      */
     @UserFunction
-    public String spectralClustering(@Name("node_label") String node_label,
-    										  @Name("is_feature_based") Boolean is_feature_based,
-                                              @Name("distance_measure") String distance_measure,
-                                              @Name("graph_type") String graph_type,
-                                              @Name("parameter") String parameter,
-                                              @Name("remove_columns") String remove_columns,
-                                              @Name("laplacian_type") String laplacian_type,
-                                              @Name("number_of_eigenvectors") Double number_of_eigenvectors,
-                                              @Name("number_of_iterations") String number_of_iterations,
-                                              @Name("distance_measure_kmean") String distance_measure_kmean,
-                                              @Name("target_column") String target_column,
-                                              @Name("use_kmean_for_silhouette") Boolean use_kmean_for_silhouette,
-                                              @Name("seed") Number seed) throws Exception {
+    public String spectralClustering(@Name("params") Map<String, Object> params) throws Exception {
+
+        String node_label = (String) params.getOrDefault("node_label", "Iris");
+        Boolean is_feature_based = (Boolean) params.getOrDefault("is_feature_based", true);
+        String distance_measure = (String) params.getOrDefault("distance_measure", "euclidean");
+        String graph_type = (String) params.getOrDefault("graph_type", "full");
+        String parameter = (String) params.getOrDefault("parameter", "7");
+        String remove_columns = (String) params.getOrDefault("remove_columns", "index,target");
+        String laplacian_type = (String) params.getOrDefault("laplacian_type", "sym");
+        Double number_of_eigenvectors = ((Number) params.getOrDefault("number_of_eigenvectors", 3)).doubleValue();
+        String number_of_iterations = (String) params.getOrDefault("number_of_iterations", "100");
+        String distance_measure_kmean = (String) params.getOrDefault("distance_measure_kmean", "euclidean");
+        String target_column = (String) params.getOrDefault("target_column", "target");
+        Boolean use_kmean_for_silhouette = (Boolean) params.getOrDefault("use_kmean_for_silhouette", false);
+        int seed = ((Number) params.getOrDefault("seed", 42)).intValue();
+        
         predictedNodeLabels.clear();
         
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
@@ -878,7 +890,7 @@ private void processClusters(SimKitProcedures connector, String nodeSet,
 	                    }
 	
 	                    // Perform k-means clustering
-	                    String kmean_result = kmean(Map.of(
+	                    String kmean_result = kMeans(Map.of(
 	                            "nodeSet", graph_name_eigen,
 	                            "numberOfCentroid", number_of_clusters,
 	                            "numberOfInteration", number_of_iterations,
