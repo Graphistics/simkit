@@ -12,8 +12,6 @@ import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.data.category.DefaultCategoryDataset;
 
-import eigendecomposed.EigenCalculation.EigenResult;
-
 
 public class EigenGap {
 
@@ -65,23 +63,25 @@ public class EigenGap {
     }
 
     /**
-     * Finds the index of the largest eigenvalue gap in the array of eigenvalues.
+     * Finds the index of the largest eigen gap among the first 10 eigenvalues.
      *
-     * @param eigenvalues The array of eigenvalues.
-     * @return The index of the largest eigenvalue gap.
+     * @param eigenvalues Array of eigenvalues sorted in ascending order.
+     * @return Index of the largest eigen gap where the index is less than 10.
      */
-    public static double findLargestEigenGap(double[] eigenvalues) {
+    public static int findLargestEigenGap(double[] eigenvalues) {
         double largest_eigen_gap = 0;
         int index_of_largest_gap = 0;
-        
-        for (int i = 0; i < eigenvalues.length - 1; i++) {
+        int max_index = Math.min(10, eigenvalues.length - 1); // Limit index to be under 10 or within array bounds
+
+        for (int i = 0; i < max_index; i++) {
             double eigen_gap = Math.abs(eigenvalues[i + 1] - eigenvalues[i]);
             if (eigen_gap > largest_eigen_gap) {
                 largest_eigen_gap = eigen_gap;
                 index_of_largest_gap = i;
             }
         }
-//        return largest_eigen_gap;
         return index_of_largest_gap;
     }
+
+
 }

@@ -88,8 +88,13 @@
     </dependency>
 	<dependency>
 	    <groupId>org.apache.commons</groupId>
-	    <artifactId>commons-math4-legacy</artifactId>
-	    <version>4.0-beta1</version>
+	    <artifactId>commons-math3</artifactId>
+	    <version>3.6.1</version>
+	</dependency>
+	<dependency>
+	  <groupId>org.ejml</groupId>
+	  <artifactId>ejml-all</artifactId>
+	  <version>0.43.1</version>
 	</dependency>
 	<dependency>
   <groupId>com.opencsv</groupId>
