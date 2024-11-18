@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.math4.legacy.linear.RealMatrix;
+import org.ejml.simple.SimpleMatrix;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.Result;
@@ -59,24 +59,6 @@ public class Neo4jGraphHandler {
         }
         return edge_list;
     }
-    
-    // correct - generate and export csv
-    public static void exportCSVFile(final String node_label, Driver driver) {
-        try (Session session = driver.session()) {
-            String cypher_query = "CALL apoc.export.csv.query("
-                + "'MATCH (n:" + node_label + ")-[r]->(m:" + node_label + ") "
-                + "WHERE r.value IS NOT NULL "
-                + "RETURN toString(n.id) AS source, toString(m.id) AS target, r.value AS weight', "
-                + "'" + node_label + ".csv', "
-                + "{}"
-                + ")";
-            session.run(cypher_query);
-        } catch (Neo4jException e) {
-            throw new RuntimeException("Error exporting CSV from Neo4j: " + e.getMessage());
-        }
-    }
-
-
     
     public static Pair<ArrayList<NodeList2>, String> retrieveNodeListFromNeo4jSimilarityGraph(final String nodeType, Driver driver) {
         ArrayList<NodeList2> nodeList = new ArrayList<>();
@@ -203,12 +185,13 @@ public class Neo4jGraphHandler {
      * @param X           The X matrix obtained from eigen decomposition.
      * @param driver      The Neo4j Driver instance.
      */
-    public static void createNodeGraphEigenTransform(String graph_type, String message, NodeList2 nodeDetail, RealMatrix X, Driver driver) {
+
+    public static void createNodeGraphEigenTransform(String graph_type, String message, NodeList2 nodeDetail, SimpleMatrix X, Driver driver) {
         final String id = nodeDetail.getIndex();
         final Map<String, Object> properties = nodeDetail.getProperties();
 
-        for (int i = 0; i < X.getColumnDimension(); i++) {
-            properties.put("eigenvector_" + i, X.getEntry(Integer.parseInt(id), i));
+        for (int i = 0; i < X.getNumCols(); i++) {
+            properties.put("eigenvector_" + i, X.get(Integer.parseInt(id), i));
         }
 
         try (Session session = driver.session()) {
@@ -235,6 +218,7 @@ public class Neo4jGraphHandler {
             });
         }
     }
+
     
     /**
      * Creates relationships in Neo4j for the transformed graph after Laplacian Eigen Transform.
@@ -301,6 +285,17 @@ public class Neo4jGraphHandler {
 
         return properties;
     }
+    
+    private static Map<String, Object> extractPropertiesFromRelationship(Relationship relationship) {
+        Map<String, Object> properties = new HashMap<>();
+
+        for (String key : relationship.keys()) {
+            Value value = relationship.get(key);
+            properties.put(key, convertToJavaType(value));
+        }
+
+        return properties;
+    }
 
     private static Object convertToJavaType(Value value) {
         if (value.type().name().equals("String")) {
@@ -316,14 +311,4 @@ public class Neo4jGraphHandler {
         }
     }
 
-    private static Map<String, Object> extractPropertiesFromRelationship(Relationship relationship) {
-        Map<String, Object> properties = new HashMap<>();
-
-        for (String key : relationship.keys()) {
-            Value value = relationship.get(key);
-            properties.put(key, convertToJavaType(value));
-        }
-
-        return properties;
-    }
 }
