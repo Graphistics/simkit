@@ -13,15 +13,44 @@ for package in required_packages:
 from neo4j import GraphDatabase
 import pandas as pd
 import psutil
+import threading
 import time
+from tqdm import tqdm
 
 # Neo4j connection details
-NEO4J_URI = "bolt://localhost:7688"
+NEO4J_URI = "bolt://localhost:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = "123412345"
 
 # Initialize Neo4j driver
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+
+def ensure_indexes(driver, datasets):
+    """Ensures indexes exist for each dataset automatically."""
+    try:
+        with driver.session() as session:
+            # Fetch existing indexes
+            existing_indexes = session.run("SHOW INDEXES")
+            existing_index_names = {record["name"] for record in existing_indexes}
+
+            for dataset, params in datasets.items():
+                node_label = params.get("label") or params.get("node_label")  # Handles both feature & graph datasets
+                
+                # Define index names
+                index_id_name = f"{node_label}_id_index"
+                index_label_name = f"{node_label}_label_index"
+
+                # Check if each index exists
+                if index_id_name not in existing_index_names:
+                    session.run(f"CREATE INDEX {index_id_name} FOR (n:{node_label}) ON (n.id);")
+                
+                if index_label_name not in existing_index_names:
+                    session.run(f"CREATE INDEX {index_label_name} FOR (n:{node_label}) ON (n.label);")
+
+        print("✅ Indexes ensured for all datasets.")
+    except Exception as e:
+        print(f"⚠️ Error creating indexes: {e}")
+
 
 def delete_all_nodes(driver, batch_size=1000):
     """Delete all nodes and relationships in the Neo4j database in batches."""
@@ -105,8 +134,6 @@ def create_edges(data, driver, node_label, edge_label):
                 session.run(query, {"source_id": source_id, "target_id": target_id})
     except Exception as e:
         print("Error during edge creation:", e)
-    finally:
-        driver.close()
 
 def run_query(driver, query, parameters):
     """Run a query and measure performance metrics."""
@@ -130,10 +157,43 @@ def run_query(driver, query, parameters):
 
     return data, duration, memory_used, cpu_used
 
+def monitor_progress():
+    """ Continuously fetch progress updates while the main query runs """
+    local_driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))  # ❌ Creates a new driver instance
+    while True:
+        with local_driver.session() as session:
+            query = "MATCH (p:Progress {id: 'current'}) RETURN p.step ORDER BY p.timestamp DESC LIMIT 1"
+            result = session.run(query)
+            record = result.single()
+            data = record.data() if record else None
+            result = data
+        if result:
+            try:
+                print(f"🔄 Current Step: {result['p.step']}", flush=True)
+            except Exception as e:
+                print(f"Error: {e}, Result: {result}")
+        time.sleep(2)  # Adjust polling interval as needed
+
+# Start the monitoring thread
+monitor_thread = threading.Thread(target=monitor_progress, daemon=True)
+monitor_thread.start()
+
 def run_experiments(driver, experiments):
     """Run experiments and measure performance metrics."""
+    # Initialize SimKit inside Neo4j
+    print("Init")
+    try:
+        with driver.session() as session:
+            session.run("""
+            RETURN simkit.initSimKit('bolt://localhost:7687', 'neo4j', '123412345')
+            """)
+    except Exception as e:
+        print(f"Error initializing SimKit: {e}")
+        return  # Exit if initialization fails
+    print("Init Done")
     results = []
     total_experiments = len(experiments)
+
     for idx, config in enumerate(experiments, 1):
         query = """
         WITH simkit.experimental_spectralClustering({
@@ -159,9 +219,10 @@ def run_experiments(driver, experiments):
                result.clustering_time AS clustering_time,
                result.adjusted_rand_index_time AS adjusted_rand_index_time
         """
-        
+
         data, duration, memory_used, cpu_used = run_query(driver, query, config)
-        
+
+
         silhouette_score = data['silhouette_score'] if data else None
         rand_index = data['rand_index'] if data else None
         total_time = data['total_time'] if data else None
@@ -185,7 +246,6 @@ def run_experiments(driver, experiments):
 
         print(f"Completed experiment {idx}/{total_experiments} with config: {config}")
 
-    driver.close()
     return results
 
 def save_results(results, dataset):
@@ -201,8 +261,13 @@ def save_results(results, dataset):
     print(f"Results saved to {dataset}_results.csv")
 
 def run_feature_experiment(dataset, label, remove_columns, number_of_eigenvectors, target_column):
+    """Runs feature-based experiments and ensures indexes exist."""
     delete_all_nodes(driver)
     delete_all_indexes(driver)
+
+    # Ensure indexes before inserting data
+    ensure_indexes(driver, {dataset: {"label": label}})
+
     file_path = os.path.join("datasets", f"{dataset}.csv")
     data = pd.read_csv(file_path)
     create_feature_nodes(data, driver, label)
@@ -216,8 +281,8 @@ def run_feature_experiment(dataset, label, remove_columns, number_of_eigenvector
                   "madelon": {"full": "45", "eps": "4.669", "knn": "419", "mknn": "117"},
                   "20newsgroups": {"full": "35", "eps": "1946.74", "knn": "512", "mknn": "26"}}
 
-    for graph_type in graph_types:
-        for laplacian_type in laplacian_types:
+    for graph_type in tqdm(graph_types, desc="Processing graph types"):
+        for laplacian_type in tqdm(laplacian_types, desc=f"Processing Laplacian for {graph_type}", leave=False):
             experiments.append({
                 "node_label": label,
                 "is_feature_based": True,
@@ -230,13 +295,19 @@ def run_feature_experiment(dataset, label, remove_columns, number_of_eigenvector
                 "use_kmean_for_silhouette": False
             })
 
-    results = run_experiments(driver, experiments)
+    results = run_experiments(driver, tqdm(experiments, desc="Running feature experiments"))
     save_results(results, dataset)
     print(f"Feature experiment completed for {dataset}")
 
+
 def run_graph_experiment(dataset, node_label, edge_label, remove_columns, number_of_eigenvectors, target_column):
+    """Runs graph-based experiments and ensures indexes exist."""
     delete_all_nodes(driver)
     delete_all_indexes(driver)
+
+    # Ensure indexes before inserting data
+    ensure_indexes(driver, {dataset: {"node_label": node_label}})
+
     node_file_path = os.path.join("datasets", f"{dataset}_nodes.csv")
     edge_file_path = os.path.join("datasets", f"{dataset}_edges.csv")
     create_graph_nodes(node_file_path, driver, node_label)
@@ -247,12 +318,12 @@ def run_graph_experiment(dataset, node_label, edge_label, remove_columns, number
     experiments = []
     laplacian_types = ["sym", "rw", "ad"]
 
-    for laplacian_type in laplacian_types:
+    for laplacian_type in tqdm(laplacian_types, desc="Processing Laplacian types"):
         experiments.append({
             "node_label": node_label,
             "is_feature_based": False,
-            "graph_type": "full", # Ignored for graph-based datasets
-            "parameter": "3", # Ignored for graph-based datasets
+            "graph_type": "full",  # Ignored for graph-based datasets
+            "parameter": "3",  # Ignored for graph-based datasets
             "remove_columns": remove_columns,
             "laplacian_type": laplacian_type,
             "number_of_eigenvectors": number_of_eigenvectors,
@@ -260,9 +331,10 @@ def run_graph_experiment(dataset, node_label, edge_label, remove_columns, number
             "use_kmean_for_silhouette": True
         })
 
-    results = run_experiments(driver, experiments)
+    results = run_experiments(driver, tqdm(experiments, desc="Running graph experiments"))
     save_results(results, dataset)
     print(f"Graph experiment completed for {dataset}")
+
 
 # List of datasets and their corresponding labels and parameters
 feature_datasets = {

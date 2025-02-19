@@ -20,6 +20,11 @@ import org.ojalgo.scalar.ComplexNumber;
 
 import definition.EdgeList2;
 import definition.NodeList2;
+import org.ejml.simple.SimpleMatrix;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Utility class for eigenvalue and eigenvector calculations related to graph Laplacians.
@@ -336,32 +341,41 @@ public class EigenCalculation {
     }
     
     public static ArrayList<EdgeList2> createEdgeList(List<NodeList2> node_properties_list, SimpleMatrix X, ArrayList<EdgeList2> original_edge_list) {
-        ArrayList<EdgeList2> edge_list = new ArrayList<>();
-
         int num_rows = X.getNumRows();
-        // Compute the pairwise Euclidean distance matrix
+        ArrayList<EdgeList2> edge_list = new ArrayList<>(num_rows * (num_rows - 1) / 2);  // Preallocate estimated capacity
+
+        // ✅ Compute Euclidean distance matrix in parallel
         Double[][] distance_matrix = euclideanDistance(X);
 
-        // Iterate over all pairs of nodes
-        for (int i = 0; i < num_rows; i++) {
-            for (int j = i + 1; j < num_rows; j++) {
-                double distance = distance_matrix[i][j];
-
-                float source_id = node_properties_list.get(i).getIndex();
-                float target_id = node_properties_list.get(j).getIndex();
-
-                // Check if there is an original edge between the nodes
-                boolean has_original_edge = original_edge_list.stream()
-                        .anyMatch(edge -> (edge.getSource() == source_id && edge.getTarget() == target_id)
-                                || (edge.getSource() == target_id && edge.getTarget() == source_id));
-
-                if (has_original_edge) {
-                    // Add the edge to the list with the computed distance
-                    edge_list.add(new EdgeList2(source_id, target_id, distance, i, null));
-                }
-            }
+        // ✅ Convert `original_edge_list` to a **HashSet** for O(1) lookups
+        Set<Long> edgeSet = new HashSet<>();
+        for (EdgeList2 edge : original_edge_list) {
+            long key1 = ((long) edge.getSource() << 32) | Float.floatToIntBits(edge.getTarget());
+            long key2 = ((long) edge.getTarget() << 32) | Float.floatToIntBits(edge.getSource());
+            edgeSet.add(key1);
+            edgeSet.add(key2);
         }
 
+        // ✅ Use parallel stream for faster processing
+        List<EdgeList2> edges = IntStream.range(0, num_rows)
+            .parallel()
+            .boxed()
+            .flatMap(i -> IntStream.range(i + 1, num_rows)
+                .mapToObj(j -> {
+                    double distance = distance_matrix[i][j];
+                    float source_id = node_properties_list.get(i).getIndex();
+                    float target_id = node_properties_list.get(j).getIndex();
+
+                    long key = ((long) source_id << 32) | Float.floatToIntBits(target_id);
+                    if (edgeSet.contains(key)) {
+                        return new EdgeList2(source_id, target_id, distance, i, null);
+                    }
+                    return null;
+                }))
+            .filter(Objects::nonNull) // Remove null entries
+            .collect(Collectors.toList());
+
+        edge_list.addAll(edges);
         return edge_list;
     }
 

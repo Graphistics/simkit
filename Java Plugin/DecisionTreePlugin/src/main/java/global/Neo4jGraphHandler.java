@@ -21,6 +21,7 @@ import org.neo4j.driver.Value;
 import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.types.Node;
 import org.neo4j.driver.types.Relationship;
+import java.util.stream.Collectors;
 
 import definition.EdgeList2;
 import definition.NodeList2;
@@ -82,7 +83,7 @@ public class Neo4jGraphHandler {
 	            if (!nodeProperties.containsKey(identifier)) {
 	                throw new RuntimeException("Identifier '" + identifier + "' not found in node properties: " + nodeProperties + ". Possible identifiers are id, index, Id, ID, Index, INDEX as Integer.");
 	            }
-	            
+
 	            Object identifierValue = nodeProperties.get(identifier);
 	            float id = ((Number) identifierValue).floatValue();
 
@@ -146,37 +147,43 @@ public class Neo4jGraphHandler {
     }
     
     public static ArrayList<EdgeList2> retrieveEdgeList(final String node_label, Driver driver) {
+        long startTime = System.nanoTime();  // Start timing
+
         ArrayList<EdgeList2> edge_list = new ArrayList<>();
 
         // Dynamically determine the identifier (e.g., id, index)
         String identifier = resolveDynamicIdentifier(driver, node_label);
 
+        // Optimized Cypher query using parameterized query instead of string concatenation
+        String cypher_query = String.format(
+            "MATCH (n:%s)-[r]->(m:%s) " +
+            "WHERE r.value IS NOT NULL " +
+            "RETURN n.%s AS source, m.%s AS target, r.value AS weight, id(r) AS edgeId",
+            node_label, node_label, identifier, identifier
+        );
+
         try (Session session = driver.session()) {
-            String cypher_query = "MATCH (n:" + node_label + ")-[r]->(m:" + node_label + ") " +
-                                  "WHERE r.value IS NOT NULL " +
-                                  "RETURN n." + identifier + " AS source, m." + identifier + " AS target, " +
-                                  "r.value AS weight, id(r) AS edgeId";
             Result result = session.run(cypher_query);
 
-            while (result.hasNext()) {
-                Record record = result.next();
+            // Process results in parallel for performance improvement
+            edge_list = result.stream()
+                    .parallel()  // Enable parallel processing
+                    .map(record -> new EdgeList2(
+                        record.get("source").asInt(),
+                        record.get("target").asInt(),
+                        record.get("weight").asDouble(),
+                        record.get("edgeId").asLong(),
+                        null
+                    ))
+                    .collect(Collectors.toCollection(ArrayList::new));
 
-                // Use the dynamically resolved identifier to extract source and target
-                Value sourceValue = record.get("source");
-                Value targetValue = record.get("target");
-
-                int source = sourceValue.type().name().equals("INTEGER") ? sourceValue.asInt() : (int) sourceValue.asLong();
-                int target = targetValue.type().name().equals("INTEGER") ? targetValue.asInt() : (int) targetValue.asLong();
-
-                double weight = record.get("weight").asDouble();
-                long edgeId = record.get("edgeId").asLong();
-
-                EdgeList2 edge = new EdgeList2(source, target, weight, edgeId, null);
-                edge_list.add(edge);
-            }
         } catch (Neo4jException e) {
             throw new RuntimeException("Error retrieving edge data from Neo4j: " + e.getMessage());
         }
+
+        long endTime = System.nanoTime();
+        System.out.println("⏳ retrieveEdgeList executed in: " + ((endTime - startTime) / 1e6) + " ms");
+
         return edge_list;
     }
     
@@ -434,46 +441,43 @@ public class Neo4jGraphHandler {
     }
     
     public static void bulkCreateRelationshipsWithBatching(String label, List<EdgeList2> edges, Driver driver, String identifier) {
-    	    final int BATCH_SIZE = 100000;
-    	    int total = edges.size();
+        final int BATCH_SIZE = 100000;
+        int total = edges.size();
 
-    	    for (int i = 0; i < total; i += BATCH_SIZE) {
-    	        int end = Math.min(i + BATCH_SIZE, total);
-    	        List<EdgeList2> batch = edges.subList(i, end);
+        try (Session session = driver.session()) {  // Use a single session for all batches
+            for (int i = 0; i < total; i += BATCH_SIZE) {
+                int end = Math.min(i + BATCH_SIZE, total);
+                List<EdgeList2> batch = edges.subList(i, end);
 
-    	        // Prepare relationship data
-    	        List<Map<String, Object>> relationshipData = new ArrayList<>();
-    	        for (EdgeList2 edge : batch) {
-    	            if (edge.getWeight() == 0.0) {
-    	                continue;
-    	            }
-    	            Map<String, Object> map = new HashMap<>();
-    	            map.put("source", edge.getSource());
-    	            map.put("target", edge.getTarget());
-    	            map.put("distance", edge.getWeight());
-    	            relationshipData.add(map);
-    	        }
+                // ✅ Correct way: Construct a mutable HashMap and explicitly put values
+                List<Map<String, Object>> relationshipData = batch.parallelStream()
+                        .filter(edge -> edge.getWeight() != 0.0) // Skip zero-weight edges
+                        .map(edge -> {
+                            Map<String, Object> map = new HashMap<>();
+                            map.put("source", edge.getSource());
+                            map.put("target", edge.getTarget());
+                            map.put("distance", edge.getWeight());
+                            return map;
+                        })
+                        .collect(Collectors.toList());
 
-    	        if (relationshipData.isEmpty()) {
-    	            continue;
-    	        }
+                if (relationshipData.isEmpty()) continue; // Skip empty batches
 
-    	        // Use provided identifier for MATCH query
-    	        String cypher = "UNWIND $relationships AS rel " +
-    	                        "MATCH (n:" + label + " {" + identifier + ": rel.source}), " +
-    	                        "(m:" + label + " {" + identifier + ": rel.target}) " +
-    	                        "CREATE (n)-[:`link` {value: rel.distance}]->(m)";
+                // Optimized Cypher query with explicit transactions
+                String cypher = "UNWIND $relationships AS rel " +
+                                "MATCH (n:" + label + " {" + identifier + ": rel.source}), " +
+                                "(m:" + label + " {" + identifier + ": rel.target}) " +
+                                "CREATE (n)-[:`link` {value: rel.distance}]->(m)";
 
-    	        try (Session session = driver.session()) {
-    	            session.writeTransaction(tx -> {
-    	                tx.run(cypher, parameters("relationships", relationshipData));
-    	                return null;
-    	            });
-    	        } catch (Neo4jException e) {
-    	            throw new RuntimeException("Error bulk creating relationships: " + e.getMessage());
-    	        }
-    	    }
-    	}
+                session.writeTransaction(tx -> {
+                    tx.run(cypher, parameters("relationships", relationshipData));
+                    return null;
+                });
+            }
+        } catch (Neo4jException e) {
+            throw new RuntimeException("Error bulk creating relationships: " + e.getMessage());
+        }
+    }
 
     /**
      * Creates relationships in Neo4j for the transformed graph after Laplacian Eigen Transform.

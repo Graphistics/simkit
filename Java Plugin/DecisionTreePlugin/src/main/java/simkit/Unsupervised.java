@@ -22,7 +22,12 @@ import java.util.ArrayList;
 import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONObject;
-
+import java.util.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.DoubleAdder;
 
 import scala.util.Random;
 
@@ -458,44 +463,47 @@ private static String extractID(String node) {
 	 * @return returns new centroids after each iteration
 	 */
 	public static String calculateNewCentroid(ArrayList<String> listOfNodesInCluster) {
-	    if (listOfNodesInCluster.isEmpty()) {
-	        return null; // Handle empty cluster case
-	    }
+        if (listOfNodesInCluster.isEmpty()) {
+            return null; // Handle empty cluster case
+        }
 
-	    // Extract attribute names from the first node
-	    String[] firstNodeAttributes = listOfNodesInCluster.get(0).split(",");
-	    String[] attributeNames = new String[firstNodeAttributes.length];
-	    for (int i = 0; i < firstNodeAttributes.length; i++) {
-	        attributeNames[i] = firstNodeAttributes[i].split(":")[0].trim();
-	    }
+        // Extract attribute names once (avoiding redundant operations)
+        String[] firstNodeAttributes = listOfNodesInCluster.get(0).split(",");
+        int numAttributes = firstNodeAttributes.length;
+        String[] attributeNames = new String[numAttributes];
 
-	    double[] attributeSums = new double[attributeNames.length];
+        for (int i = 0; i < numAttributes; i++) {
+            attributeNames[i] = firstNodeAttributes[i].split(":")[0].trim();
+        }
 
-	    for (String node : listOfNodesInCluster) {
-	        String[] attributes = node.split(",");
-	        for (int i = 0; i < attributes.length; i++) {
-	            try {
-	                attributeSums[i] += Double.parseDouble(attributes[i].split(":")[1].trim());
-	            } catch (NumberFormatException e) {
-	                System.err.println("Error parsing number: " + attributes[i]);
-	                return null; // or handle the error appropriately
-	            }
-	        }
-	    }
+        // ✅ Use a parallel stream to compute the sum efficiently
+        double[] attributeSums = new double[numAttributes];
 
-	    StringBuilder newCentroid = new StringBuilder();
-	    for (int i = 0; i < attributeSums.length; i++) {
-	        double average = attributeSums[i] / listOfNodesInCluster.size();
-	        newCentroid.append(attributeNames[i]).append(":").append(average);
-	        if (i < attributeSums.length - 1) {
-	            newCentroid.append(",");
-	        }
-	    }
-		// Log the new centroid
-    	System.out.println("New centroid: " + newCentroid.toString());
+        listOfNodesInCluster.parallelStream()
+            .map(node -> Arrays.stream(node.split(","))
+                .map(attr -> attr.split(":")[1].trim())
+                .mapToDouble(Double::parseDouble)
+                .toArray())
+            .forEach(values -> {
+                synchronized (attributeSums) { // Ensuring thread safety
+                    for (int i = 0; i < numAttributes; i++) {
+                        attributeSums[i] += values[i];
+                    }
+                }
+            });
 
-	    return newCentroid.toString();
-	}
+        // ✅ Compute averages and construct centroid string using StringJoiner (faster than StringBuilder)
+        int totalNodes = listOfNodesInCluster.size();
+        StringJoiner newCentroid = new StringJoiner(",");
+
+        for (int i = 0; i < numAttributes; i++) {
+            newCentroid.add(attributeNames[i] + ":" + (attributeSums[i] / totalNodes));
+        }
+
+        String centroidResult = newCentroid.toString();
+        System.out.println("New centroid: " + centroidResult);
+        return centroidResult;
+    }
 	
 	/**
 	 * Method to calculate and update centroids in the clusterAssign.
@@ -503,69 +511,80 @@ private static String extractID(String node) {
 	 * @param clusterAssign The current cluster assignments
 	 * @return Updated cluster assignments with new centroids
 	 */
-	private static HashMap<String, ArrayList<String>> calculateAndUpdateCentroids(HashMap<String, ArrayList<String>> clusterAssign) {
-	    HashMap<String, ArrayList<String>> updatedClusterAssign = new HashMap<>();
+        public static HashMap<String, ArrayList<String>> calculateAndUpdateCentroids(HashMap<String, ArrayList<String>> clusterAssign) {
+        // ✅ Use ConcurrentHashMap for thread-safe parallel computation
+        ConcurrentHashMap<String, ArrayList<String>> updatedClusterAssign = new ConcurrentHashMap<>();
 
-	    for (String key : clusterAssign.keySet()) {
-	        ArrayList<String> clusterNodes = clusterAssign.get(key);
-	        String newCentroid = calculateNewCentroid(clusterNodes);
-	        if (newCentroid != null) { // Check for null to handle empty clusters
-	            updatedClusterAssign.put(newCentroid, clusterNodes);
-	        }
-	    }
-	    return updatedClusterAssign;
-	}
+        // ✅ Process clusters in parallel
+        clusterAssign.entrySet().parallelStream().forEach(entry -> {
+            String oldCentroid = entry.getKey();
+            ArrayList<String> clusterNodes = entry.getValue();
+
+            String newCentroid = calculateNewCentroid(clusterNodes);
+            if (newCentroid != null) { // Handle empty clusters
+                updatedClusterAssign.put(newCentroid, clusterNodes);
+            }
+        });
+
+        return new HashMap<>(updatedClusterAssign);  // Convert back to HashMap before returning
+    }
 	
-	public static HashMap<String, ArrayList<String>> distanceAssign (ArrayList<String> listOfCentroid, ArrayList<String> listOfRemain, String distanceMeasure) {
-	    HashMap<String, ArrayList<String>> hashClusterAssign = new HashMap<String, ArrayList<String>>();
-	    // Calculate distance and assign points to clusters
-	    for (int i = 0; i < listOfRemain.size(); i++) {
-	        double minDistance = Double.MAX_VALUE;
-	        String closestCentroid = null;
+	public static HashMap<String, ArrayList<String>> distanceAssign(
+            ArrayList<String> listOfCentroid, ArrayList<String> listOfRemain, String distanceMeasure) {
 
-	        for (int j = 0; j < listOfCentroid.size(); j++) {
-	            double distance = calculateDistance(removeIndexAndIdEntries(listOfRemain.get(i)), removeIndexAndIdEntries(listOfCentroid.get(j)), distanceMeasure);
-	            if (distance < minDistance) {
-	                minDistance = distance;
-	                closestCentroid = listOfCentroid.get(j);
-	            }
-	        }
-	        hashClusterAssign.computeIfAbsent(closestCentroid, k -> new ArrayList<>()).add(listOfRemain.get(i));
-	    }
-	    // Ensure all centroids are in the hashmap, even if they have no assigned points
-	    for (String centroid : listOfCentroid) {
-	        hashClusterAssign.putIfAbsent(centroid, new ArrayList<>());
-	    }
+        HashMap<String, ArrayList<String>> hashClusterAssign = new HashMap<>();
 
-	    return hashClusterAssign;
-	}
+        // ✅ Precompute cleaned versions of centroid & remain data (avoids redundant function calls)
+        Map<String, String> cleanedRemain = new ConcurrentHashMap<>();
+        Map<String, String> cleanedCentroids = new ConcurrentHashMap<>();
 
-        public static String removeIndexAndIdEntries(String centroidString) {
-        // Split the string by commas to get individual key-value pairs
-        String[] entries = centroidString.split(",");
+        listOfRemain.parallelStream().forEach(remain ->
+            cleanedRemain.put(remain, removeIndexAndIdEntries(remain))
+        );
 
-        // Use a StringBuilder to collect entries that don't contain "index" or "id"
-        StringBuilder result = new StringBuilder();
+        listOfCentroid.parallelStream().forEach(centroid ->
+            cleanedCentroids.put(centroid, removeIndexAndIdEntries(centroid))
+        );
 
-        for (String entry : entries) {
-            // Check if the entry contains a key-value pair
-            if (entry.contains(":")) {
-                String[] keyValue = entry.split(":");
-                if (keyValue.length > 1) {
-                    String key = keyValue[0].trim();
-                    key.toLowerCase();
-                    // Only append the entry if it doesn't contain "index" or "id"
-                    if (!key.equalsIgnoreCase("index") && !key.equalsIgnoreCase("id") && !key.equalsIgnoreCase(" index") && !key.equalsIgnoreCase(" id")) {
-                        if (result.length() > 0) {
-                            result.append(", ");
-                        }
-                        result.append(entry);
-                    }
+        // ✅ Parallel Processing for Assigning Points
+        listOfRemain.parallelStream().forEach(remain -> {
+            double minDistance = Double.MAX_VALUE;
+            String closestCentroid = null;
+            String cleanedRemainEntry = cleanedRemain.get(remain);
+
+            for (String centroid : listOfCentroid) {
+                double distance = calculateDistance(cleanedRemainEntry, cleanedCentroids.get(centroid), distanceMeasure);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestCentroid = centroid;
                 }
             }
+
+            synchronized (hashClusterAssign) {
+                hashClusterAssign.computeIfAbsent(closestCentroid, k -> new ArrayList<>()).add(remain);
+            }
+        });
+
+        // ✅ Ensure all centroids are in the hashmap (avoiding redundant lookups)
+        listOfCentroid.forEach(centroid -> hashClusterAssign.putIfAbsent(centroid, new ArrayList<>()));
+
+        return hashClusterAssign;
+    }
+
+            public static String removeIndexAndIdEntries(String centroidString) {
+        if (centroidString == null || centroidString.isEmpty()) {
+            return ""; // Handle empty or null input safely
         }
 
-        return result.toString();
+        // ✅ Use Stream API for efficient filtering & joining
+        return Arrays.stream(centroidString.split(","))
+                .map(String::trim) // Trim whitespace
+                .filter(entry -> entry.contains(":")) // Ensure valid key-value pair
+                .filter(entry -> {
+                    String key = entry.split(":")[0].trim().toLowerCase(); // Extract key & normalize case
+                    return !(key.equals("index") || key.equals("id")); // Exclude "index" and "id"
+                })
+                .collect(Collectors.joining(", "));
     }
 
 
@@ -741,22 +760,30 @@ private static String extractID(String node) {
 	}
 	
 	//Calculate the SilhouetteCoefficient : Calculate the mean of the Silhouette Coefficients for all point
-	public static double averageSilhouetteCoefficient(HashMap<String, ArrayList<String>> allCluster, String distanceMeasure) {
-	    double sumSilhouette = 0.0;
-	    int numPoints = 0;
+    public static double averageSilhouetteCoefficient(HashMap<String, ArrayList<String>> allCluster, String distanceMeasure) {
+        if (allCluster.isEmpty()) {
+            return 0.0; // Handle edge case
+        }
 
-	    for (String key : allCluster.keySet())
-	    {
-	    	ArrayList<String> cluster = allCluster.get(key);
-	    	for (String point : cluster)
-	    	{
-	    		sumSilhouette += silhouetteCoefficient(point, cluster, allCluster, distanceMeasure);
-	    		numPoints++;
-	    	}
-	    }
-	    System.out.println("Sum " + sumSilhouette);
-	    return sumSilhouette / numPoints;
-	}
+        // ✅ Use Atomic Types for Thread-Safe Accumulation
+        DoubleAdder sumSilhouette = new DoubleAdder();
+        AtomicInteger numPoints = new AtomicInteger();
+
+        // ✅ Parallel Stream for Faster Processing
+        allCluster.entrySet().parallelStream().forEach(entry -> {
+            String key = entry.getKey();
+            ArrayList<String> cluster = entry.getValue();
+
+            cluster.parallelStream().forEach(point -> {
+                sumSilhouette.add(silhouetteCoefficient(point, cluster, allCluster, distanceMeasure));
+                numPoints.incrementAndGet();
+            });
+        });
+
+        System.out.println("Sum " + sumSilhouette.sum());
+
+        return numPoints.get() == 0 ? 0.0 : sumSilhouette.sum() / numPoints.get();
+    }
 	    // Function to remove "index" and "id" attributes from centroid keys and cluster points
     public static HashMap<String, ArrayList<String>> removeIndexAndId(HashMap<String, ArrayList<String>> kmeanAssign) {
         HashMap<String, ArrayList<String>> cleanedKmeanAssign = new HashMap<>();
