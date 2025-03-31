@@ -329,8 +329,16 @@ def run_sklearn_experiment_feature(config, file_path):
 def run_sklearn_experiment_graph(config, node_file_path, edge_file_path):
     """Run scikit-learn spectral clustering on graph-based data."""
     nodes_df = pd.read_csv(node_file_path)
-    features = nodes_df.drop(columns=[col.strip() for col in config["remove_columns"].split(',')], errors='ignore')
     true_labels = nodes_df[config["target_column"]].values
+
+    # Drop the non-numeric columns as specified
+    features = nodes_df.drop(columns=[col.strip() for col in config["remove_columns"].split(',')], errors='ignore')
+
+    # If a 'features' column exists, convert it from its string representation to a numeric array
+    if "features" in features.columns:
+        features = np.array(features["features"].apply(lambda x: eval(x) if isinstance(x, str) else x).tolist())
+    else:
+        features = features.values.astype(float)
 
     process = psutil.Process(os.getpid())
     start_time = time.time()
