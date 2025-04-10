@@ -97,20 +97,6 @@ SimKit contains ... procedures, which read CSV files, map nodes, generate ... si
 
 ---> visualize and save matrix (adjacency/X matrix) as CSV 
 
-## Data [(check wiki)](https://github.com/Graphistics/simkit/wiki)
-
-* [Dataset 1 - Iris ](https://www.kaggle.com/datasets/uciml/iris)
-
---> [K-means clustering on iris dataset](https://www.kaggle.com/code/khotijahs1/k-means-clustering-of-iris-dataset) \
---> [Spectral clustering on iris dataset](https://evoq-eval.siam.org/Portals/0/Publications/SIURO/Vol4/SPECTRAL_CLUSTERING_AND_VISUALIZATION.pdf?ver=2018-04-06-103239-570)
-
-* [Dataset 2 - Madelon]
-
-* [Dataset 3 - CORA]
- 
-* [Dataset 4 - 20newsgroups]
-
-
 ## Changelog
 - Renamed main. to simkit.
 - added initSimkit as initialisation function to remove hardcoded login creds
