@@ -20,6 +20,18 @@ for package in required_packages:
 
 from neo4j import GraphDatabase
 
+def get_neo4j_usage():
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            cmdline = ' '.join(proc.info.get('cmdline') or [])
+            if ('neo4j' in cmdline.lower()) or ('org.neo4j' in cmdline.lower()):
+                cpu = proc.cpu_percent(interval=1)
+                mem = proc.memory_info().rss / (1024 * 1024)  # in MB
+                return cpu, mem
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+    return None, None
+
 # For scikit-learn experiments
 from sklearn.metrics import silhouette_score, adjusted_rand_score
 from sklearn.cluster import KMeans
@@ -38,14 +50,14 @@ def spectral_clustering(dataframe, similarity_graph, laplacian, number_of_cluste
     dimension = dataframe.shape[0]
     dist_mat = squareform(pdist(dataframe))
     sample_size = len(dist_mat)
-    
+
     # Set n based on proportional selection, but limit by log scaling for large datasets
     n = min(sample_size // 10, int(math.log(sample_size)))
-    
+
     # Fallback values for epsilon and k
     epsilon = eps if eps else np.percentile(dist_mat, 90)
     k = k if k else int(np.sqrt(sample_size))
-    
+
     if similarity_graph == "full":
         # calculate local sigma
         sigmas = np.zeros(dimension)
@@ -116,7 +128,7 @@ def spectral_clustering(dataframe, similarity_graph, laplacian, number_of_cluste
         idx = np.argsort(np.real(e))
         e = np.real(e[idx])
         v = np.real(v[:, idx])
-    
+
     # Calculate eigengap
     eigengap = np.diff(e)
     optimal_number_of_clusters = np.argmax(eigengap[:10]) + 1
@@ -255,7 +267,8 @@ def run_query(driver, query, parameters):
     duration = end_time - start_time
     cpu_used = (end_cpu_times.user + end_cpu_times.system) - (start_cpu_times.user + start_cpu_times.system)
     memory_used = (end_mem - start_mem) / (1024 ** 2)
-    return data, duration, memory_used, cpu_used
+    neo4j_cpu, neo4j_mem = get_neo4j_usage()
+    return data, duration, memory_used, cpu_used, neo4j_mem, neo4j_cpu
 
 def monitor_progress():
     """Continuously fetch progress updates while the main query runs."""
@@ -300,16 +313,32 @@ def run_sklearn_experiment_feature(config, file_path):
         eps_val = None
         k_val = None
 
-    # Call the custom spectral clustering function
+    # Time affinity computation
+    affinity_start = time.time()
+    dist_mat = squareform(pdist(features))
+    affinity_end = time.time()
+    affinity_time = affinity_end - affinity_start
+
+    # Time Laplacian construction and clustering
+    laplacian_start = time.time()
     clustering_result = spectral_clustering(features, config["graph_type"], config["laplacian_type"],
                                             config["number_of_eigenvectors"], eps=eps_val, k=k_val)
+    laplacian_end = time.time()
+    laplacian_time = laplacian_end - laplacian_start
+
     current_k, cluster_labels, sil_score = clustering_result[0]
 
-    clustering_time = time.time() - start_time
+    clustering_end = time.time()
+    clustering_time = clustering_end - laplacian_end
+
+    # Time ARI
+    ari_start = time.time()
+    skl_rand_index = adjusted_rand_score(true_labels, cluster_labels)
+    ari_end = time.time()
+    ari_time = ari_end - ari_start
 
     skl_silhouette = sil_score
-    skl_rand_index = adjusted_rand_score(true_labels, cluster_labels)
-    total_time = clustering_time
+    total_time = ari_end - start_time
     end_cpu = process.cpu_times()
     cpu_used = (end_cpu.user + end_cpu.system) - (start_cpu.user + start_cpu.system)
     end_mem = process.memory_info().rss
@@ -318,10 +347,10 @@ def run_sklearn_experiment_feature(config, file_path):
         "sklearn_silhouette_score": skl_silhouette,
         "sklearn_rand_index": skl_rand_index,
         "sklearn_total_time": total_time,
-        "sklearn_affinity_time": 0,
-        "sklearn_laplacian_time": 0,
+        "sklearn_affinity_time": affinity_time,
+        "sklearn_laplacian_time": laplacian_time,
         "sklearn_clustering_time": clustering_time,
-        "sklearn_adjusted_rand_index_time": 0,
+        "sklearn_adjusted_rand_index_time": ari_time,
         "sklearn_memory_used": memory_used,
         "sklearn_cpu_used": cpu_used
     }
@@ -348,15 +377,33 @@ def run_sklearn_experiment_graph(config, node_file_path, edge_file_path):
     # For graph experiments, we assume 'full' type (eps/k not needed)
     eps_val = None
     k_val = None
+
+    # Time affinity computation
+    affinity_start = time.time()
+    dist_mat = squareform(pdist(features))
+    affinity_end = time.time()
+    affinity_time = affinity_end - affinity_start
+
+    # Time Laplacian construction and clustering
+    laplacian_start = time.time()
     clustering_result = spectral_clustering(features, config["graph_type"], config["laplacian_type"],
                                             config["number_of_eigenvectors"], eps=eps_val, k=k_val)
+    laplacian_end = time.time()
+    laplacian_time = laplacian_end - laplacian_start
+
     current_k, cluster_labels, sil_score = clustering_result[0]
 
-    clustering_time = time.time() - start_time
+    clustering_end = time.time()
+    clustering_time = clustering_end - laplacian_end
+
+    # Time ARI
+    ari_start = time.time()
+    skl_rand_index = adjusted_rand_score(true_labels, cluster_labels)
+    ari_end = time.time()
+    ari_time = ari_end - ari_start
 
     skl_silhouette = sil_score
-    skl_rand_index = adjusted_rand_score(true_labels, cluster_labels)
-    total_time = clustering_time
+    total_time = ari_end - start_time
     end_cpu = process.cpu_times()
     cpu_used = (end_cpu.user + end_cpu.system) - (start_cpu.user + start_cpu.system)
     end_mem = process.memory_info().rss
@@ -365,10 +412,10 @@ def run_sklearn_experiment_graph(config, node_file_path, edge_file_path):
         "sklearn_silhouette_score": skl_silhouette,
         "sklearn_rand_index": skl_rand_index,
         "sklearn_total_time": total_time,
-        "sklearn_affinity_time": 0,
-        "sklearn_laplacian_time": 0,
+        "sklearn_affinity_time": affinity_time,
+        "sklearn_laplacian_time": laplacian_time,
         "sklearn_clustering_time": clustering_time,
-        "sklearn_adjusted_rand_index_time": 0,
+        "sklearn_adjusted_rand_index_time": ari_time,
         "sklearn_memory_used": memory_used,
         "sklearn_cpu_used": cpu_used
     }
@@ -388,6 +435,7 @@ def run_experiments(driver, experiments):
     results = []
     total_experiments = len(experiments)
     for idx, config in enumerate(experiments, 1):
+        print(config)
         query = """
         WITH simkit.experimental_spectralClustering({
             node_label: $node_label,
@@ -398,7 +446,7 @@ def run_experiments(driver, experiments):
             remove_columns: $remove_columns,
             laplacian_type: $laplacian_type,
             number_of_eigenvectors: $number_of_eigenvectors,
-            number_of_iterations: "100",
+            number_of_iterations: 100,
             distance_measure_kmean: "euclidean",
             target_column: $target_column,
             use_kmean_for_silhouette: $use_kmean_for_silhouette,
@@ -412,7 +460,7 @@ def run_experiments(driver, experiments):
                result.clustering_time AS clustering_time,
                result.adjusted_rand_index_time AS adjusted_rand_index_time
         """
-        data, duration, memory_used, cpu_used = run_query(driver, query, config)
+        data, duration, memory_used, cpu_used, neo4j_mem, neo4j_cpu = run_query(driver, query, config)
         silhouette_score = data['silhouette_score'] if data else None
         rand_index = data['rand_index'] if data else None
         total_time = data['total_time'] if data else duration
@@ -429,7 +477,9 @@ def run_experiments(driver, experiments):
             "clustering_time": clustering_time,
             "adjusted_rand_index_time": adjusted_rand_index_time,
             "memory_used": memory_used,
-            "cpu_used": cpu_used
+            "cpu_used": cpu_used,
+            "neo4j_memory_used": neo4j_mem,
+            "neo4j_cpu_used": neo4j_cpu
         }
         
         if config.get("is_feature_based"):
@@ -517,12 +567,12 @@ def run_graph_experiment(dataset, node_label, edge_label, remove_columns, number
 # Define datasets and their parameters
 feature_datasets = {
     "iris": {"label": "IrisNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"},
-    "madelon": {"label": "MadelonNode", "remove_columns": "Index,target", "number_of_eigenvectors": 2, "target_column": "target"},
-    "20newsgroups": {"label": "NewsGroupNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"}
+    #"madelon": {"label": "MadelonNode", "remove_columns": "Index,target", "number_of_eigenvectors": 2, "target_column": "target"},
+    #"20newsgroups": {"label": "NewsGroupNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"}
 }
 graph_datasets = {
-    "cora": {"node_label": "CoraNode", "edge_label": "CoraEdge", "remove_columns": "id,label", "number_of_eigenvectors": 7, "target_column": "label"},
-    "pubmed": {"node_label": "PubMedNode", "edge_label": "PubMedEdge", "remove_columns": "id,label", "number_of_eigenvectors": 3, "target_column": "label"},
+    #"cora": {"node_label": "CoraNode", "edge_label": "CoraEdge", "remove_columns": "id,label", "number_of_eigenvectors": 7, "target_column": "label"},
+    #"pubmed": {"node_label": "PubMedNode", "edge_label": "PubMedEdge", "remove_columns": "id,label", "number_of_eigenvectors": 3, "target_column": "label"},
     "citeseer": {"node_label": "CiteSeerNode", "edge_label": "CiteSeerEdge", "remove_columns": "id,label", "number_of_eigenvectors": 6, "target_column": "label"}
 }
 
@@ -625,3 +675,5 @@ if __name__ == "__main__":
     plt.ylabel("Total Time (s)")
     plt.savefig("scalability_sklearn.pdf", bbox_inches="tight")
     plt.show()
+
+
