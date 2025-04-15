@@ -316,58 +316,88 @@ def run_python_experiment_feature(config, file_path):
         "python_cpu_used": cpu_used
     }
 
+
 def run_python_experiment_graph(config, node_file_path, edge_file_path):
-    # Run Python spectral clustering on graph-based data
+    # Load node data
     nodes_df = pd.read_csv(node_file_path)
     true_labels = nodes_df[config["target_column"]].values
     features = nodes_df.drop(columns=[col.strip() for col in config["remove_columns"].split(',')], errors='ignore')
+
     if "features" in features.columns:
         features = np.array(features["features"].apply(lambda x: eval(x) if isinstance(x, str) else x).tolist())
     else:
         features = features.values.astype(float)
+
+    # Load edge data and create adjacency matrix
+    edge_df = pd.read_csv(edge_file_path)
+    node_ids = nodes_df["id"].tolist()
+    id_to_index = {node_id: idx for idx, node_id in enumerate(node_ids)}
+    dim = len(node_ids)
+    adjacency_matrix = np.zeros((dim, dim))
+
+    for _, row in edge_df.iterrows():
+        src = id_to_index.get(row["source_id"])
+        tgt = id_to_index.get(row["target_id"])
+        if src is not None and tgt is not None:
+            adjacency_matrix[src, tgt] = 1
+            adjacency_matrix[tgt, src] = 1  # assuming undirected graph
 
     process = psutil.Process(os.getpid())
     start_time = time.time()
     start_cpu = process.cpu_times()
     start_mem = process.memory_info().rss
 
-    eps_val = None
-    k_val = None
-
-    affinity_start = time.time()
-    dist_mat = squareform(pdist(features))
-    affinity_end = time.time()
-    affinity_time = affinity_end - affinity_start
-
+    # Compute Laplacian
     laplacian_start = time.time()
-    clustering_result = spectral_clustering(features, config["graph_type"], config["laplacian_type"],
-                                            config["number_of_eigenvectors"], eps=eps_val, k=k_val)
+    degrees = np.sum(adjacency_matrix, axis=1)
+    degree_matrix = np.diag(degrees)
+
+    if config["laplacian_type"] == "sym":
+        d_inv_sqrt = np.zeros_like(degrees)
+        nonzero = degrees > 0
+        d_inv_sqrt[nonzero] = 1.0 / np.sqrt(degrees[nonzero])
+        d_half = np.diag(d_inv_sqrt)
+        laplacian_matrix_normalized = d_half @ adjacency_matrix @ d_half
+    elif config["laplacian_type"] == "rw":
+        d_inv = np.zeros_like(degrees)
+        nonzero = degrees > 0
+        d_inv[nonzero] = 1.0 / degrees[nonzero]
+        d_inverse = np.diag(d_inv)
+        laplacian_matrix_normalized = d_inverse @ adjacency_matrix
+    else:
+        raise ValueError("Unsupported laplacian type. Only 'sym' and 'rw' are allowed.")
+
+    # Eigen-decomposition and clustering
+    e, v = np.linalg.eigh(laplacian_matrix_normalized)
+    eigengap = np.diff(e)
+    optimal_number_of_clusters = np.argmax(eigengap[:10]) + 1
+    current_k = max(optimal_number_of_clusters, 2)
+
+    X = v[:, 1:current_k + 1]  # skip the first trivial eigenvector
+    clustering = KMeans(n_clusters=current_k, random_state=42, n_init=100)
+    cluster_labels = clustering.fit_predict(X)
+    python_silhouette = silhouette_score(X, cluster_labels)
     laplacian_end = time.time()
-    laplacian_time = laplacian_end - laplacian_start
-
-    current_k, cluster_labels, sil_score_val = clustering_result[0]
     clustering_end = time.time()
-    clustering_time = clustering_end - laplacian_end
 
+    # Evaluation
     ari_start = time.time()
     python_rand_index = adjusted_rand_score(true_labels, cluster_labels)
     ari_end = time.time()
-    ari_time = ari_end - ari_start
 
-    python_silhouette = sil_score_val
+    #python_silhouette = silhouette_score(adjacency_matrix, cluster_labels, metric='precomputed')
     total_time = ari_end - start_time
-    end_cpu = process.cpu_times()
-    cpu_used = (end_cpu.user + end_cpu.system) - (start_cpu.user + start_cpu.system)
-    end_mem = process.memory_info().rss
-    memory_used = (end_mem - start_mem) / (1024 ** 2)
+    cpu_used = (process.cpu_times().user + process.cpu_times().system) - (start_cpu.user + start_cpu.system)
+    memory_used = (process.memory_info().rss - start_mem) / (1024 ** 2)
+
     return {
         "python_silhouette_score": python_silhouette,
         "python_rand_index": python_rand_index,
         "python_total_time": total_time,
-        "python_affinity_time": affinity_time,
-        "python_laplacian_time": laplacian_time,
-        "python_clustering_time": clustering_time,
-        "python_adjusted_rand_index_time": ari_time,
+        "python_affinity_time": 0.0,  # not used now
+        "python_laplacian_time": laplacian_end - laplacian_start,
+        "python_clustering_time": clustering_end - laplacian_end,
+        "python_adjusted_rand_index_time": ari_end - ari_start,
         "python_memory_used": memory_used,
         "python_cpu_used": cpu_used
     }
