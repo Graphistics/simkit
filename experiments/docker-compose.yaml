@@ -1,19 +1,46 @@
 services:
-  neo4j:
+
+  #-----------------------------------
+  # SimKit on Neo4j 4.2.3
+  #-----------------------------------
+  neo4j_simkit:
+    image: neo4j:4.2.3
+    container_name: neo4j_simkit
+    environment:
+      # use the same user/pass you already have
+      NEO4J_AUTH: "neo4j/123412345"
+      # allow your SimKit procedures
+      dbms.security.procedures.unrestricted: "simkit.*"
+    volumes:
+      # mount your locally built simkit.jar
+      - ./simkit.jar:/var/lib/neo4j/plugins/simkit.jar
+      - simkit_data:/data
+      - simkit_logs:/logs
+    ports:
+      - "7474:7474"   # HTTP
+      - "7687:7687"   # Bolt
+
+  #-----------------------------------
+  # GDS on Neo4j 5.26
+  #-----------------------------------
+  neo4j_gds:
     image: neo4j:5.26
-    container_name: simkit-gds-db
+    container_name: neo4j_gds
     environment:
       NEO4J_AUTH: "neo4j/123412345"
-      NEO4JLABS_PLUGINS: '["graph-data-science"]'
-      # NEO4J_dbms_security_procedures_unrestricted: "simkit.*,gds.*"
+      # install Graph Data Science via labs
+      NEO4J_PLUGINS: '["graph-data-science"]'
+      # allow GDS procedures
+      dbms.security.procedures.unrestricted: "gds.*"
     volumes:
-      # - ./simkit.jar:/var/lib/neo4j/plugins/simkit.jar
-      - neo4j_data:/data
-      - neo4j_logs:/logs
+      - gds_data:/data
+      - gds_logs:/logs
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "7475:7474" 
+      - "7688:7687"  
 
 volumes:
-  neo4j_data:
-  neo4j_logs:
+  simkit_data:
+  simkit_logs:
+  gds_data:
+  gds_logs:
