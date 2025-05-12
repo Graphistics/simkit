@@ -1,15 +1,15 @@
-# Use the official Neo4j image from Docker Hub
-FROM neo4j:4.2.3
+# Use the official Neo4j 4.2.3 image
+FROM neo4j:5.26
 
-# Set the default password for Neo4j (adjust as needed)
+# Set the authentication (username/password)
 ENV NEO4J_AUTH=neo4j/123412345
 
-# Copy the simkit plugin jar into the plugins directory
-# Ensure simkit.jar is in the same directory as this Dockerfile
-COPY simkit.jar /var/lib/neo4j/plugins/
+# Copy your locally built SimKit plugin into the plugins directory
+# COPY simkit.jar /var/lib/neo4j/plugins/
 
-# Allow Neo4j to load simkit procedures without restrictions
-RUN echo "dbms.security.procedures.unrestricted=simkit.*" >> /var/lib/neo4j/conf/neo4j.conf
+# Allow SimKit procedures to run unrestricted
+# RUN echo "dbms.security.procedures.unrestricted=simkit.*" \
+#    >> /var/lib/neo4j/conf/neo4j.conf
 
-# Expose the Bolt and HTTP ports
+# Expose standard Bolt and HTTP ports
 EXPOSE 7687 7474

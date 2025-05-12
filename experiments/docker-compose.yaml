@@ -1,0 +1,19 @@
+services:
+  neo4j:
+    image: neo4j:5.26
+    container_name: simkit-gds-db
+    environment:
+      NEO4J_AUTH: "neo4j/123412345"
+      NEO4JLABS_PLUGINS: '["graph-data-science"]'
+      # NEO4J_dbms_security_procedures_unrestricted: "simkit.*,gds.*"
+    volumes:
+      # - ./simkit.jar:/var/lib/neo4j/plugins/simkit.jar
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
