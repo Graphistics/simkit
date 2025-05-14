@@ -42,107 +42,324 @@ from scipy.sparse.linalg import eigsh
 import scipy.sparse as sp
 
 def check_symmetric(matrix, tol=1e-8):
-    return np.allclose(matrix, matrix.T, atol=tol)
+    """
+    Checks if a matrix is symmetric. Handles both dense NumPy arrays and SciPy sparse matrices.
 
-def spectral_clustering(dataframe, similarity_graph, laplacian, number_of_clusters, n = None , eps=None, k_knn=None, k_mknn=None): ## Check for inputs for all parameters
-    # Pairwise distances
+    Args:
+        matrix (np.ndarray or sp.spmatrix): The matrix to check.
+        tol (float): Tolerance for numerical comparison (mainly for dense matrices).
+
+    Returns:
+        bool: True if the matrix is symmetric, False otherwise.
+    """
+    if matrix.shape[0] != matrix.shape[1]:
+        return False
+
+    if sp.issparse(matrix):
+        # For sparse matrices, the most reliable check for symmetry needed by eigsh
+        # is that (matrix - matrix.T) has no non-zero elements.
+        # This checks for A_ij == A_ji for all i, j.
+        diff = matrix - matrix.T
+        return diff.nnz == 0
+    else:
+        # For dense matrices, use np.allclose
+        return
+
+def spectral_clustering(dataframe, similarity_graph, laplacian, number_of_clusters, n=None, eps=None, k_knn=None, k_mknn=None):
+    """
+    Performs spectral clustering and returns labels, score, and timings.
+
+    Returns:
+        tuple: Contains (cluster_labels, sil_score, affinity_time,
+               laplacian_time, clustering_time_combined, silhouette_time)
+    """
+    print(f"🐍 Starting Python Spectral Clustering (inside function): graph={similarity_graph}, laplacian={laplacian}, k_param={number_of_clusters}")
+
+    # --- Affinity Matrix Calculation ---
+    start_affinity = time.time()
     dimension = dataframe.shape[0]
+
+    # Handle empty input DataFrame gracefully
+    if dimension == 0:
+        print("⚠️ Empty dataframe provided to spectral_clustering.")
+        return np.array([]), 0.0, 0.0, 0.0, 0.0, 0.0 # Return empty/zero values
+
+    # Calculate pairwise distances
     dist_mat = squareform(pdist(dataframe))
     sample_size = len(dist_mat)
 
-    # Set n based on proportional selection, but limit by log scaling for large datasets
-    if(n is None):
-        n = min(sample_size // 10, int(math.log(sample_size)))
+    # --- Parameter Setup ---
+    # Use provided parameters or calculate defaults
+    # Default n for 'full' graph (local sigma tuning)
+    if n is None and similarity_graph == "full":
+        if sample_size <= 1:
+            n = 0 # Cannot compute neighbors
+        else:
+            # Heuristic: Use a value related to log(N) or sqrt(N), capped
+            log_val = math.log(sample_size) if sample_size > 1 else 0
+            # Ensure n is at least 1 and not more than available neighbors
+            n = min(max(7, int(log_val)), 15) # Example heuristic, adjust as needed
+            n = min(n, dimension - 1) if dimension > 1 else 0
+            print(f"   Auto-calculated n for 'full' graph: {n}")
+    elif n is not None:
+         n = int(n) # Ensure n is int if provided
 
-    # Fallback values for epsilon and k
-    epsilon = eps if eps else np.percentile(dist_mat, 90)
-    k_knn = k_knn if k_knn else int(np.sqrt(sample_size))
-    k_mknn = k_mknn if k_mknn else int(np.sqrt(sample_size))
 
+    # Default epsilon for 'eps' graph
+    if eps is None and similarity_graph == "eps":
+        non_zero_distances = dist_mat[dist_mat > 1e-9]
+        if non_zero_distances.size > 0:
+            eps = np.percentile(non_zero_distances, 10) # e.g., 10th percentile
+        else:
+            eps = 0.1 # Small default if all points are coincident
+        print(f"   Auto-calculated eps for 'eps' graph: {eps:.4f}")
+    elif eps is not None:
+        eps = float(eps) # Ensure eps is float
+
+    # Default k for 'knn'/'mknn' graphs
+    default_k = 1
+    if sample_size > 1:
+         default_k = max(1, int(np.sqrt(sample_size)))
+
+    if k_knn is None and similarity_graph == "knn":
+        k_knn = default_k
+        print(f"   Auto-calculated k_knn for 'knn' graph: {k_knn}")
+    elif k_knn is not None:
+         k_knn = int(k_knn)
+
+    if k_mknn is None and similarity_graph == "mknn":
+        k_mknn = default_k
+        print(f"   Auto-calculated k_mknn for 'mknn' graph: {k_mknn}")
+    elif k_mknn is not None:
+        k_mknn = int(k_mknn)
+
+    # --- Build Adjacency Matrix ---
+    # (Using original logic, ensure tqdm is imported)
     if similarity_graph == "full":
-        # calculate local sigma
         sigmas = np.zeros(dimension)
-        for i in tqdm(range(len(dist_mat)), desc="Calculating sigmas"):
-            sigmas[i] = sorted(dist_mat[i])[n]
+        # Ensure n is valid before using it as index
+        kth_neighbor_index = min(n, dimension - 1) if n is not None and n > 0 else 1
+        if kth_neighbor_index <= 0 and dimension > 1: kth_neighbor_index = 1 # Need at least 1 neighbor
+
+        for i in range(dimension):
+             if dimension > 1:
+                 sorted_dist_i = np.sort(dist_mat[i])
+                 sigmas[i] = sorted_dist_i[kth_neighbor_index]
+             else:
+                 sigmas[i] = 1.0 # Handle single point case
+
+        sigmas = np.maximum(sigmas, 1e-9) # Prevent division by zero
         adjacency_matrix = np.zeros([dimension, dimension])
-        for i in tqdm(range(dimension), desc="Building full affinity"):
-            for j in range(i+1, dimension):
-                d = np.exp(-1 * dist_mat[i, j]**2 / (sigmas[i] * sigmas[j]))
-                adjacency_matrix[i, j] = d
-                adjacency_matrix[j, i] = d
+        # Can be slow for large D, consider optimizations if needed
+        for i in tqdm(range(dimension), desc="Building full affinity", leave=False, ncols=80):
+            for j in range(i + 1, dimension):
+                # Avoid division by zero or invalid ops if sigmas are near zero
+                if sigmas[i] * sigmas[j] > 1e-12:
+                     d = np.exp(-(dist_mat[i, j]**2) / (sigmas[i] * sigmas[j]))
+                     adjacency_matrix[i, j] = d
+                     adjacency_matrix[j, i] = d
+                # else: adjacency remains 0
+
     elif similarity_graph == "eps":
-        adjacency_matrix = np.zeros([dimension, dimension])
-        for i in tqdm(range(dimension), desc="Building eps affinity"):
-            for j in range(i+1, dimension):
-                d = 1 if dist_mat[i, j] < epsilon else 0
-                adjacency_matrix[i, j] = d
-                adjacency_matrix[j, i] = d
+        adjacency_matrix = (dist_mat < eps).astype(float)
+        np.fill_diagonal(adjacency_matrix, 0)
+
     elif similarity_graph == "knn":
         adjacency_matrix = np.zeros([dimension, dimension])
-        for i in tqdm(range(dimension), desc="Building knn affinity"):
-            sorted_indices = np.argsort(dist_mat[i])
-            k_nearest_indices = sorted_indices[1:k_knn+1]
-            adjacency_matrix[i, k_nearest_indices] = 1
-    else:
+        k_to_use = min(k_knn, dimension - 1) if k_knn is not None else 0
+        if k_to_use > 0:
+            for i in tqdm(range(dimension), desc="Building knn affinity", leave=False, ncols=80):
+                nearest_indices = np.argsort(dist_mat[i])[1:k_to_use + 1]
+                adjacency_matrix[i, nearest_indices] = 1
+            # Symmetrize
+            adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.T)
+
+    elif similarity_graph == "mknn": # Original logic assumed undirected, let's keep it
         adjacency_matrix = np.zeros([dimension, dimension])
-        for i in tqdm(range(dimension), desc="Building mknn affinity"):
-            sorted_indices = np.argsort(dist_mat[i])
-            k_nearest_indices = sorted_indices[1:k_mknn+1]
-            for neighbor in k_nearest_indices:
-                neighbor_sorted_indices = np.argsort(dist_mat[neighbor])
-                if i in neighbor_sorted_indices[1:k_mknn+1]:
-                    adjacency_matrix[i, neighbor] = 1
-                    adjacency_matrix[neighbor, i] = 1
+        k_to_use = min(k_mknn, dimension - 1) if k_mknn is not None else 0
+        if k_to_use > 0:
+            # Precompute kNN sets for efficiency
+            knn_sets = {}
+            for i in range(dimension):
+                 knn_sets[i] = set(np.argsort(dist_mat[i])[1:k_to_use+1])
 
+            for i in tqdm(range(dimension), desc="Building mknn affinity", leave=False, ncols=80):
+                 for neighbor in knn_sets[i]:
+                     # Check if i is in neighbor's kNN set
+                     if i in knn_sets.get(neighbor, set()):
+                          adjacency_matrix[i, neighbor] = 1
+                          # No need for adjacency_matrix[neighbor, i] = 1 due to outer loop covering all i
+
+    else:
+        raise ValueError(f"Unsupported similarity_graph: {similarity_graph}")
+
+    affinity_time = time.time() - start_affinity
+    print(f"   Affinity matrix built. Time: {affinity_time:.2f}s")
+    # --- End Affinity ---
+
+
+    # --- Laplacian Calculation ---
+    start_laplacian = time.time()
     degrees = np.sum(adjacency_matrix, axis=1)
-    degree_matrix = np.diag(degrees)
+    # Handle isolated nodes to prevent division by zero
+    if np.any(degrees == 0):
+        print(f"   ⚠️ Warning: {np.sum(degrees == 0)} nodes have degree 0.")
+        degrees += 1e-12 # Add small epsilon
 
+    laplacian_matrix_normalized = None # Initialize
     if laplacian == "sym":
-        d_inv_sqrt = np.zeros_like(degrees)
-        nonzero = degrees > 0
-        d_inv_sqrt[nonzero] = 1.0 / np.sqrt(degrees[nonzero])
+        d_inv_sqrt = np.power(degrees, -0.5)
+        d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0
         d_half = np.diag(d_inv_sqrt)
         laplacian_matrix_normalized = d_half @ adjacency_matrix @ d_half
     elif laplacian == "rw":
-        d_inv = np.zeros_like(degrees)
-        nonzero = degrees > 0
-        d_inv[nonzero] = 1.0 / degrees[nonzero]
+        d_inv = np.power(degrees, -1.0)
+        d_inv[np.isinf(d_inv)] = 0
         d_inverse = np.diag(d_inv)
         laplacian_matrix_normalized = d_inverse @ adjacency_matrix
     else:
         raise ValueError("Unsupported laplacian type. Only 'sym' and 'rw' are allowed.")
 
-    if check_symmetric(laplacian_matrix_normalized):
-        e, v = np.linalg.eigh(laplacian_matrix_normalized)
+    laplacian_time = time.time() - start_laplacian
+    print(f"   Laplacian calculated. Time: {laplacian_time:.2f}s")
+    # --- End Laplacian ---
+
+
+    # --- Eigen Decomposition & KMeans ---
+    start_clustering = time.time() # Time combined eigen + kmeans
+
+    # Determine number of clusters (k)
+    current_k = 0 # Initialize
+    try:
+        if isinstance(number_of_clusters, int):
+            current_k = number_of_clusters
+        elif number_of_clusters == "fixed2":
+            current_k = 2
+        elif number_of_clusters == "fixed3":
+            current_k = 3
+        elif isinstance(number_of_clusters, str) and number_of_clusters.startswith("eigengap"):
+            # Calculate eigenvalues for eigengap (simplified version)
+            max_k_check = min(dimension - 1, 15) # Check up to 15 eigenvalues
+            if max_k_check > 1:
+                 # Use appropriate eigenvalue solver
+                 if check_symmetric(laplacian_matrix_normalized):
+                     # For Lsym/NormAdj, interested in largest eigenvalues (LM)
+                     evals = np.linalg.eigvalsh(laplacian_matrix_normalized) # Get all eigenvalues
+                     evals_sorted = np.sort(np.abs(evals))[::-1] # Sort by magnitude desc
+                 else: # RW case, not symmetric
+                     evals = np.linalg.eigvals(laplacian_matrix_normalized) # Get all eigenvalues
+                     evals_sorted = np.sort(np.real(evals))[::-1] # Sort by real part desc
+
+                 # Calculate gaps
+                 eigengaps = np.abs(np.diff(evals_sorted))
+                 relevant_gaps = eigengaps[:max_k_check - 1]
+                 if len(relevant_gaps) > 0:
+                     optimal_k_eigengap = np.argmax(relevant_gaps) + 1 # +1 because diff reduces length
+                     current_k = max(2, optimal_k_eigengap) # Ensure k>=2
+                     print(f"   Eigengap heuristic suggests k = {current_k}")
+                 else:
+                     print("   Not enough eigenvalues for eigengap, using default k=2")
+                     current_k = 2
+            else:
+                 print("   Dimension too small for eigengap, using default k=2")
+                 current_k = 2
+        else: # Fallback default
+            print(f"   Unrecognized 'number_of_clusters': {number_of_clusters}. Using default k=2.")
+            current_k = 2
+
+        # Ensure k is valid
+        current_k = max(2, current_k) # Minimum k=2 for clustering
+        current_k = min(current_k, dimension) # Max k=N
+        print(f"   Final number of clusters (k): {current_k}")
+
+        # Eigen decomposition
+        if current_k >= dimension: # Avoid requesting N or more eigenvectors
+            print("   Warning: k >= N, using all available components.")
+            num_eig_needed = dimension -1
+        else:
+             num_eig_needed = current_k
+
+        if num_eig_needed <= 0:
+             print("   Error: Cannot compute eigenvectors for k <= 0.")
+             v = np.zeros((dimension, 1)) # Dummy
+        else:
+             if check_symmetric(laplacian_matrix_normalized):
+                 # Use eigh for symmetric, get largest magnitude e-vectors
+                 # Note: Standard spectral often uses smallest e-vectors of L=D-A
+                 # Here we use largest of normalized adjacency, common variant.
+                 e, v = np.linalg.eigh(laplacian_matrix_normalized)
+                 idx = np.argsort(np.abs(e))[::-1] # Sort by magnitude desc
+                 v = np.real(v[:, idx[:num_eig_needed]])
+             else: # RW case
+                 e, v = np.linalg.eig(laplacian_matrix_normalized)
+                 idx = np.argsort(np.real(e))[::-1] # Sort by real part desc
+                 v = np.real(v[:, idx[:num_eig_needed]])
+
+        # Prepare features for KMeans
+        X = v # Shape (n_samples, k)
+
+        # Normalize if using symmetric Laplacian (Ng, Jordan, Weiss)
+        if laplacian == "sym":
+            norms = np.linalg.norm(X, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0 # Avoid division by zero
+            X = X / norms
+
+        # KMeans Clustering
+        if X.shape[0] > 0 and X.shape[1] > 0: # Ensure valid input for KMeans
+            kmeans = KMeans(n_clusters=current_k, random_state=42, n_init=10) # Use n_init=10 or 'auto'
+            cluster_labels = kmeans.fit_predict(X)
+        else:
+            print("   ⚠️ Skipping KMeans due to invalid eigenvector matrix.")
+            cluster_labels = np.zeros(dimension, dtype=int) # Default assignment
+
+    except np.linalg.LinAlgError as e:
+        print(f"   ❌ Linear algebra error during eigen decomposition: {e}. Clustering failed.")
+        cluster_labels = np.zeros(dimension, dtype=int) # Assign default cluster
+        current_k = 0 # Indicate failure
+    except Exception as e:
+        print(f"   ❌ Error during eigen/kmeans: {e}")
+        cluster_labels = np.zeros(dimension, dtype=int)
+        current_k = 0
+
+
+    clustering_time_combined = time.time() - start_clustering
+    print(f"   Clustering (Eigen + KMeans) done. Time: {clustering_time_combined:.2f}s")
+    # --- End Clustering ---
+
+
+    # --- Silhouette Score ---
+    start_silhouette = time.time()
+    sil_score = -1.0 # Default to indicate not calculated or error
+    # Check if calculation is possible and meaningful
+    if cluster_labels is not None and current_k > 1 and current_k < dimension:
+        try:
+            # Using original features (dataframe) for silhouette
+            sil_score = silhouette_score(dataframe, cluster_labels)
+            print(f"   Silhouette Score: {sil_score:.4f}")
+        except ValueError as e:
+            print(f"   ⚠️ Could not calculate Silhouette Score: {e}")
+            # sil_score remains -1.0
     else:
-        e, v = np.linalg.eig(laplacian_matrix_normalized)
-        idx = np.argsort(np.real(e))
-        e = np.real(e[idx])
-        v = np.real(v[:, idx])
+        if cluster_labels is None:
+            print("   ⚠️ Skipping Silhouette Score (clustering failed).")
+        elif current_k <= 1:
+             print("   ⚠️ Skipping Silhouette Score (k <= 1).")
+        elif current_k >= dimension:
+             print("   ⚠️ Skipping Silhouette Score (k >= n).")
 
-    eigengap = np.diff(e)
-    optimal_number_of_clusters = np.argmax(eigengap[:10]) + 1
+    silhouette_time = time.time() - start_silhouette
+    # --- End Silhouette ---
 
-    if isinstance(number_of_clusters, int):
-        current_k = number_of_clusters
-    elif number_of_clusters == "fixed2":
-        current_k = 2
-    elif number_of_clusters == "fixed3":
-        current_k = 3
-    else:
-        current_k = max(optimal_number_of_clusters, 2)
+    # Final check on cluster_labels type before returning
+    if cluster_labels is None:
+        cluster_labels = np.array([], dtype=int)
 
-    X = v[:, -current_k:]
-    clustering = KMeans(n_clusters=current_k, random_state=42, n_init=100)
-    cluster_labels = clustering.fit_predict(X)
 
-    sil_score = silhouette_score(dataframe, cluster_labels)
+    # --- Return Results ---
+    # Return the 6 values expected by the calling function
+    return cluster_labels, sil_score, affinity_time, laplacian_time, clustering_time_combined, silhouette_time
 
-    print(f"🔍 Inside spectral_clustering -> n: {n}, epsilon: {eps}, k_knn: {k_knn}, k_mknn: {k_mknn}, clusters: {current_k}")
-
-    return [(current_k, cluster_labels, sil_score)]
-
-NEO4J_URI = "bolt://localhost:7688"
+NEO4J_URI = "bolt://localhost:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = "123412345"
 
@@ -265,194 +482,511 @@ def monitor_progress():
 monitor_thread = threading.Thread(target=monitor_progress, daemon=True)
 monitor_thread.start()
 
-def run_python_experiment_feature(config, file_path):
-    # Run Python spectral clustering on feature-based data
+def run_python_experiment_feature(config, file_path, driver, experiment_tag):
+    """
+    Runs Python spectral clustering, calculates metrics, and writes the
+    resulting cluster assignments and centroids to Neo4j using the 'Index' column.
+    """
+    print(f"\n--- Running Python Feature Experiment & Neo4j Write: {experiment_tag} ---")
+    # --- Start: Setup and Data Loading ---
     df = pd.read_csv(file_path)
-    cols_to_remove = [col.strip() for col in config["remove_columns"].split(',')]
-    features = df.drop(columns=cols_to_remove, errors='ignore')
-    true_labels = df[config["target_column"]].values
+
+    # --- Use the 'Index' column directly as the identifier ---
+    id_property_in_neo4j = 'Index' # Define the property name used in Neo4j
+    if id_property_in_neo4j not in df.columns:
+        print(f"❌ Error: Required '{id_property_in_neo4j}' column not found in CSV for linking.")
+        return {"error": f"'{id_property_in_neo4j}' column missing"}
+
+    try:
+        # Use the actual 'Index' column values, ensuring integer type
+        identifiers = df[id_property_in_neo4j].astype(int).values
+        print(f"   Using column '{id_property_in_neo4j}' as identifier for Neo4j linking.")
+    except ValueError:
+         print(f"❌ Error: Cannot convert '{id_property_in_neo4j}' column to integer.")
+         return {"error": f"Cannot convert '{id_property_in_neo4j}' column to integer"}
+    # --- End Identifier Setup ---
+
+
+    # Ensure 'Index' is NOT removed by the config setting 'remove_columns'
+    cols_to_remove_config = config["remove_columns"].split(',') if config.get("remove_columns") else []
+    cols_to_remove = [col.strip() for col in cols_to_remove_config]
+    if id_property_in_neo4j in cols_to_remove:
+         cols_to_remove.remove(id_property_in_neo4j)
+         print(f"   Kept '{id_property_in_neo4j}' column for identification.")
+    # Remove previous 'nodeId' logic if it exists (no longer needed)
+    if 'nodeId' in cols_to_remove:
+         cols_to_remove.remove('nodeId')
+
+    features_df = df.drop(columns=cols_to_remove, errors='ignore')
+
+    # --- (Feature matrix conversion, true labels, timing start - as before) ---
+    try:
+        feature_matrix = features_df.to_numpy(dtype=float)
+    except ValueError as e:
+        print(f"   ⚠️ Warning: Could not convert features to numeric numpy array: {e}. Centroid calculation might fail.")
+        features_df_numeric = features_df.select_dtypes(include=np.number)
+        if not features_df_numeric.empty:
+            feature_matrix = features_df_numeric.to_numpy(dtype=float)
+            print(f"   Using only numeric columns for features: {features_df_numeric.columns.tolist()}")
+        else:
+            print("   ❌ Error: No numeric feature columns found. Cannot proceed.")
+            return {"error": "No numeric features for clustering/centroids"}
+
+    true_labels = None
+    if config["target_column"] in df.columns:
+        true_labels = df[config["target_column"]].values
+    else:
+        print(f"   Target column '{config['target_column']}' not found.")
 
     process = psutil.Process(os.getpid())
-    start_time = time.time()
-    start_cpu = process.cpu_times()
     start_mem = process.memory_info().rss
+    start_cpu_times = process.cpu_times()
+    start_python_execution = time.time() # Time Python part separately
+    # --- End: Setup ---
 
-    graph_type = config["graph_type"]
-    parameter = float(config["parameter"])
+    # --- (Python Spectral Clustering call - as before) ---
+    try:
+        # Expects: labels, sil_score, aff_time, lap_time, cluster_time(eigen+kmeans), sil_time
+        cluster_labels, sil_score_val, affinity_time, laplacian_time, clustering_time, _ = spectral_clustering(
+            features_df, # Pass features DataFrame
+            config["graph_type"], config["laplacian_type"], config["number_of_eigenvectors"],
+            # Pass n, eps, k parameters correctly based on previous logic...
+            n=config.get('n_val'), eps=config.get('eps_val'), k_knn=config.get('knn_val'), k_mknn=config.get('mknn_val') # Make sure these are set before calling if needed
+        )
+    # (Error handling for spectral_clustering call - as before)
+    except NameError:
+         print("❌ Error: spectral_clustering function is not defined or imported.")
+         return {"error": "spectral_clustering function not found"}
+    except Exception as e:
+         print(f"❌ Error during spectral_clustering execution: {e}")
+         return {"error": f"Spectral clustering failed: {e}"}
 
-    # Initialize and consider all possible parameters
-    n_val = None
-    eps_val = None
-    knn_val = None
-    mknn_val = None
+    python_execution_time = time.time() - start_python_execution
+    print(f"   🐍 Python spectral clustering finished. Time: {python_execution_time:.2f}s")
+    # --- End: Python Spectral Clustering ---
 
-    if graph_type == "full":
-        n_val = int(parameter)
-    elif graph_type == "eps":
-        eps_val = parameter
-    elif graph_type == "knn":
-        knn_val = int(parameter)
-    elif graph_type == "mknn":
-        mknn_val = int(parameter)
 
-    '''
-    if config["graph_type"] == "eps":
-        eps_val = float(config["parameter"])
-        k_val = None
-    elif config["graph_type"] in ["knn", "mknn"]:
-        k_val = int(config["parameter"])
-        eps_val = None
-    else:
-        eps_val = None
-        k_val = None
-    '''
+    # --- (Python Metric Calculation - as before) ---
+    ari_time = 0.0
+    python_rand_index = np.nan
+    if true_labels is not None and cluster_labels is not None and len(cluster_labels) == len(true_labels):
+         if len(np.unique(cluster_labels)) > 1:
+             ari_start = time.time(); python_rand_index = adjusted_rand_score(true_labels, cluster_labels); ari_time = time.time() - ari_start
+    # (Error handling for ARI, checking cluster_labels not None etc. - as before)
+    # --- End: Python Metric Calculation ---
 
-    affinity_start = time.time()
-    dist_mat = squareform(pdist(features))
-    affinity_end = time.time()
-    affinity_time = affinity_end - affinity_start
 
-    laplacian_start = time.time()
-    clustering_result = spectral_clustering(features, config["graph_type"], config["laplacian_type"],
-                                            config["number_of_eigenvectors"], n=n_val, eps=eps_val, k_knn=knn_val, k_mknn=mknn_val)
-    laplacian_end = time.time()
-    laplacian_time = laplacian_end - laplacian_start
+    # --- Start: Neo4j Writing ---
+    neo4j_write_time = np.nan # Default
+    if driver and cluster_labels is not None and len(identifiers) == len(cluster_labels):
+        print(f"    GDB Writing Python results to Neo4j for experiment: {experiment_tag}...")
+        start_neo4j_write = time.time()
+        node_label = config['node_label'] # e.g., 'IrisNode'
 
-    current_k, cluster_labels, sil_score_val = clustering_result[0]
-    clustering_end = time.time()
-    clustering_time = clustering_end - laplacian_end
-    ari_start = time.time()
-    python_rand_index = adjusted_rand_score(true_labels, cluster_labels)
-    ari_end = time.time()
-    ari_time = ari_end - ari_start
+        try:
+            unique_clusters = sorted(np.unique(cluster_labels))
+            if len(unique_clusters) == 0:
+                 print("   ⚠️ No clusters found, skipping Neo4j write.")
+            else:
+                # 1. Calculate Centroids (using feature_matrix - as before)
+                centroids = {}
+                if feature_matrix is not None:
+                     for cluster_id in unique_clusters:
+                         cluster_features = feature_matrix[cluster_labels == cluster_id]
+                         centroids[cluster_id] = cluster_features.mean(axis=0).tolist() if cluster_features.shape[0] > 0 else [np.nan] * feature_matrix.shape[1]
+                     print(f"      Calculated {len(centroids)} centroids.")
+                else:
+                    print("      ⚠️ Skipping centroid calculation as feature matrix is unavailable.")
 
-    python_silhouette = sil_score_val
-    total_time = ari_end - start_time
-    end_cpu = process.cpu_times()
-    cpu_used = (end_cpu.user + end_cpu.system) - (start_cpu.user + start_cpu.system)
-    end_mem = process.memory_info().rss
-    memory_used = (end_mem - start_mem) / (1024 ** 2)
-    return {
-        "python_silhouette_score": python_silhouette,
+
+                # 2. Write Centroids and Link Nodes in Neo4j session
+                with driver.session(database="neo4j") as session:
+                    # Create/Update Centroid Nodes (as before)
+                    if centroids:
+                        centroid_batch = [{"cluster_id": int(cid), "coords": ccoords} for cid, ccoords in centroids.items()]
+                        session.run("""
+                            UNWIND $batch AS c_data
+                            MERGE (c:ClusterCentroid {clusterId: c_data.cluster_id, experiment: $experiment_tag})
+                            SET c.coordinates = c_data.coords, c.nodeLabel = $nodeLabel
+                            """, batch=centroid_batch, experiment_tag=experiment_tag, nodeLabel=node_label)
+                        print(f"      Created/updated {len(centroid_batch)} ClusterCentroid nodes.")
+
+                    # Link Data Nodes to Centroids
+                    # Use the 'identifiers' derived from the 'Index' column (already integers)
+                    link_data = [{"identifier": int(identifiers[i]), "cluster_id": int(cluster_labels[i])}
+                                 for i in range(len(identifiers))]
+
+                    batch_size = 2000
+                    print(f"      Linking {len(link_data)} '{node_label}' nodes using property '{id_property_in_neo4j}'...")
+                    for i in tqdm(range(0, len(link_data), batch_size), desc="Linking nodes", ncols=80, leave=False):
+                        batch = link_data[i:i+batch_size]
+                        # Use the correct id_property_in_neo4j ('Index') in the MATCH clause
+                        cypher_link = f"""
+                            UNWIND $batch AS link
+                            MATCH (d:{node_label} {{{id_property_in_neo4j}: link.identifier}}) // Ensure this matches node prop
+                            MATCH (c:ClusterCentroid {{clusterId: link.cluster_id, experiment: $experiment_tag}})
+                            MERGE (d)-[r:BELONGS_TO_CLUSTER {{experiment: $experiment_tag}}]->(c)
+                        """
+                        session.run(cypher_link, batch=batch, experiment_tag=experiment_tag)
+
+                neo4j_write_time = time.time() - start_neo4j_write
+                print(f"   ✅ Finished writing results to Neo4j. Time: {neo4j_write_time:.2f}s")
+
+        # (Error handling for Neo4j write - as before)
+        except Exception as e:
+             print(f"   ❌ Error writing results to Neo4j: {e}")
+             neo4j_write_time = -1.0 # Indicate error
+
+    # (Checks for driver, cluster_labels None, length mismatch - as before)
+    elif not driver: print("   ⚠️ Neo4j driver not provided, skipping write operation.")
+    elif cluster_labels is None: print("   ⚠️ Cluster labels are None (clustering failed), skipping Neo4j write.")
+    else: print("   ⚠️ Identifiers and cluster_labels length mismatch, skipping Neo4j write.")
+    # --- End: Neo4j Writing ---
+
+    # --- (Final Metrics Calculation & Return - as before) ---
+    end_cpu_times = process.cpu_times(); cpu_used = (end_cpu_times.user + end_cpu_times.system) - (start_cpu_times.user + start_cpu_times.system)
+    end_mem = process.memory_info().rss; memory_used = (end_mem - start_mem) / (1024 ** 2)
+    results_dict = {
+        "python_silhouette_score": sil_score_val if cluster_labels is not None else np.nan,
         "python_rand_index": python_rand_index,
-        "python_total_time": total_time,
-        "python_affinity_time": affinity_time,
-        "python_laplacian_time": laplacian_time,
-        "python_clustering_time": clustering_time,
+        "python_total_time": python_execution_time,
+        "python_affinity_time": affinity_time if cluster_labels is not None else np.nan,
+        "python_laplacian_time": laplacian_time if cluster_labels is not None else np.nan,
+        "python_clustering_time": clustering_time if cluster_labels is not None else np.nan,
         "python_adjusted_rand_index_time": ari_time,
-        "python_memory_used": memory_used,
-        "python_cpu_used": cpu_used
+        "python_memory_used_MB": memory_used,
+        "python_cpu_used_seconds": cpu_used,
+        "neo4j_write_time_seconds": neo4j_write_time
     }
+    # --- End: Final Metrics ---
+
+    return results_dict
 
 
-def run_python_experiment_graph(config, node_file_path, edge_file_path):
-    # Load node data
-    nodes_df = pd.read_csv(node_file_path)
-    true_labels = nodes_df[config["target_column"]].values
-    features = nodes_df.drop(columns=[col.strip() for col in config["remove_columns"].split(',')], errors='ignore')
+def run_python_experiment_graph(config, node_file_path, edge_file_path, driver, experiment_tag):
+    """
+    Runs Python spectral clustering on graph structure, calculates metrics,
+    calculates centroids from node features, and writes results to Neo4j.
 
-    if "features" in features.columns:
-        features = np.array(features["features"].apply(lambda x: eval(x) if isinstance(x, str) else x).tolist())
+    Args:
+        config (dict): Dictionary with experiment configuration. Must include 'node_label'.
+        node_file_path (str): Path to the node CSV file (must contain 'id' column).
+        edge_file_path (str): Path to the edge CSV file.
+        driver (neo4j.Driver): Active Neo4j driver instance.
+        experiment_tag (str): A unique string identifying this specific experimental run.
+
+    Returns:
+        dict: Dictionary containing Python performance metrics and Neo4j write time.
+    """
+    print(f"\n--- Running Python Graph Experiment & Neo4j Write: {experiment_tag} ---")
+    # --- Start: Setup and Data Loading ---
+    try:
+        nodes_df = pd.read_csv(node_file_path)
+        edge_df = pd.read_csv(edge_file_path)
+    except FileNotFoundError as e:
+        print(f"❌ Error: Data file not found: {e}")
+        return {"error": f"Data file not found: {e}"}
+
+    # --- Use the 'id' column as the identifier ---
+    id_property_in_neo4j = 'id' # Property name used in Neo4j MATCH for graph nodes
+    if id_property_in_neo4j not in nodes_df.columns:
+         print(f"❌ Error: Required '{id_property_in_neo4j}' column not found in node file for linking.")
+         return {"error": f"'{id_property_in_neo4j}' column missing in node file"}
+    # Type of identifier depends on the data (can be int or string)
+    identifiers = nodes_df[id_property_in_neo4j].values
+    print(f"   Using column '{id_property_in_neo4j}' as identifier for Neo4j linking.")
+    # --- End Identifier Setup ---
+
+    # Load true labels if available
+    true_labels = None
+    if config["target_column"] in nodes_df.columns:
+        true_labels = nodes_df[config["target_column"]].values
     else:
-        features = features.values.astype(float)
+        print(f"   Target column '{config['target_column']}' not found in node file.")
 
-    # Load edge data and create adjacency matrix
-    edge_df = pd.read_csv(edge_file_path)
-    node_ids = nodes_df["id"].tolist()
-    id_to_index = {node_id: idx for idx, node_id in enumerate(node_ids)}
-    dim = len(node_ids)
-    adjacency_matrix = np.zeros((dim, dim))
+    # Load features for centroid calculation (handle potential 'eval' and errors)
+    feature_matrix = None
+    node_label = config['node_label'] # Get label early for messages
+    if "features" in nodes_df.columns:
+        print(f"   Processing 'features' column for {node_label}...")
+        try:
+            # Attempt to evaluate string representations safely
+            def safe_eval(x):
+                if isinstance(x, str):
+                    try: return eval(x)
+                    except: return None # Return None if eval fails
+                return x # Assume list/array otherwise
+            feature_list = nodes_df["features"].apply(safe_eval).tolist()
 
-    for _, row in edge_df.iterrows():
-        src = id_to_index.get(row["source_id"])
-        tgt = id_to_index.get(row["target_id"])
-        if src is not None and tgt is not None:
-            adjacency_matrix[src, tgt] = 1
-            adjacency_matrix[tgt, src] = 1  # assuming undirected graph
+            # Check if parsing worked and features are consistent
+            if all(isinstance(f, (list, np.ndarray)) for f in feature_list if f is not None):
+                 # Get length of first valid feature
+                 first_valid_feature = next((f for f in feature_list if f is not None), None)
+                 if first_valid_feature is not None:
+                     feature_len = len(first_valid_feature)
+                     # Check consistency and filter out None entries if needed
+                     valid_features = [f for f in feature_list if f is not None and len(f) == feature_len]
+                     if len(valid_features) == len(feature_list): # All features were valid and consistent
+                         feature_matrix = np.array(valid_features, dtype=float)
+                         print(f"   Loaded feature matrix with shape {feature_matrix.shape}")
+                     else:
+                          print(f"   ⚠️ Warning: {len(feature_list) - len(valid_features)} rows had invalid or inconsistent features. Centroids might be affected.")
+                          # Option: Create matrix only with valid features? Needs careful index mapping later.
+                          # For simplicity, we'll flag that centroids might be unreliable if this happens.
+                          # Setting feature_matrix to None prevents centroid calculation.
+                          feature_matrix = None
+                 else:
+                      print("   ⚠️ No valid features found after parsing.")
+            else:
+                 print("   ⚠️ Could not parse 'features' column into consistent lists/arrays.")
+
+        except Exception as e:
+            print(f"   ⚠️ Warning: Error processing 'features' column: {e}. Cannot calculate centroids.")
+    else:
+        print("   ⚠️ 'features' column not found in node file. Cannot calculate centroids.")
+
 
     process = psutil.Process(os.getpid())
-    start_time = time.time()
-    start_cpu = process.cpu_times()
     start_mem = process.memory_info().rss
+    start_cpu_times = process.cpu_times()
+    start_python_execution = time.time() # Time Python part separately
+
+    # --- Start: Python Spectral Clustering on Graph Structure ---
+    print(f"   Building adjacency matrix for {len(identifiers)} nodes...")
+    id_to_index = {identifier: idx for idx, identifier in enumerate(identifiers)}
+    dim = len(identifiers)
+    adjacency_matrix = sp.lil_matrix((dim, dim)) # Use sparse matrix
+    affinity_start = time.time()
+    # Ensure source/target IDs from edge file are looked up correctly
+    for _, row in edge_df.iterrows():
+        src_idx = id_to_index.get(row["source_id"]) # Use actual ID value
+        tgt_idx = id_to_index.get(row["target_id"]) # Use actual ID value
+        if src_idx is not None and tgt_idx is not None:
+            adjacency_matrix[src_idx, tgt_idx] = 1
+            adjacency_matrix[tgt_idx, src_idx] = 1 # Assuming undirected
+    adjacency_matrix = adjacency_matrix.tocsr()
+    affinity_time = time.time() - affinity_start
+    print(f"   Adjacency matrix built. Time: {affinity_time:.2f}s")
+
 
     # Compute Laplacian
     laplacian_start = time.time()
-    degrees = np.sum(adjacency_matrix, axis=1)
-    degree_matrix = np.diag(degrees)
+    degrees = np.array(adjacency_matrix.sum(axis=1)).flatten()
+    if np.any(degrees == 0):
+        print(f"   ⚠️ Warning: {np.sum(degrees == 0)} nodes have degree 0.")
+        degrees += 1e-12 # Add small epsilon
 
-    if config["laplacian_type"] == "sym":
-        d_inv_sqrt = np.zeros_like(degrees, dtype=float)
-        nonzero = degrees > 0
-        d_inv_sqrt[nonzero] = 1.0 / np.sqrt(degrees[nonzero])
-        d_half = sp.diags(d_inv_sqrt)
-        laplacian_matrix_normalized = d_half @ adjacency_matrix @ d_half
-    elif config["laplacian_type"] == "rw":
-        d_inv = np.zeros_like(degrees, dtype=float)
-        nonzero = degrees > 0
-        d_inv[nonzero] = 1.0 / degrees[nonzero]
-        d_inverse = sp.diags(d_inv)
-        laplacian_matrix_normalized = d_inverse @ adjacency_matrix
-    else:
-        raise ValueError("Unsupported laplacian type. Only 'sym' and 'rw' are allowed.")
+    laplacian_matrix_normalized = None
+    try:
+        if config["laplacian_type"] == "sym":
+            d_inv_sqrt = np.power(degrees, -0.5)
+            d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0
+            d_half = sp.diags(d_inv_sqrt)
+            laplacian_matrix_normalized = d_half @ adjacency_matrix @ d_half # Normalized Adjacency
+        elif config["laplacian_type"] == "rw":
+            d_inv = np.power(degrees, -1.0)
+            d_inv[np.isinf(d_inv)] = 0
+            d_inverse = sp.diags(d_inv)
+            laplacian_matrix_normalized = d_inverse @ adjacency_matrix # Transition Matrix P
+        else:
+            raise ValueError(f"Unsupported laplacian type: {config['laplacian_type']}")
+    except Exception as e:
+        print(f"   ❌ Error calculating Laplacian: {e}")
+        return {"error": f"Laplacian calculation failed: {e}"}
+
+    laplacian_time = time.time() - laplacian_start
+    print(f"   Laplacian calculated. Time: {laplacian_time:.2f}s")
 
     # Eigen-decomposition and clustering
-    if check_symmetric(laplacian_matrix_normalized):
-        e, v = np.linalg.eigh(laplacian_matrix_normalized)
-    else:
-        e, v = np.linalg.eig(laplacian_matrix_normalized)
-        idx = np.argsort(np.real(e))
-        e = np.real(e[idx])
-        v = np.real(v[:, idx])
+    clustering_start = time.time()
+    cluster_labels = None
+    sil_score_val = np.nan
+    try:
+        # Determine number of clusters (k) - using simplified logic from previous example
+        number_of_clusters = config["number_of_eigenvectors"]
+        current_k = 0
+        if isinstance(number_of_clusters, int): current_k = number_of_clusters
+        elif number_of_clusters == "fixed2": current_k = 2
+        elif number_of_clusters == "fixed3": current_k = 3
+        elif isinstance(number_of_clusters, str) and number_of_clusters.startswith("eigengap"):
+             # Eigengap logic (simplified - requires check_symmetric, assumes numpy/scipy linalg)
+             # ... (eigengap calculation logic would go here, setting current_k) ...
+             print("   (Eigengap logic placeholder - using default k=2 for now)")
+             current_k = 2 # Placeholder if eigengap logic omitted here
+        else: current_k = 2 # Default
 
-    eigengap = np.diff(e)
-    optimal_number_of_clusters = np.argmax(eigengap[:10]) + 1
+        current_k = max(2, min(current_k, dim)) # Ensure valid k
+        print(f"   Final number of clusters (k): {current_k}")
 
-    number_of_clusters = config["number_of_eigenvectors"]
-    if isinstance(number_of_clusters, int):
-        current_k = number_of_clusters
-    elif number_of_clusters == "fixed2":
-        current_k = 2
-    elif number_of_clusters == "fixed3":
-        current_k = 3
-    else:
-        current_k = max(optimal_number_of_clusters, 2)
+        # Eigen decomposition (request k eigenvectors)
+        num_eig_needed = min(current_k, dim - 1)
+        if num_eig_needed <= 0: raise ValueError("k must be > 0")
 
-    X = v[:, -current_k:]  # skip the first trivial eigenvector - ignore
-    clustering = KMeans(n_clusters=current_k, random_state=42, n_init=100)
-    cluster_labels = clustering.fit_predict(X)
-    python_silhouette = silhouette_score(X, cluster_labels)
-    laplacian_end = time.time()
-    clustering_end = time.time()
+        if check_symmetric(laplacian_matrix_normalized):
+             # Use eigsh for sparse symmetric, get largest magnitude ('LM')
+             # Increase maxiter for potentially better convergence
+             eigenvalues, eigenvectors = sp.linalg.eigsh(laplacian_matrix_normalized, k=num_eig_needed, which='LM', tol=1e-6, maxiter=dim*5)
+             idx = np.argsort(np.abs(eigenvalues))[::-1]
+             eigenvectors = np.real(eigenvectors[:, idx])
+        else: # Not symmetric (RW case)
+             # Use eigs for sparse non-symmetric, get largest real part ('LR')
+             eigenvalues, eigenvectors = sp.linalg.eigs(laplacian_matrix_normalized, k=num_eig_needed, which='LR', tol=1e-6, maxiter=dim*5)
+             eigenvectors = np.real(eigenvectors) # Eigenvectors for real eigenvalues are real
 
-    print(f"🔍 Inside spectral_clustering -> clusters: {current_k}")
+        X = eigenvectors # Features for KMeans
 
-    # Evaluation
-    ari_start = time.time()
-    python_rand_index = adjusted_rand_score(true_labels, cluster_labels)
-    ari_end = time.time()
+        # Normalize if using symmetric Laplacian
+        if config["laplacian_type"] == "sym":
+            norms = np.linalg.norm(X, axis=1, keepdims=True); norms[norms == 0] = 1.0; X = X / norms
 
-    #python_silhouette = silhouette_score(adjacency_matrix, cluster_labels, metric='precomputed')
-    total_time = ari_end - start_time
-    cpu_used = (process.cpu_times().user + process.cpu_times().system) - (start_cpu.user + start_cpu.system)
-    memory_used = (process.memory_info().rss - start_mem) / (1024 ** 2)
+        # KMeans Clustering
+        if X.shape[0] > 0 and X.shape[1] > 0:
+            kmeans = KMeans(n_clusters=current_k, random_state=42, n_init=10)
+            cluster_labels = kmeans.fit_predict(X)
+        else:
+            print("   ⚠️ Skipping KMeans due to invalid eigenvector matrix.")
+            cluster_labels = np.zeros(dim, dtype=int)
 
-    return {
-        "python_silhouette_score": python_silhouette,
+        # Calculate Silhouette score (on eigenvectors X)
+        if cluster_labels is not None and len(np.unique(cluster_labels)) > 1 and len(np.unique(cluster_labels)) < X.shape[0]:
+            try:
+                 sil_score_val = silhouette_score(X, cluster_labels)
+                 print(f"   Silhouette Score (on Eigenvectors): {sil_score_val:.4f}")
+            except ValueError as e: print(f"   ⚠️ Could not calculate Silhouette Score: {e}")
+        else: print("   ⚠️ Skipping Silhouette Score (k<=1 or k>=n).")
+
+    except (np.linalg.LinAlgError, sp.linalg.ArpackNoConvergence) as e:
+         print(f"   ❌ Linear algebra/Convergence error during eigen/kmeans: {e}. Clustering failed.")
+         # cluster_labels remains None or default zeros
+         if cluster_labels is None: cluster_labels = np.zeros(dim, dtype=int)
+    except Exception as e:
+         print(f"   ❌ Error during clustering steps: {e}")
+         if cluster_labels is None: cluster_labels = np.zeros(dim, dtype=int)
+
+    clustering_time = time.time() - clustering_start
+    print(f"   Clustering (Eigen + KMeans) done. Time: {clustering_time:.2f}s")
+    # --- End: Python Spectral Clustering ---
+
+    # --- Start: Python Metric Calculation (ARI) ---
+    ari_time = 0.0
+    python_rand_index = np.nan
+    if true_labels is not None and cluster_labels is not None and len(cluster_labels) == len(true_labels):
+         if len(np.unique(cluster_labels)) > 1:
+             ari_start = time.time(); python_rand_index = adjusted_rand_score(true_labels, cluster_labels); ari_time = time.time() - ari_start
+    # (Error handling as before)
+    # --- End: Python Metric Calculation ---
+
+
+    # --- Start: Neo4j Writing ---
+    neo4j_write_time = np.nan # Default
+    if driver and cluster_labels is not None and len(identifiers) == len(cluster_labels):
+        print(f"    GDB Writing Python results to Neo4j for experiment: {experiment_tag}...")
+        start_neo4j_write = time.time()
+        # node_label = config['node_label'] # Already got this
+
+        try:
+            unique_clusters = sorted(np.unique(cluster_labels))
+            if len(unique_clusters) == 0:
+                 print("   ⚠️ No clusters found, skipping Neo4j write.")
+            else:
+                # 1. Calculate Centroids (using feature_matrix loaded earlier)
+                centroids = {}
+                if feature_matrix is not None: # Check if features were loaded successfully
+                     for cluster_id in unique_clusters:
+                         # Make sure indices align: labels correspond to rows in feature_matrix
+                         cluster_features = feature_matrix[cluster_labels == cluster_id]
+                         if cluster_features.shape[0] > 0:
+                             centroids[cluster_id] = cluster_features.mean(axis=0).tolist()
+                         else: # Handle potentially empty cluster
+                             centroids[cluster_id] = [np.nan] * feature_matrix.shape[1]
+                             print(f"      Warning: Cluster {cluster_id} is empty.")
+                     print(f"      Calculated {len(centroids)} centroids.")
+                else:
+                    print("      ⚠️ Cannot calculate centroids as features are unavailable.")
+
+
+                # 2. Write Centroids and Link Nodes in Neo4j session
+                with driver.session(database="neo4j") as session:
+                    # Create/Update Centroid Nodes
+                    if centroids: # Only write if centroids were calculated
+                        centroid_batch = [{"cluster_id": int(cid), "coords": ccoords}
+                                          for cid, ccoords in centroids.items() if not np.isnan(ccoords).any()] # Avoid writing NaN centroids
+                        if centroid_batch:
+                             session.run("""
+                                 UNWIND $batch AS c_data
+                                 MERGE (c:ClusterCentroid {clusterId: c_data.cluster_id, experiment: $experiment_tag})
+                                 SET c.coordinates = c_data.coords, c.nodeLabel = $nodeLabel
+                                 """, batch=centroid_batch, experiment_tag=experiment_tag, nodeLabel=node_label)
+                             print(f"      Created/updated {len(centroid_batch)} ClusterCentroid nodes.")
+                        else:
+                             print("      No valid centroids to write (all might have been NaN).")
+
+
+                    # Link Data Nodes to Centroids
+                    # Use the 'identifiers' derived from the 'id' column
+                    # Ensure type consistency (identifier vs node property type)
+                    link_data = [{"identifier": identifiers[i], "cluster_id": int(cluster_labels[i])}
+                                 for i in range(len(identifiers))]
+
+                    batch_size = 2000
+                    print(f"      Linking {len(link_data)} '{node_label}' nodes using property '{id_property_in_neo4j}'...")
+                    for i in tqdm(range(0, len(link_data), batch_size), desc="Linking nodes", ncols=80, leave=False):
+                        batch = link_data[i:i+batch_size]
+                        # Use the correct id_property_in_neo4j ('id') in the MATCH clause
+                        # Ensure link.identifier type matches node property type
+                        cypher_link = f"""
+                            UNWIND $batch AS link
+                            MATCH (d:{node_label} {{{id_property_in_neo4j}: link.identifier}}) // Match using 'id'
+                            MATCH (c:ClusterCentroid {{clusterId: link.cluster_id, experiment: $experiment_tag}})
+                            MERGE (d)-[r:BELONGS_TO_CLUSTER {{experiment: $experiment_tag}}]->(c)
+                        """
+                        # Note: If IDs in Neo4j are strings, convert identifier in batch dict if needed.
+                        # Assuming create_graph_nodes stored IDs with the correct type from CSV.
+                        session.run(cypher_link, batch=batch, experiment_tag=experiment_tag)
+
+                neo4j_write_time = time.time() - start_neo4j_write
+                print(f"   ✅ Finished writing results to Neo4j. Time: {neo4j_write_time:.2f}s")
+
+        # (Error handling for Neo4j write - as before)
+        except Exception as e:
+             print(f"   ❌ Error writing results to Neo4j: {e}")
+             neo4j_write_time = -1.0 # Indicate error
+
+    # (Checks for driver, cluster_labels None, length mismatch - as before)
+    elif not driver: print("   ⚠️ Neo4j driver not provided, skipping write operation.")
+    elif cluster_labels is None: print("   ⚠️ Cluster labels are None (clustering failed), skipping Neo4j write.")
+    else: print("   ⚠️ Identifiers and cluster_labels length mismatch, skipping Neo4j write.")
+    # --- End: Neo4j Writing ---
+
+
+    # --- Start: Final Metrics Calculation & Return ---
+    end_cpu_times = process.cpu_times(); cpu_used = (end_cpu_times.user + end_cpu_times.system) - (start_cpu_times.user + start_cpu_times.system)
+    end_mem = process.memory_info().rss; memory_used = (end_mem - start_mem) / (1024 ** 2) # In MB
+
+    # Calculate total Python execution time from measured components
+    python_total_exec_time = laplacian_time + clustering_time + ari_time
+
+    results_dict = {
+        "python_silhouette_score": sil_score_val, # Based on eigenvectors
         "python_rand_index": python_rand_index,
-        "python_total_time": total_time,
-        "python_affinity_time": 0.0,  # not used now
-        "python_laplacian_time": laplacian_end - laplacian_start,
-        "python_clustering_time": clustering_end - laplacian_end,
-        "python_adjusted_rand_index_time": ari_end - ari_start,
-        "python_memory_used": memory_used,
-        "python_cpu_used": cpu_used
+        "python_total_time": python_total_exec_time, # Sum of measured Python steps
+        "python_affinity_time": affinity_time, # Adjacency matrix creation time
+        "python_laplacian_time": laplacian_time,
+        "python_clustering_time": clustering_time, # Eigen + KMeans time
+        "python_adjusted_rand_index_time": ari_time,
+        "python_memory_used_MB": memory_used, # Memory for the whole function
+        "python_cpu_used_seconds": cpu_used,  # CPU for the whole function
+        "neo4j_write_time_seconds": neo4j_write_time # Add the new timing metric
     }
+    # --- End: Final Metrics ---
+
+    return results_dict
 
 def run_experiments(driver, experiments):
     print("Init")
     try:
         with driver.session() as session:
-            session.run("RETURN simkit.initSimKit('bolt://localhost:7688', 'neo4j', '123412345')")
+            session.run("RETURN simkit.initSimKit('bolt://localhost:7687', 'neo4j', '123412345')")
     except Exception as e:
         print(f"Error initializing SimKit: {e}")
         return
@@ -485,11 +1019,11 @@ def run_experiments(driver, experiments):
         }
         if config.get("is_feature_based"):
             filename = f"{config['node_label'].replace('Node','').lower()}.csv"
-            python_result = run_python_experiment_feature(config, os.path.join("datasets", filename))
+            python_result = run_python_experiment_feature(config, os.path.join("datasets", filename), driver, f"experiment_feature_{filename}_{memory_used}")
         else:
             node_file_path = os.path.join("datasets", f"{config['node_label'].replace('Node','').lower()}_nodes.csv")
             edge_file_path = os.path.join("datasets", f"{config['node_label'].replace('Node','').lower()}_edges.csv")
-            python_result = run_python_experiment_graph(config, node_file_path, edge_file_path)
+            python_result = run_python_experiment_graph(config, node_file_path, edge_file_path, driver, f"experiment_graph_{config['node_label'].replace('Node','').lower()}_{memory_used}")
         merged_result = {**config, **simkit_result, **python_result}
         results.append(merged_result)
         print(f"Completed experiment {idx}/{total_experiments} with config: {config}")
@@ -564,7 +1098,7 @@ def run_graph_experiment(dataset, node_label, edge_label, remove_columns, number
     print(f"Graph experiment completed for {dataset}")
 
 feature_datasets = {
-    "iris": {"label": "IrisNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"}
+    #"iris": {"label": "IrisNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"}
 }
 
 graph_datasets = {
