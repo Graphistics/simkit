@@ -8,7 +8,7 @@ import numpy as np
 # ------------------------------------------------------------------
 # 1. CONNECT & PRINT VERSIONS
 # ------------------------------------------------------------------
-URI = "bolt://localhost:7687"
+URI = "bolt://localhost:7688"
 USER, PWD = "neo4j", "123412345"
 
 print("[INFO] ▶ Connecting to Neo4j…", end=" ")
