@@ -1,6 +1,9 @@
 # SimKit
 Plug-in for Neo4j containing user-defined procedures to perform Spectral Clustering through a single procedure or as individual procedures (Similarity Graph, Laplacian Eigendecomposed Graph, KMeans). Additional procedures available for evaluation with Average Silhouette Score and Adjusted Rand Index, visualization of matrices into String and saving them to CSV.
 
+![SimKit Spectral Clustering Flowchart](./SimKit_spectralClustering_flowchart.png)
+
+
 ## [About](https://github.com/Graphistics/simkit/wiki)
 
 ## Methodology
