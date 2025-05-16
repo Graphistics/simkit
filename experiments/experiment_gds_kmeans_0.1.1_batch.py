@@ -2,9 +2,10 @@
 import os, sys, logging, pandas as pd, numpy as np, ast
 from neo4j import GraphDatabase
 from graphdatascience import GraphDataScience
+import time  # Import the time module
 
-# -----------------------------------------------------------------------------  
-# 0. LOG CONFIGURATION  
+# -----------------------------------------------------------------------------
+# 0. LOG CONFIGURATION
 # -----------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
@@ -13,8 +14,8 @@ logging.basicConfig(
 )
 log = logging.getLogger()
 
-# -----------------------------------------------------------------------------  
-# 1. CONNECT TO NEO4J & GDS  
+# -----------------------------------------------------------------------------
+# 1. CONNECT TO NEO4J & GDS
 # -----------------------------------------------------------------------------
 URI  = os.getenv("NEO4J_URI",  "bolt://localhost:7688")
 USER = os.getenv("NEO4J_USER", "neo4j")
@@ -33,8 +34,8 @@ log.info("▶ Initializing GDS client…")
 gds = GraphDataScience(URI, auth=(USER, PWD))
 log.info(f"  → GDS version: {gds.version()}")
 
-# -----------------------------------------------------------------------------  
-# 2. DATA‐LOADING HELPERS  
+# -----------------------------------------------------------------------------
+# 2. DATA‐LOADING HELPERS
 # -----------------------------------------------------------------------------
 def load_tabular(fp):
     df = pd.read_csv(fp, index_col="Index")
@@ -49,8 +50,8 @@ def load_graph(nodes_fp):
     k = int(df["label"].nunique())
     return features, k
 
-# -----------------------------------------------------------------------------  
-# 3. PER‐DATASET WORKFLOW  
+# -----------------------------------------------------------------------------
+# 3. PER‐DATASET WORKFLOW
 # -----------------------------------------------------------------------------
 def process(ds):
     name, typ = ds["name"], ds["type"]
@@ -67,7 +68,7 @@ def process(ds):
     # 3b) ingest nodes
     with driver.session() as sess:
         sess.run(f"MATCH (n:{label}) DETACH DELETE n")
-        rows = [{"id": int(i), "features": row.tolist()} 
+        rows = [{"id": int(i), "features": row.tolist()}
                 for i, row in feats.iterrows()]
         sess.run(
             f"UNWIND $rows AS r CREATE (n:{label} {{id:r.id,features:r.features}})",
@@ -118,6 +119,7 @@ def process(ds):
     # 3f) run K-means & write clusterId
     G = gds.graph.get(gname)
     log.info(f"  ▶ Running k-means (k={k}) …")
+    start_time = time.time()  # Start time measurement
     summary = gds.kmeans.write(
         G,
         nodeProperty  = "features",
@@ -125,7 +127,9 @@ def process(ds):
         k             = k,
         maxIterations = 10
     )
-    log.info(f"   ✓ k-means done (avgDist={summary.averageDistanceToCentroid:.3f})")
+    end_time = time.time()  # End time measurement
+    kmeans_time = end_time - start_time
+    log.info(f"   ✓ k-means done (avgDist={summary.averageDistanceToCentroid:.3f}, time={kmeans_time:.3f}s)")
 
     # 3g) create Centroid nodes + ASSIGNED_TO edges
     centroids = summary.centroids
@@ -135,7 +139,7 @@ def process(ds):
         sess.run("MATCH (c:Centroid {graph:$g}) DETACH DELETE c", g=gname)
         # create new centroids
         centroid_rows = [
-            {"cluster": int(i), "features": list(centroid)} 
+            {"cluster": int(i), "features": list(centroid)}
             for i, centroid in enumerate(centroids)
         ]
         sess.run("""
@@ -170,8 +174,8 @@ def process(ds):
     gds.graph.drop(gname)
     log.info(f"  ✓ Dropped graph `{gname}`")
 
-# -----------------------------------------------------------------------------  
-# 4. MAIN  
+# -----------------------------------------------------------------------------
+# 4. MAIN
 # -----------------------------------------------------------------------------
 def main():
     datasets = [

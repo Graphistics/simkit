@@ -4,6 +4,7 @@ from graphdatascience import GraphDataScience
 from sklearn.datasets import load_iris
 import pandas as pd
 import numpy as np
+import time  # Import the time module
 
 # ------------------------------------------------------------------
 # 1. CONNECT & PRINT VERSIONS
@@ -85,6 +86,7 @@ print(proj_summary)
 print("[INFO] Running K-means (k=3)…")
 # need a Graph object, not just the name
 G = gds.graph.get(GRAPH_NAME)
+start_time = time.time()  # Start time measurement
 kmeans_summary = gds.kmeans.write(
     G,
     nodeProperty  = "features",    # array property
@@ -92,8 +94,11 @@ kmeans_summary = gds.kmeans.write(
     k             = 3,
     maxIterations = 10
 )
+end_time = time.time()  # End time measurement
+kmeans_time = end_time - start_time
 print("[INFO] K-means summary:")
 print(kmeans_summary)
+print(f"[INFO] K-means execution time: {kmeans_time:.3f} seconds")
 
 # ------------------------------------------------------------------
 # 6. VERIFY FIRST 10 ASSIGNMENTS
