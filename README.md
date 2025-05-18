@@ -29,7 +29,7 @@ return simkit.nodePropertyToGraph({
 ### Create EigenGraph
 ```java
 return simkit.nodePropertyEigen({
-    node_label: "affinity_full_7_Iris",
+    label: "affinity_full_7_Iris",
     laplacian_type: "sym",
     number_of_eigenvectors: 3
 })
@@ -38,29 +38,29 @@ return simkit.nodePropertyEigen({
 ### Kmean Clustering
 ```java
 return simkit.kMeans({
-    nodeSet: "eigen_sym_3_affinity_full_7_Iris",
-    numberOfCentroid: "3",
-    numberOfInteration: "100",
-    distanceMeasure: "euclidean",
-    originalSet: "Iris",
+    label: "eigen_sym_3_affinity_full_7_Iris",
+    number_of_centroids: "3",
+    number_of_iterations: "100",
+    distance_measure: "euclidean",
+    original_set: "Iris",
     overlook: "target,sepal_length,sepal_width,petal_length,petal_width",
-    overlookOriginal: "target",
-    useKmeanForSilhouette: false
+    overlook_riginal: "target",
+    silhouette: false
 })
 ```
 
 ### Calculate Adjusted rand index
 ```java
 return simkit.adjustedRandIndex({
-    nodeSet: "Iris",
-    trueLabels: "target"
+    label: "Iris",
+    true_labels: "target"
 })
 ```
 
 ### Spectral Clustering
 ```java
 return simkit.spectralClustering({
-    node_label: "Iris",
+    label: "Iris",
     is_feature_based: true,
     distance_measure: "euclidean",
     graph_type: "full",
@@ -71,7 +71,7 @@ return simkit.spectralClustering({
     number_of_iterations: "100",
     distance_measure_kmean: "euclidean",
     target_column: "target",
-    use_kmean_for_silhouette: false,
+    silhouette: false,
     seed: 42
 })
 ```
