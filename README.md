@@ -44,7 +44,7 @@ return simkit.kMeans({
     distance_measure: "euclidean",
     original_set: "Iris",
     overlook: "target,sepal_length,sepal_width,petal_length,petal_width",
-    overlook_riginal: "target",
+    overlook_original: "target",
     silhouette: false
 })
 ```
