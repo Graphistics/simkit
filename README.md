@@ -21,7 +21,7 @@ return simkit.nodePropertyToGraph({
     label: "Iris",
     distance_measure: "euclidean",
     graph_type: "full",
-    parameter: "7",
+    parameter: 7,
     remove_column: "index,target"
 })
 ```
@@ -39,8 +39,8 @@ return simkit.nodePropertyEigen({
 ```java
 return simkit.kMeans({
     label: "eigen_sym_3_affinity_full_7_Iris",
-    number_of_centroids: "3",
-    number_of_iterations: "100",
+    number_of_centroids: 3,
+    number_of_iterations: 100,
     distance_measure: "euclidean",
     original_set: "Iris",
     overlook: "target,sepal_length,sepal_width,petal_length,petal_width",
@@ -64,11 +64,11 @@ return simkit.spectralClustering({
     is_feature_based: true,
     distance_measure: "euclidean",
     graph_type: "full",
-    parameter: "7",
+    parameter: 7,
     remove_columns: "index,target",
     laplacian_type: "sym",
     number_of_eigenvectors: 3,
-    number_of_iterations: "100",
+    number_of_iterations: 100,
     distance_measure_kmean: "euclidean",
     target_column: "target",
     silhouette: false,
