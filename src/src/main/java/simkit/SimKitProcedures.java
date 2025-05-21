@@ -362,7 +362,6 @@ public class SimKitProcedures implements AutoCloseable {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-
     }
 
 
