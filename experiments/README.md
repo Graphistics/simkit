@@ -1,108 +1,66 @@
 # SimKit Experiments with Neo4j & Python
 
-This repository demonstrates how to run spectral clustering experiments using both the SimKit plugin (loaded into Neo4j) and scikit-learn. It includes:
-- A Dockerfile to build a Neo4j container with the SimKit plugin.
-- The `experiments_2.py` script which runs experiments against the Neo4j instance.
+This repository demonstrates how to run spectral clustering experiments using both the SimKit plugin (loaded into Neo4j) and scikit-learn. It also includes experiments using Neo4j Graph Data Science (GDS) algorithms.
+
+## Features
+- Dockerized Neo4j setup with the SimKit plugin.
+- Scripts to compare clustering results using:
+- SimKit (custom Neo4j plugin)
+- scikit-learn
+- Neo4j GDS library
+- Batch and timing experiments for performance comparison.
+
+## Contents
+- Dockerfile and docker-compose.yml: Builds and runs a Neo4j instance with the SimKit plugin.
+- requirements.txt: Python dependencies.
+- SimKit-0.1.1.jar: SimKit plugin (must be compatible with the Neo4j version used).
+- Python scripts:
+  - experiment_gds.py: Runs k-means clustering using Neo4j GDS.
+  - experiments_simkit-0.1.1.py: Runs and times clustering using SimKit and scikit-learn.
 
 ## Prerequisites
-
-- Docker must be installed on your system.
+- Docker installed on your system.
 - Python 3.x and pip installed.
-- Ensure your system has enough memory (Neo4j can be memory intensive).
-- Place the `simkit.jar` plugin file (compatible with your Neo4j version) in the same folder as the Dockerfile.
+- Memory: Ensure your system has enough RAM (Neo4j can be memory-intensive).
+- Place the simkit.jar plugin (compatible with your Neo4j version) in the same directory as the Dockerfile.
 
-## Building and Running the Neo4j Docker Container
+## Setup Instructions
+1. Clone the repository:
 
-1. **Build the Docker Image**
+    ```bash
+    git clone https://github.com/yourusername/simkit-experiments.git
+    cd simkit-experiments
+    ```
 
-   Open a terminal in the directory containing the Dockerfile and `simkit.jar` and run:
+2. Install Python dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-   ```bash
-   docker build -t my-neo4j .
-   ```
+3. Start the Neo4j database:
+    ```bash
+    docker compose up
+    ```
 
-   This builds a Docker image named `my-neo4j` that includes the SimKit plugin.
+    This will build and start the Neo4j container with SimKit.
 
-2. **Run the Docker Container**
 
-   Start the container with:
+4. Run experiments:
+   - Run GDS clustering experiments on Neo4j:
+    ```bash
+    python experiment_gds.py
+    ```
 
-   ```bash
-   docker run --name neo4j -p 7687:7687 -p 7474:7474 -d my-neo4j
-   ```
+   - Run SimKit and scikit-learn timing experiments:
+    ```bash
+    python experiments_simkit-0.1.1.py
+    ```
 
-   - **Ports:**  
-     - `7687` is the Bolt port for Neo4j.
-     - `7474` is the HTTP port (Neo4j Browser).
+## Notes
+- Ensure the Neo4j container is fully up before starting any experiments.
+- The scripts assume the Neo4j instance is accessible at the configured bolt:// address and uses default credentials (neo4j/neo4j by default; change if modified).
+- You may need to load or generate a sample graph dataset in Neo4j before running experiments.
 
-3. **Verify the Container**
+## License
 
-   - Check logs for any errors (especially plugin errors):
-
-     ```bash
-     docker logs neo4j
-     ```
-
-   - Open [http://localhost:7474](http://localhost:7474) in your browser to access the Neo4j Browser and verify that the SimKit procedures are available (e.g., try a test query like `RETURN simkit.experimental_spectralClustering({ ... })`).
-
-## Running the Experiments
-
-The `experiments_2.py` script runs spectral clustering experiments using both SimKit (via Neo4j procedures) and scikit-learn spectral clustering.
-
-1. **Install Python Dependencies**
-
-   The script will attempt to install missing packages automatically. Alternatively, install manually:
-
-   ```bash
-   pip install neo4j pandas psutil tqdm scikit-learn scipy
-   ```
-
-2. **Prepare Datasets**
-
-   Place your dataset CSV files under the `datasets/` directory. The script expects file names such as `iris.csv`, `cora_nodes.csv`, `cora_edges.csv`, etc.
-
-3. **Run the Experiment Script**
-
-   Ensure the Neo4j container is running, then execute:
-
-   ```bash
-   python experiments_2.py
-   ```
-
-   The script will:
-   - Delete existing nodes and indexes in Neo4j.
-   - Create feature/graph nodes from the datasets.
-   - Run experiments using both SimKit and scikit-learn.
-   - Save results as CSV files in a `results/` directory.
-
-## Troubleshooting
-
-- **Container Exits Early:**  
-  Check the container logs with:
-
-  ```bash
-  docker logs neo4j
-  ```
-
-  Review for errors related to plugin incompatibility, configuration issues, or memory constraints.
-
-- **SimKit Procedure Not Found:**  
-  Ensure the `simkit.jar` file is correctly placed and compatible with the Neo4j version used.
-
-- **Python Errors:**  
-  Verify that all dataset files exist and have the expected schema.
-
-## Cleanup
-
-To stop and remove the Docker container:
-
-```bash
-docker stop neo4j
-docker rm neo4j
-```
-
-To remove the Docker image:
-
-```bash
-docker rmi my-neo4j
-```
+This project is licensed under the Apache License 2.0.
