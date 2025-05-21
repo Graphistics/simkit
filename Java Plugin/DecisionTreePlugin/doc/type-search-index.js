@@ -1,1 +1,0 @@
-typeSearchIndex = [{"l":"All Classes","u":"allclasses-index.html"},{"p":"main","l":"OutputDecisionTreeNeo4j"}];updateSearchResults();

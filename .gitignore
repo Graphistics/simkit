@@ -14,3 +14,5 @@ dataset_1_iris_numeric/Iris_Mythica_Data_Set.csv
 /.venv2/
 *.sh
 *.pdf
+/experiments/results_old/
+find_.sh
