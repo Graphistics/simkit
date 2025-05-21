@@ -6,7 +6,6 @@ Plug-in for Neo4j containing user-defined procedures to perform Spectral Cluster
 
 ## [About](https://github.com/Graphistics/simkit/wiki)
 
-## Methodology
 
 ## Procedure Stack
 
@@ -81,24 +80,6 @@ return simkit.spectralClustering({
 return simkit.getMatrix("affinity_full_7_Iris","adjacency","/path/to/folder")
 ```
 
-## Features 
-
-SimKit contains ... procedures, which read CSV files, map nodes, generate ... similarity graphs using .. different distance measures, generate laplacian eigendecomposed graph, perform K-means clustering, and validate the clustering with silhouette coefficient. 
-
-## Procedures to
----> map data into Neo4j Nodes
-
----> generate Similarity graph
-
----> generate Laplacian eigendecomposed graph
-
----> perform K-means clustering and validate it with silhouette coefficient
-
----> calculate Adjusted rand index
-
----> perform Spectral clustering (feature-/graph-based clustering) and validate it with silhouette coefficient
-
----> visualize and save matrix (adjacency/X matrix) as CSV 
 
 ## Changelog
 - Renamed main. to simkit.
