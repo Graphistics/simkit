@@ -13,7 +13,7 @@ services:
       dbms.security.procedures.unrestricted: "simkit.*"
     volumes:
       # mount your locally built simkit.jar
-      - ./simkit.jar:/var/lib/neo4j/plugins/simkit.jar
+      - ./SimKit-0.1.1.jar:/var/lib/neo4j/plugins/simkit.jar
       - simkit_data:/data
       - simkit_logs:/logs
     ports:
