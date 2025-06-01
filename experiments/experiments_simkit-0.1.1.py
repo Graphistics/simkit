@@ -1061,7 +1061,7 @@ def run_experiments(driver, experiments):
     total_experiments = len(experiments)
     for idx, config in enumerate(experiments, 1):
         print(config)
-        query = "WITH simkit.experimental_spectralClustering({ node_label: $node_label, is_feature_based: $is_feature_based, distance_measure: 'euclidean', graph_type: $graph_type, parameter: $parameter, remove_columns: $remove_columns, laplacian_type: $laplacian_type, number_of_eigenvectors: $number_of_eigenvectors, number_of_iterations: 100, distance_measure_kmean: 'euclidean', target_column: $target_column, use_kmean_for_silhouette: $use_kmean_for_silhouette, seed: 42 }) AS result RETURN result.silhouette_score AS silhouette_score, result.rand_index AS rand_index, result.total_time AS total_time, result.affinity_time AS affinity_time, result.laplacian_time AS laplacian_time, result.clustering_time AS clustering_time, result.adjusted_rand_index_time AS adjusted_rand_index_time"
+        query = "WITH simkit.experimentalSpectralClustering({ label: $node_label, is_feature_based: $is_feature_based, distance_measure: 'euclidean', graph_type: $graph_type, parameter: $parameter, remove_columns: $remove_columns, laplacian_type: $laplacian_type, number_of_eigenvectors: $number_of_eigenvectors, number_of_iterations: 100, distance_measure_kmean: 'euclidean', target_column: $target_column, silhouette: $use_kmean_for_silhouette, seed: 42 }) AS result RETURN result.silhouette_score AS silhouette_score, result.rand_index AS rand_index, result.total_time AS total_time, result.affinity_time AS affinity_time, result.laplacian_time AS laplacian_time, result.clustering_time AS clustering_time, result.adjusted_rand_index_time AS adjusted_rand_index_time"
         data, duration, memory_used, cpu_used, neo4j_mem, neo4j_cpu = run_query(driver, query, config)
         silhouette_val = data['silhouette_score'] if data else None
         rand_index_val = data['rand_index'] if data else None
@@ -1122,7 +1122,7 @@ def run_feature_experiment(dataset, label, remove_columns, number_of_eigenvector
     for graph_type in tqdm(graph_types, desc="Processing graph types"):
         for laplacian_type in tqdm(laplacian_types, desc=f"Processing Laplacian for {graph_type}", leave=False):
             experiments.append({
-                "node_label": label,
+                "label": label,
                 "is_feature_based": True,
                 "graph_type": graph_type,
                 "parameter": parameters[dataset][graph_type],
@@ -1139,7 +1139,7 @@ def run_feature_experiment(dataset, label, remove_columns, number_of_eigenvector
 def run_graph_experiment(dataset, node_label, edge_label, remove_columns, number_of_eigenvectors, target_column):
     delete_all_nodes(driver)
     delete_all_indexes(driver)
-    ensure_indexes(driver, {dataset: {"node_label": node_label}})
+    ensure_indexes(driver, {dataset: {"label": node_label}})
     node_file_path = os.path.join("datasets", f"{dataset}_nodes.csv")
     edge_file_path = os.path.join("datasets", f"{dataset}_edges.csv")
     create_graph_nodes(node_file_path, driver, node_label)
@@ -1149,7 +1149,7 @@ def run_graph_experiment(dataset, node_label, edge_label, remove_columns, number
     laplacian_types = ["sym", "rw"]
     for laplacian_type in tqdm(laplacian_types, desc="Processing Laplacian types"):
         experiments.append({
-            "node_label": node_label,
+            "label": node_label,
             "is_feature_based": False,
             "graph_type": "full",
             "parameter": "3",

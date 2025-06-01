@@ -10,7 +10,6 @@ import graph.GraphTransform;
 import graph.ReadCsvTestData;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.ejml.simple.SimpleMatrix;
-import org.neo4j.driver.Record;
 import org.neo4j.driver.*;
 import org.neo4j.driver.exceptions.AuthenticationException;
 import org.neo4j.driver.exceptions.Neo4jException;
@@ -23,6 +22,7 @@ import org.neo4j.procedure.UserFunction;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.sql.Driver;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -120,50 +120,50 @@ public class SimKitProcedures implements AutoCloseable {
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 
             if (data_path == null && distance_measure == null) {
-                throw new Exception("Missing dataPath or distance measure type");
+                throw new Exception("Missing data_path or distance measure type");
             } else {
-                String graphName = null;
+                String graph_name = null;
                 Double[][] adj_mat = null;
-                String[] removeList = remove_columns.split(",");
-                List<String> removeListNew = Arrays.stream(removeList).collect(Collectors.toList());
+                String[] remove_list = remove_columns.split(",");
+                List<String> remove_list_new = Arrays.stream(remove_list).collect(Collectors.toList());
                 ReadCsvTestData readCsvTestData = new ReadCsvTestData(data_path);
 //				//ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(data_path,IndexColumn);
-                ArrayList<NodeList2> nodePropertiesList = readCsvTestData.readCsvFileToMap(data_path);
+                ArrayList<NodeList2> node_properties_list = readCsvTestData.readCsvFileToMap(data_path);
 //                ArrayList<NodeList2> nodePropertiesList_copy = readCsvTestData.readCsvFileToMap(data_path);
-                Double[][] DistanceMatrix = getDistanceMatrixFromNodes(distance_measure, nodePropertiesList, removeListNew);
+                Double[][] distance_matrix = getDistanceMatrixFromNodes(distance_measure, node_properties_list, remove_list_new);
 
                 if (graph_type.equals("full")) {
-                    Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix, parameter);
-                    adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix, sigmas);
-                    graphName = graph_type.concat("_" + parameter);
+                    Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(distance_matrix, parameter);
+                    adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(distance_matrix, sigmas);
+                    graph_name = graph_type.concat("_" + parameter);
                 }
                 if (graph_type.equals("eps")) {
-                    Double espilonValue = Double.parseDouble(parameter);
-                    adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix, espilonValue);
-                    graphName = graph_type.concat("_" + parameter);
+                    Double epsilon = Double.parseDouble(parameter);
+                    adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(distance_matrix, epsilon);
+                    graph_name = graph_type.concat("_" + parameter);
                 }
                 if (graph_type.equals("knn")) {
-                    Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix, parameter);
-                    adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix, knn);
-                    graphName = graph_type.concat("_" + parameter);
+                    Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix, parameter);
+                    adj_mat = ReadCsvTestData.calculateKNNGraph(distance_matrix, knn);
+                    graph_name = graph_type.concat("_" + parameter);
                 }
                 if (graph_type.equals("mknn")) {
-                    Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix, parameter);
-                    adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix, knn);
-                    graphName = graph_type.concat("_" + parameter);
+                    Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix, parameter);
+                    adj_mat = ReadCsvTestData.calculateMutualKNNGraph(distance_matrix, knn);
+                    graph_name = graph_type.concat("_" + parameter);
                 }
-                ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList, adj_mat);
+                ArrayList<EdgeList2> edge_list = GraphTransform.calculateEdgeList(node_properties_list, adj_mat);
 
-                for (NodeList2 node : nodePropertiesList) {
-                    Neo4jGraphHandler.createNodeGraph(graphName.concat("new"), "Created nodes succesfully!\n", node, connector.getDriver());
+                for (NodeList2 node : node_properties_list) {
+                    Neo4jGraphHandler.createNodeGraph(graph_name.concat("new"), "Created nodes succesfully!\n", node, connector.getDriver());
                 }
 
-                for (int i = 0; i < edgeList.size(); i++) {
-                    EdgeList2 edgeListDetail = edgeList.get(i);
+                for (int i = 0; i < edge_list.size(); i++) {
+                    EdgeList2 edgeListDetail = edge_list.get(i);
                     if (edgeListDetail.getWeight() == 0.0) {
                         continue;
                     }
-                    Neo4jGraphHandler.createRelationshipGraph(graphName.concat("new"), "Created similarity graph succesfully!\n", edgeListDetail, connector.getDriver());
+                    Neo4jGraphHandler.createRelationshipGraph(graph_name.concat("new"), "Created similarity graph succesfully!\n", edgeListDetail, connector.getDriver());
 
                 }
 
@@ -186,110 +186,110 @@ public class SimKitProcedures implements AutoCloseable {
 //	public String nodePropertyToGraph(@Name("params") Map<String, Object> params) throws Exception {
 //
 //	    String label = (String) params.getOrDefault("label", "Iris");
-//	    String distanceMeasure = (String) params.getOrDefault("distance_measure", "euclidean");
-//	    String graphType = (String) params.getOrDefault("graph_type", "full");
+//	    String distance_measure = (String) params.getOrDefault("distance_measure", "euclidean");
+//	    String graph_type = (String) params.getOrDefault("graph_type", "full");
 //	    String parameter = (String) params.getOrDefault("parameter", "7");
 //	    String remove_columns = (String) params.getOrDefault("remove_column", "index,target");
 //
-//		StringBuilder outputString = new StringBuilder("Graph Data: ");
+//		StringBuilder output_string = new StringBuilder("Graph Data: ");
 //		try ( SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password) )
 //		{
 //
 //
-//			if(label == null && distanceMeasure == null) {
-//                throw new Exception("Missing dataPath or distance measure type");
+//			if(label == null && distance_measure == null) {
+//                throw new Exception("Missing data_path or distance measure type");
 //			}else {
-//				String graphName = "affinity_";
-//				//ArrayList<NodeList2> nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
+//				String graph_name = "affinity_";
+//				//ArrayList<NodeList2> node_properties_list = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
 //				org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> nodeData = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
-//				ArrayList<NodeList2> nodePropertiesList = nodeData.getLeft();
+//				ArrayList<NodeList2> node_properties_list = nodeData.getLeft();
 //				//				ArrayList<NodeList2> nodePropertiesList_copy = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
-//				String[] removeList = remove_columns.split(",");
-//				List<String> removeListNew = Arrays.stream(removeList).collect(Collectors.toList());
-////				Double[][] DistanceMatrix = GraphTransform.euclideanDistance(nodePropertiesList);
-//				Double[][] DistanceMatrix = getDistanceMatrixFromNodes(distanceMeasure,nodePropertiesList,removeListNew);
+//				String[] remove_list = remove_columns.split(",");
+//				List<String> remove_list_new = Arrays.stream(remove_list).collect(Collectors.toList());
+////				Double[][] distance_matrix = GraphTransform.euclideanDistance(node_properties_list);
+//				Double[][] distance_matrix = getDistanceMatrixFromNodes(distance_measure,node_properties_list,remove_list_new);
 //				Double[][] adj_mat = null;
 //
-//				if(graphType.equals("full")) {
-//					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix,parameter);
-//					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix,sigmas);
-//					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
+//				if(graph_type.equals("full")) {
+//					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(distance_matrix,parameter);
+//					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(distance_matrix,sigmas);
+//					graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
 //				}
-//				else if(graphType.equals("eps")) {
-//					Double espilonValue = Double.parseDouble(parameter);
-//					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix,espilonValue);
-//					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
+//				else if(graph_type.equals("eps")) {
+//					Double epsilon = Double.parseDouble(parameter);
+//					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(distance_matrix,epsilon);
+//					graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
 //
 //				}
-//				else if(graphType.equals("knn")) {
-//					int[][] knn = ReadCsvTestData.calculateKNNIndices(DistanceMatrix,parameter);
-//					adj_mat = ReadCsvTestData.calculateKNNGraphWithIndices(DistanceMatrix,knn);
-//					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
+//				else if(graph_type.equals("knn")) {
+//					int[][] knn = ReadCsvTestData.calculateKNNIndices(distance_matrix,parameter);
+//					adj_mat = ReadCsvTestData.calculateKNNGraphWithIndices(distance_matrix,knn);
+//					graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
 //
 //				}
-//				else if(graphType.equals("mknn")) {
-//					Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix,parameter);
-//					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix,knn);
-//					graphName = graphName.concat(graphType + "_" + parameter.replace(".", "_"));
+//				else if(graph_type.equals("mknn")) {
+//					Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix,parameter);
+//					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(distance_matrix,knn);
+//					graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
 //				} else {
 //                    throw new Exception("Invalid graph_type specified.");
 //				}
 //
-//				outputString.append("\n\nAdjacency Matrix:\n").append(doubleToString(adj_mat));
+//				output_string.append("\n\nAdjacency Matrix:\n").append(doubleToString(adj_mat));
 //
-//				ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList,adj_mat);
-//				graphName += "_" + label;
-////				Neo4jGraphHandler.bulkDeleteNodesWithBatching(graphName, connector.getDriver());
+//				ArrayList<EdgeList2> edge_list = GraphTransform.calculateEdgeList(node_properties_list,adj_mat);
+//				graph_name += "_" + label;
+////				Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name, connector.getDriver());
 //
 //
-//				//for (EdgeList edgeListDetail : edgeList) {
-//				for (NodeList2 node : nodePropertiesList) {
-//					Neo4jGraphHandler.createNodeGraph(graphName, "Created nodes succesfully!\n", node, connector.getDriver());
+//				//for (edge_list edgeListDetail : edge_list) {
+//				for (NodeList2 node : node_properties_list) {
+//					Neo4jGraphHandler.createNodeGraph(graph_name, "Created nodes succesfully!\n", node, connector.getDriver());
 //				}
 //
-//				for (int i = 0; i < edgeList.size(); i++) {
-//					EdgeList2 edgeListDetail = edgeList.get(i);
+//				for (int i = 0; i < edge_list.size(); i++) {
+//					EdgeList2 edgeListDetail = edge_list.get(i);
 //					if(edgeListDetail.getWeight()==0.0){
 //						continue;
 //					}
-//					Neo4jGraphHandler.createRelationshipGraph(graphName, "Created similarity graph succesfully!\n", edgeListDetail, connector.getDriver());
+//					Neo4jGraphHandler.createRelationshipGraph(graph_name, "Created similarity graph succesfully!\n", edgeListDetail, connector.getDriver());
 //
 //				}
 //
 //			}
-//			return "Create fully connected graph successful, " + outputString;
+//			return "Create fully connected graph successful, " + output_string;
 //		} catch (Exception e) {
 //			throw new RuntimeException(e);
 //		}
 //
 //	}
-    public static Double[][] getDistanceMatrixFromNodes(String distanceMeasure, ArrayList<NodeList2> nodePropertiesList, List<String> removeList) {
-        Double[][] DistanceMatrix = null;
+    public static Double[][] getDistanceMatrixFromNodes(String distance_measure, ArrayList<NodeList2> node_properties_list, List<String> remove_list) {
+        Double[][] distance_matrix = null;
 
-        switch (distanceMeasure) {
+        switch (distance_measure) {
             case "euclidean":
-                DistanceMatrix = DistanceMeasureNodes.euclideanDistance(nodePropertiesList, removeList);
+                distance_matrix = DistanceMeasureNodes.euclideanDistance(node_properties_list, remove_list);
                 break;
             case "manhattan":
-                DistanceMatrix = DistanceMeasureNodes.manhattanDistance(nodePropertiesList, removeList);
+                distance_matrix = DistanceMeasureNodes.manhattanDistance(node_properties_list, remove_list);
                 break;
             case "canberra":
-                DistanceMatrix = DistanceMeasureNodes.canberraDistance(nodePropertiesList, removeList);
+                distance_matrix = DistanceMeasureNodes.canberraDistance(node_properties_list, remove_list);
                 break;
             case "cosine":
-                DistanceMatrix = DistanceMeasureNodes.cosineSimilarity(nodePropertiesList, removeList);
+                distance_matrix = DistanceMeasureNodes.cosineSimilarity(node_properties_list, remove_list);
                 break;
             case "jaccard":
-                DistanceMatrix = DistanceMeasureNodes.jaccardCoefficient(nodePropertiesList, removeList);
+                distance_matrix = DistanceMeasureNodes.jaccardCoefficient(node_properties_list, remove_list);
                 break;
             case "bray_curtis":
-                DistanceMatrix = DistanceMeasureNodes.brayCurtisDistance(nodePropertiesList, removeList);
+                distance_matrix = DistanceMeasureNodes.brayCurtisDistance(node_properties_list, remove_list);
                 break;
             default:
                 System.out.println("Invalid distance measure type");
         }
 
-        return DistanceMatrix;
+        return distance_matrix;
 
     }
 
@@ -298,7 +298,7 @@ public class SimKitProcedures implements AutoCloseable {
 
         String label = (String) params.getOrDefault("label", "Iris");
         String distance_measure = (String) params.getOrDefault("distance_measure", "euclidean");
-        String graphType = (String) params.getOrDefault("graph_type", "full");
+        String graph_type = (String) params.getOrDefault("graph_type", "full");
         String parameter = (String) params.getOrDefault("parameter", "7");
         String remove_columns = (String) params.getOrDefault("remove_column", "index,target");
 
@@ -306,7 +306,7 @@ public class SimKitProcedures implements AutoCloseable {
 
 
             if (label == null && distance_measure == null) {
-                throw new Exception("Missing dataPath or distance measure type");
+                throw new Exception("Missing data_path or distance measure type");
             } else {
                 String graph_name = "affinity_";
                 ArrayList<NodeList2> node_properties_list;
@@ -325,24 +325,24 @@ public class SimKitProcedures implements AutoCloseable {
                 Double[][] distance_matrix = getDistanceMatrixFromNodes(distance_measure, node_properties_list, remove_list_new);
                 Double[][] adj_mat = null;
 
-                if (graphType.equals("full")) {
+                if (graph_type.equals("full")) {
                     Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(distance_matrix, parameter);
                     adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(distance_matrix, sigmas);
-                    graph_name = graph_name.concat(graphType + "_" + parameter.replace(".", "_"));
-                } else if (graphType.equals("eps")) {
-                    Double espilonValue = Double.parseDouble(parameter);
-                    adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(distance_matrix, espilonValue);
-                    graph_name = graph_name.concat(graphType + "_" + parameter.replace(".", "_"));
+                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
+                } else if (graph_type.equals("eps")) {
+                    Double epsilon = Double.parseDouble(parameter);
+                    adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(distance_matrix, epsilon);
+                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
 
-                } else if (graphType.equals("knn")) {
+                } else if (graph_type.equals("knn")) {
                     int[][] knn = ReadCsvTestData.calculateKNNIndices(distance_matrix, parameter);
                     adj_mat = ReadCsvTestData.calculateKNNGraphWithIndices(distance_matrix, knn);
-                    graph_name = graph_name.concat(graphType + "_" + parameter.replace(".", "_"));
+                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
 
-                } else if (graphType.equals("mknn")) {
+                } else if (graph_type.equals("mknn")) {
                     Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix, parameter);
                     adj_mat = ReadCsvTestData.calculateMutualKNNGraph(distance_matrix, knn);
-                    graph_name = graph_name.concat(graphType + "_" + parameter.replace(".", "_"));
+                    graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
                 } else {
                     throw new Exception("Invalid graph_type specified.");
                 }
@@ -423,29 +423,29 @@ public class SimKitProcedures implements AutoCloseable {
     }
 
     @UserFunction
-    public String mapNodes(@Name("nodeSet") String nodeSet, @Name("overlook") String overLook) throws Exception {
-        String listOfData = "";
-        String[] overLookArray = new String[0];
+    public String mapNodes(@Name("label") String label, @Name("overlook") String overlook) throws Exception {
+        String list_of_data = "";
+        String[] overlook_array = new String[0];
         mapNodeList.clear();
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
-            if (!overLook.isEmpty()) {
-                overLookArray = overLook.split(",");
+            if (!overlook.isEmpty()) {
+                overlook_array = overlook.split(",");
             }
-            queryData(nodeSet);
+            queryData(label);
             for (Record key : dataKey) {
                 List<Pair<String, Value>> values = key.fields();
-                for (Pair<String, Value> nodeValues : values) {
-                    if ("n".equals(nodeValues.key())) {
-                        Value value = nodeValues.value();
-                        String valueOfNode = getNodeValues(value, overLookArray);
+                for (Pair<String, Value> node_values : values) {
+                    if ("n".equals(node_values.key())) {
+                        Value value = node_values.value();
+                        String valueOfNode = getNodeValues(value, overlook_array);
                         mapNodeList.add(valueOfNode);
-//	                    listOfData = listOfData + valueOfNode + " | ";
-                        listOfData = mapNodeList.toString();
+//	                    list_of_data = list_of_data + valueOfNode + " | ";
+                        list_of_data = mapNodeList.toString();
                     }
                 }
             }
         }
-        return "Map all node data: " + listOfData;
+        return "Map all node data: " + list_of_data;
     }
 
     /**
@@ -462,52 +462,52 @@ public class SimKitProcedures implements AutoCloseable {
 
         predictedNodeLabels.clear();
 
-        String nodeSet = (String) params.getOrDefault("nodeSet", "eigen_sym_3_affinity_full_7_Iris");
-        String numberOfCentroid = (String) params.getOrDefault("numberOfCentroid", "3");
-        String numberOfInteration = (String) params.getOrDefault("numberOfInteration", "100");
-        String distanceMeasure = (String) params.getOrDefault("distanceMeasure", "euclidean");
-        String originalNodeSet = (String) params.getOrDefault("originalSet", "Iris");
-        String overLook = (String) params.getOrDefault("overlook", "target,sepal_length,sepal_width,petal_length,petal_width");
-        String overlookOriginal = (String) params.getOrDefault("overlookOriginal", "target");
-        boolean kmeanBool = (Boolean) params.getOrDefault("useKmeanForSilhouette", false);
+        String label = (String) params.getOrDefault("label", "eigen_sym_3_affinity_full_7_Iris");
+        String number_of_centroids = (String) params.getOrDefault("number_of_centroids", "3");
+        String number_of_iterations = (String) params.getOrDefault("number_of_iterations", "100");
+        String distance_measure = (String) params.getOrDefault("distance_measure", "euclidean");
+        String original_set = (String) params.getOrDefault("original_set", "Iris");
+        String overlook = (String) params.getOrDefault("overlook", "target,sepal_length,sepal_width,petal_length,petal_width");
+        String overlook_original = (String) params.getOrDefault("overlook_original", "target");
+        boolean silhouette = (Boolean) params.getOrDefault("silhouette", false);
         int seed = ((Number) params.getOrDefault("seed", 42)).intValue();
         List<String> allowedMeasures = Arrays.asList("manhattan", "cosine", "bray-curtis", "euclidean");
-        if (!allowedMeasures.contains(distanceMeasure.toLowerCase())) {
-            throw new IllegalArgumentException("Invalid distance measure: " + distanceMeasure);
+        if (!allowedMeasures.contains(distance_measure.toLowerCase())) {
+            throw new IllegalArgumentException("Invalid distance measure: " + distance_measure);
         }
 
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
-            int numCentroids = Integer.parseInt(numberOfCentroid);
-            int numIterations = Integer.parseInt(numberOfInteration);
+            int numCentroids = Integer.parseInt(number_of_centroids);
+            int numIterations = Integer.parseInt(number_of_iterations);
             double centroidNumber = 1.0;
             //Clear Existing node Labels
-            String nodeLabel = "Clustering_" + nodeSet;
+            String nodeLabel = "Clustering_" + label;
 
             Neo4jGraphHandler.deleteExistingNodeLabels(nodeLabel, connector.getDriver());
 
-            ArrayList<String> mapNodeList = parseNodeValues(nodeSet, overLook.split(","));
+            ArrayList<String> mapNodeList = parseNodeValues(label, overlook.split(","));
             if (mapNodeList == null || mapNodeList.isEmpty()) {
-                throw new Exception("No nodes found with the nodeSet: " + nodeSet);
+                throw new Exception("No nodes found with the label: " + label);
             }
-            ArrayList<String> mapNodeOriginalList = parseNodeValues(originalNodeSet, overlookOriginal.split(","));
+            ArrayList<String> mapNodeOriginalList = parseNodeValues(original_set, overlook_original.split(","));
 
             HashMap<String, ArrayList<String>> kmeanAssign = Unsupervised.KmeanClust(
-                    mapNodeList, numCentroids, numIterations, distanceMeasure, false, new ArrayList<>(), seed
+                    mapNodeList, numCentroids, numIterations, distance_measure, false, new ArrayList<>(), seed
             );
 
 
             HashMap<String, ArrayList<String>> cleanedKmeanAssign = Unsupervised.removeIndexAndId(kmeanAssign);
 
             double averageSilhouetteCoefficientValue;
-            if (kmeanBool) {
+            if (silhouette) {
                 // Remove index and id from kmeanAssign
-                averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(cleanedKmeanAssign, distanceMeasure);
+                averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(cleanedKmeanAssign, distance_measure);
             } else {
                 HashMap<String, ArrayList<String>> mappedNodes = Unsupervised.replaceValuesWithOriginalSet(kmeanAssign, mapNodeOriginalList);
-                averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(mappedNodes, distanceMeasure);
+                averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(mappedNodes, distance_measure);
             }
 
-            processClusters(connector, nodeSet, cleanedKmeanAssign, centroidNumber, distanceMeasure);
+            processClusters(connector, label, cleanedKmeanAssign, centroidNumber, distance_measure);
 
 //	        return "The average Silhouette Coefficient value is: " + averageSilhouetteCoefficientValue + " predicted labels: " + predictedNodeLabels;
             return averageSilhouetteCoefficientValue;
@@ -517,28 +517,28 @@ public class SimKitProcedures implements AutoCloseable {
     /**
      * Parses node values from the dataset based on overlook fields.
      */
-    private ArrayList<String> parseNodeValues(String nodeSet, String[] overlookFields) throws Exception {
-        ArrayList<String> nodeList = new ArrayList<>();
-        queryData(nodeSet);
+    private ArrayList<String> parseNodeValues(String label, String[] overlookFields) throws Exception {
+        ArrayList<String> node_list = new ArrayList<>();
+        queryData(label);
 
         for (Record record : dataKey) {
             for (Pair<String, Value> pair : record.fields()) {
                 if ("n".equals(pair.key())) {
                     String value = getNodeValues(pair.value(), overlookFields);
-                    nodeList.add(value);
+                    node_list.add(value);
                 }
             }
         }
-        System.out.println("parsed nodeList: " + nodeList);
-        return nodeList;
+        System.out.println("parsed node_list: " + node_list);
+        return node_list;
     }
 
     /**
      * Processes clusters and connects nodes based on the k-means result.
      */
-    private void processClusters(SimKitProcedures connector, String nodeSet,
+    private void processClusters(SimKitProcedures connector, String label,
                                  HashMap<String, ArrayList<String>> kmeanAssign,
-                                 double centroidNumber, String distanceMeasure) throws Exception {
+                                 double centroidNumber, String distance_measure) throws Exception {
         DecimalFormat decimalFormat = new DecimalFormat("#.###");
         for (String centroid : kmeanAssign.keySet()) {
             ArrayList<String> clusterNodes = kmeanAssign.get(centroid);
@@ -546,11 +546,11 @@ public class SimKitProcedures implements AutoCloseable {
             for (String clusterNode : clusterNodes) {
                 predictedNodeLabels.add(centroidNumber);
 
-                double distance = Unsupervised.calculateDistance(clusterNode, centroid, distanceMeasure);
+                double distance = Unsupervised.calculateDistance(clusterNode, centroid, distance_measure);
                 String formattedDistance = decimalFormat.format(distance);
 
 
-                connectNodes(nodeSet, "create relationship in kmean node", centroid, clusterNode, Double.parseDouble(formattedDistance), getDriver());
+                connectNodes(label, "create relationship in kmean node", centroid, clusterNode, Double.parseDouble(formattedDistance), getDriver());
             }
             centroidNumber += 1.0;
         }
@@ -567,30 +567,30 @@ public class SimKitProcedures implements AutoCloseable {
 //	public String adjustedRandIndex(@Name("params") Map<String, Object> params) throws Exception {
     public Map<String, Object> adjustedRandIndex(@Name("params") Map<String, Object> params) throws Exception {
 
-        String nodeSet = (String) params.getOrDefault("nodeSet", "Iris");
-        String trueLabels = (String) params.getOrDefault("trueLabels", "target");
+        String label = (String) params.getOrDefault("label", "Iris");
+        String true_labels = (String) params.getOrDefault("true_labels", "target");
 
         if (predictedNodeLabels.size() == 0) {
             throw new Exception(" predicted Labels is null, please run kmean clustering to add the predicted labels");
         } else {
-            String listOfData = "";
+            String list_of_data = "";
             Double adjustedRandIndexValue = 0.0;
             trueNodeLabels.clear();
             List<String> stringTrueNodeLabelsList = new ArrayList<String>();
             try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
-                queryData(nodeSet);
+                queryData(label);
                 for (Record key : dataKey) {
                     List<Pair<String, Value>> values = key.fields();
-                    for (Pair<String, Value> nodeValues : values) {
-                        if ("n".equals(nodeValues.key())) {
-                            Value value = nodeValues.value();
+                    for (Pair<String, Value> node_values : values) {
+                        if ("n".equals(node_values.key())) {
+                            Value value = node_values.value();
                             StringBuilder nodeLabel = new StringBuilder();
                             for (String nodeKey : value.keys()) {
-                                if (nodeKey.equals(trueLabels)) {
+                                if (nodeKey.equals(true_labels)) {
                                     try {
                                         double num = Double.parseDouble(String.valueOf(value.get(nodeKey)));
                                         trueNodeLabels.add(num);
-                                        listOfData = listOfData + num;
+                                        list_of_data = list_of_data + num;
                                         //	                	            	nodeLabel.append(getStringValue(nodeLabel)).append(nodeKey).append(":").append(value.get(nodeKey));
                                     } catch (NumberFormatException e) {
                                         System.out.println(value.get(nodeKey) + " is not a number.");
@@ -614,13 +614,13 @@ public class SimKitProcedures implements AutoCloseable {
 
             Map<String, Object> result = new HashMap<>();
             result.put("adjustedRandIndex", adjustedRandIndexValue);
-            result.put("trueLabels", trueNodeLabels);
+            result.put("true_labels", trueNodeLabels);
             result.put("predictedLabels", predictedNodeLabels);
 
             return result;
 
 //		    return adjustedRandIndexValue;
-//		    return "ajusted rand index of " + nodeSet + " is: " + adjustedRandIndexValue ;
+//		    return "ajusted rand index of " + label + " is: " + adjustedRandIndexValue ;
 //		    return "true labels: " + trueNodeLabels + " -- predicted labels: " + predictedNodeLabels + " -- adjustedRandIndexValue: " + adjustedRandIndexValue;
         }
     }
@@ -629,31 +629,31 @@ public class SimKitProcedures implements AutoCloseable {
     @UserFunction
     @Description("Calculate the mean of the Silhouette Coefficients for all points")
     public String averageSilhouetteCoefficient(
-            @Name("nodeSet") String nodeSet,
-            @Name("numberOfCentroid") String numberOfCentroid,
-            @Name("numberOfInteration") String numberOfInteration,
-            @Name("distanceMeasure") String distanceMeasure,
-            @Name("Seed") Number seed) throws Exception {
+            @Name("label") String label,
+            @Name("number_of_centroids") String number_of_centroids,
+            @Name("number_of_iterations") String number_of_iterations,
+            @Name("distance_measure") String distance_measure,
+            @Name("seed") Number seed) throws Exception {
 
-        if (nodeSet == null) {
+        if (label == null) {
             return null;
         }
 
-        // ✅ Validate distanceMeasure early
+        // ✅ Validate distance_measure early
         List<String> allowedMeasures = Arrays.asList("manhattan", "cosine", "bray-curtis", "euclidean");
-        if (!allowedMeasures.contains(distanceMeasure.toLowerCase())) {
-            throw new IllegalArgumentException("Unsupported distance measure: " + distanceMeasure);
+        if (!allowedMeasures.contains(distance_measure.toLowerCase())) {
+            throw new IllegalArgumentException("Unsupported distance measure: " + distance_measure);
         }
 
         String averageSilhouetteCoefficientString = "The average Silhouette Coefficient value is: ";
-        int numberOfCentroidInt = Integer.parseInt(numberOfCentroid);
-        int numberOfInterationInt = Integer.parseInt(numberOfInteration);
+        int numberOfCentroidInt = Integer.parseInt(number_of_centroids);
+        int numberOfInterationInt = Integer.parseInt(number_of_iterations);
         ArrayList<String> debug = new ArrayList<>();
 
         HashMap<String, ArrayList<String>> kmeanAssign = Unsupervised.KmeanClust(
-                mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, false, debug, (int) seed);
+                mapNodeList, numberOfCentroidInt, numberOfInterationInt, distance_measure, false, debug, (int) seed);
 
-        double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
+        double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distance_measure);
         return averageSilhouetteCoefficientString + averageSilhouetteCoefficientValue;
     }
 
@@ -661,14 +661,14 @@ public class SimKitProcedures implements AutoCloseable {
     /**
      * This function is used to query the data from graph database
      *
-     * @param nodeType type of node
+     * @param label type of node
      */
-    public void queryData(final String nodeType) {
+    public void queryData(final String label) {
         try (Session session = getDriver().session()) {
             String greeting = session.writeTransaction(new TransactionWork<String>() {
                 @Override
                 public String execute(Transaction tx) {
-                    Result result = tx.run("MATCH (n:" + nodeType + ") RETURN n");
+                    Result result = tx.run("MATCH (n:" + label + ") RETURN n");
                     dataKey = result.list();
                     return "Query Successful";
                 }
@@ -676,32 +676,32 @@ public class SimKitProcedures implements AutoCloseable {
         }
     }
 
-//	public void connectNodes(final String nodeType, final String message, final String nodeCentroid, final String nodeCluster, final double distance) throws Exception
+//	public void connectNodes(final String label, final String message, final String nodeCentroid, final String nodeCluster, final double distance) throws Exception
 //    {
 //    	final String name = "kmean";
 //    	try ( Session session = getDriver().session() )
 //	        {
 //
 //    		log.info("kmeans connection starts....");
-//        	String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(getDriver(), nodeType);
+//        	String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(getDriver(), label);
 //            String greeting = session.writeTransaction( new TransactionWork<String>()
 //            {
 //                @Override
 //                public String execute( Transaction tx )
 //                {
 //					// First, find and delete the existing node if it exists
-//					String deleteQuery = "MATCH (a:Clustering_" + nodeType + " {" + nodeCentroid + "}) " +
+//					String deleteQuery = "MATCH (a:Clustering_" + label + " {" + nodeCentroid + "}) " +
 //										 "DETACH DELETE a";
 //					//tx.run(deleteQuery);
 //					// Then create the new nodes and relationship
-//					String createQuery = "MERGE (a:Clustering_" + nodeType + " {" + nodeCentroid + "}) " +
-//										 "MERGE (b:Clustering_" + nodeType + " {" + nodeCluster + "}) " +
+//					String createQuery = "MERGE (a:Clustering_" + label + " {" + nodeCentroid + "}) " +
+//										 "MERGE (b:Clustering_" + label + " {" + nodeCluster + "}) " +
 //										 "MERGE (a)-[r:link]->(b) " +
 //										 "SET r.distance = " + distance + " " +
 //										 "RETURN a.message";
 //
-////					String createQuery = "MERGE (a:Clustering_" + nodeType + " {" + identifier + ": '" + nodeCentroid + "'}) " +
-////		                     "MERGE (b:Clustering_" + nodeType + " {" + identifier + ": '" + nodeCluster + "'}) " +
+////					String createQuery = "MERGE (a:Clustering_" + label + " {" + identifier + ": '" + nodeCentroid + "'}) " +
+////		                     "MERGE (b:Clustering_" + label + " {" + identifier + ": '" + nodeCluster + "'}) " +
 ////		                     "MERGE (a)-[r:link]->(b) " +
 ////		                     "SET r.distance = " + distance + " " +
 ////		                     "RETURN a";
@@ -715,26 +715,26 @@ public class SimKitProcedures implements AutoCloseable {
 //	}
 
 
-    public void connectNodes(final String nodeType, final String message, final String nodeCentroid, final String nodeCluster, final double distance, Driver driver) throws Exception {
+    public void connectNodes(final String label, final String message, final String nodeCentroid, final String nodeCluster, final double distance, Driver driver) throws Exception {
         final String name = "kmean";
         try (Session session = driver.session()) {
-            String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(getDriver(), nodeType);
+            String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(getDriver(), label);
 
             String greeting = session.writeTransaction(new TransactionWork<String>() {
                 @Override
                 public String execute(Transaction tx) {
 
                     // Resolve identifier for dynamic node matching
-                    String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(getDriver(), nodeType);
+                    String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(getDriver(), label);
 
 
                     // First, find and delete the existing node if it exists
-                    String deleteQuery = "MATCH (a:Clustering_" + nodeType + " {" + nodeCentroid + "}) " +
+                    String deleteQuery = "MATCH (a:Clustering_" + label + " {" + nodeCentroid + "}) " +
                             "DETACH DELETE a";
                     //tx.run(deleteQuery);
                     // Then create the new nodes and relationship
-                    String createQuery = "MERGE (a:Clustering_" + nodeType + " {" + nodeCentroid + "}) " +
-                            "MERGE (b:Clustering_" + nodeType + " {" + nodeCluster + "}) " +
+                    String createQuery = "MERGE (a:Clustering_" + label + " {" + nodeCentroid + "}) " +
+                            "MERGE (b:Clustering_" + label + " {" + nodeCluster + "}) " +
                             "MERGE (a)-[r:link]->(b) " +
                             "SET r.distance = " + distance + " " +
                             "RETURN a.message";
@@ -746,10 +746,10 @@ public class SimKitProcedures implements AutoCloseable {
         }
     }
 
-    public String getNodeValues(Value value, String[] overLookArray) {
+    public String getNodeValues(Value value, String[] overlook_array) {
         StringBuilder valueOfNode = new StringBuilder();
         for (String nodeKey : value.keys()) {
-            if (overLookArray.length > 0 && Arrays.asList(overLookArray).contains(nodeKey)) {
+            if (overlook_array.length > 0 && Arrays.asList(overlook_array).contains(nodeKey)) {
                 continue;
             }
             try {
@@ -841,7 +841,7 @@ public class SimKitProcedures implements AutoCloseable {
      */
     @UserFunction
     public double spectralClustering(@Name("params") Map<String, Object> params) throws Exception {
-        String node_label = (String) params.getOrDefault("node_label", "Iris");
+        String label = (String) params.getOrDefault("label", "Iris");
         Boolean is_feature_based = (Boolean) params.getOrDefault("is_feature_based", true);
         String distance_measure = (String) params.getOrDefault("distance_measure", "euclidean");
         String graph_type = (String) params.getOrDefault("graph_type", "full");
@@ -852,17 +852,17 @@ public class SimKitProcedures implements AutoCloseable {
         String number_of_iterations = (String) params.getOrDefault("number_of_iterations", "100");
         String distance_measure_kmean = (String) params.getOrDefault("distance_measure_kmean", "euclidean");
         String target_column = (String) params.getOrDefault("target_column", "target");
-        Boolean use_kmean_for_silhouette = (Boolean) params.getOrDefault("use_kmean_for_silhouette", false);
+        Boolean silhouette = (Boolean) params.getOrDefault("silhouette", false);
         int seed = ((Number) params.getOrDefault("seed", 42)).intValue();
 
         predictedNodeLabels.clear();
 
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
-            if (node_label == null) {
+            if (label == null) {
                 throw new Exception("Missing node label");
             }
 
-            String graph_name = "affinity_" + graph_type + "_" + parameter.replace(".", "_") + "_" + node_label;
+            String graph_name = "affinity_" + graph_type + "_" + parameter.replace(".", "_") + "_" + label;
 
             ArrayList<NodeList2> node_properties_list;
             String property_names = "";
@@ -870,9 +870,9 @@ public class SimKitProcedures implements AutoCloseable {
 
             // Step 1: Create affinity graph
             if (is_feature_based) {
-                org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(node_label, connector.getDriver());
+                org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
                 node_properties_list = node_data.getLeft();
-                identifier = Neo4jGraphHandler.resolveDynamicIdentifier(connector.getDriver(), node_label);
+                identifier = Neo4jGraphHandler.resolveDynamicIdentifier(connector.getDriver(), label);
 
                 property_names = node_data.getRight();
 
@@ -902,7 +902,7 @@ public class SimKitProcedures implements AutoCloseable {
                 Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(graph_name, edge_list, connector.getDriver(), identifier);
 
             } else {
-                graph_name = node_label;
+                graph_name = label;
                 org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(graph_name, connector.getDriver());
                 node_properties_list = node_data.getLeft();
                 if (node_properties_list.isEmpty()) {
@@ -949,14 +949,14 @@ public class SimKitProcedures implements AutoCloseable {
             System.out.println("filtered_properties: " + filtered_properties);
 
             double kmean_result = kMeans(Map.of(
-                    "nodeSet", graph_name_eigen,
-                    "numberOfCentroid", number_of_clusters,
-                    "numberOfInteration", number_of_iterations,
-                    "distanceMeasure", distance_measure_kmean,
-                    "originalSet", node_label,
+                    "label", graph_name_eigen,
+                    "number_of_centroids", number_of_clusters,
+                    "number_of_iterations", number_of_iterations,
+                    "distance_measure", distance_measure_kmean,
+                    "original_set", label,
                     "overlook", target_column + "," + filtered_properties.toString(),
-                    "overlookOriginal", target_column,
-                    "useKmeanForSilhouette", use_kmean_for_silhouette,
+                    "overlook_original", target_column,
+                    "silhouette", silhouette,
                     "seed", seed
             ));
 
@@ -973,8 +973,8 @@ public class SimKitProcedures implements AutoCloseable {
      * @throws Exception If any error occurs during the spectral clustering process.
      */
     @UserFunction
-    public Map<String, Object> experimental_spectralClustering(@Name("params") Map<String, Object> params) throws Exception {
-        String node_label = (String) params.getOrDefault("node_label", "Iris");
+    public Map<String, Object> experimentalSpectralClustering(@Name("params") Map<String, Object> params) throws Exception {
+        String label = (String) params.getOrDefault("label", "Iris");
         Boolean is_feature_based = (Boolean) params.getOrDefault("is_feature_based", true);
         String distance_measure = (String) params.getOrDefault("distance_measure", "euclidean");
         String graph_type = (String) params.getOrDefault("graph_type", "full");
@@ -985,7 +985,7 @@ public class SimKitProcedures implements AutoCloseable {
         String number_of_iterations = params.getOrDefault("number_of_iterations", 100).toString();
         String distance_measure_kmean = (String) params.getOrDefault("distance_measure_kmean", "euclidean");
         String target_column = (String) params.getOrDefault("target_column", "target");
-        Boolean use_kmean_for_silhouette = (Boolean) params.getOrDefault("use_kmean_for_silhouette", false);
+        Boolean silhouette = (Boolean) params.getOrDefault("silhouette", false);
         int seed = ((Number) params.getOrDefault("seed", 42)).intValue();
 
         try {
@@ -998,8 +998,8 @@ public class SimKitProcedures implements AutoCloseable {
             if (!(params.getOrDefault("is_feature_based", true) instanceof Boolean)) {
                 throw new IllegalArgumentException("Invalid type for parameter: is_feature_based. Expected a boolean.");
             }
-            if (!(params.getOrDefault("use_kmean_for_silhouette", false) instanceof Boolean)) {
-                throw new IllegalArgumentException("Invalid type for parameter: use_kmean_for_silhouette. Expected a boolean.");
+            if (!(params.getOrDefault("silhouette", false) instanceof Boolean)) {
+                throw new IllegalArgumentException("Invalid type for parameter: silhouette. Expected a boolean.");
             }
         } catch (ClassCastException e) {
             throw new IllegalArgumentException("Parameter casting error: " + e.getMessage());
@@ -1013,11 +1013,11 @@ public class SimKitProcedures implements AutoCloseable {
 		// StringBuilder output_string = new StringBuilder("Debug Data: ");
 
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
-            if (node_label == null) {
+            if (label == null) {
                 throw new Exception("Missing node label");
             }
 
-            String graph_name = "affinity_" + graph_type + "_" + parameter.replace(".", "_") + "_" + node_label;
+            String graph_name = "affinity_" + graph_type + "_" + parameter.replace(".", "_") + "_" + label;
 
             ArrayList<NodeList2> node_properties_list;
             String property_names = "";
@@ -1033,9 +1033,9 @@ public class SimKitProcedures implements AutoCloseable {
 
                     // Retrieve node data
                     updateProgress(sessions, "📥 Retrieving node list...");
-                    org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(node_label, connector.getDriver());
+                    org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
                     node_properties_list = node_data.getLeft();
-                    identifier = Neo4jGraphHandler.resolveDynamicIdentifier(connector.getDriver(), node_label);
+                    identifier = Neo4jGraphHandler.resolveDynamicIdentifier(connector.getDriver(), label);
                     property_names = node_data.getRight();
                     updateProgress(sessions, "✅ Node list retrieved.");
 
@@ -1096,7 +1096,7 @@ public class SimKitProcedures implements AutoCloseable {
 
                 } else {
                     updateProgress(sessions, "🔄 Creating Affinity Graph - Non-Feature Based...");
-                    graph_name = node_label;
+                    graph_name = label;
 
                     // Retrieve existing node list
                     updateProgress(sessions, "📥 Retrieving node list for non-feature based graph...");
@@ -1205,14 +1205,14 @@ public class SimKitProcedures implements AutoCloseable {
                 // Execute k-Means Clustering
                 updateProgress(sessions, "⚡ Running k-Means clustering...");
                 double kmean_result = kMeans(Map.of(
-                        "nodeSet", graph_name_eigen,
-                        "numberOfCentroid", number_of_clusters,
-                        "numberOfInteration", number_of_iterations,
-                        "distanceMeasure", distance_measure_kmean,
-                        "originalSet", node_label,
+                        "label", graph_name_eigen,
+                        "number_of_centroids", number_of_clusters,
+                        "number_of_iterations", number_of_iterations,
+                        "distance_measure", distance_measure_kmean,
+                        "original_set", label,
                         "overlook", target_column + "," + filtered_properties.toString(),
-                        "overlookOriginal", target_column,
-                        "useKmeanForSilhouette", use_kmean_for_silhouette,
+                        "overlook_original", target_column,
+                        "silhouette", silhouette,
                         "seed", seed
                 ));
                 updateProgress(sessions, "✅ k-Means clustering completed. Silhouette Score: " + kmean_result);
@@ -1229,18 +1229,18 @@ public class SimKitProcedures implements AutoCloseable {
                 // Start computation
                 updateProgress(sessions, "📊 Running adjusted Rand Index calculation...");
                 Map<String, Object> adjustedRandIndexResult = adjustedRandIndex(Map.of(
-                        "nodeSet", node_label,
-                        "trueLabels", target_column
+                        "label", label,
+                        "true_labels", target_column
                 ));
 
                 // Extract Results
                 updateProgress(sessions, "📥 Extracting adjusted Rand Index results...");
                 double adjustedRandIndexValue = (double) adjustedRandIndexResult.get("adjustedRandIndex");
-                List<Integer> trueLabels = (List<Integer>) adjustedRandIndexResult.get("trueLabels");
+                List<Integer> true_labels = (List<Integer>) adjustedRandIndexResult.get("true_labels");
                 List<Integer> predictedLabels = (List<Integer>) adjustedRandIndexResult.get("predictedLabels");
 
                 updateProgress(sessions, "✅ Adjusted Rand Index Computed: " + adjustedRandIndexValue);
-                updateProgress(sessions, "📋 True Labels Count: " + trueLabels.size());
+                updateProgress(sessions, "📋 True Labels Count: " + true_labels.size());
                 updateProgress(sessions, "📋 Predicted Labels Count: " + predictedLabels.size());
 
 
@@ -1280,70 +1280,70 @@ public class SimKitProcedures implements AutoCloseable {
     }
 
     @UserFunction
-    public String displayEdgeList(@Name("nodeType") String nodeType, @Name("dataPath") String dataPath, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("method") String method, @Name("parameter") String parameter, @Name("remove_column") String remove_columns) throws Exception {
+    public String displayEdgeList(@Name("label") String label, @Name("data_path") String data_path, @Name("distance_measure") String distance_measure, @Name("graph_type") String graph_type, @Name("method") String method, @Name("parameter") String parameter, @Name("remove_column") String remove_columns) throws Exception {
 
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 
-            if (dataPath == null && distance_measure == null) {
+            if (data_path == null && distance_measure == null) {
                 return "Missing data_path or distance measure type";
             } else {
 
                 // Display edge list
 
 
-                String graphName = "affinity_";
+                String graph_name = "affinity_";
                 Double[][] adj_mat = null;
-                ArrayList<NodeList2> nodePropertiesList = null;
-                String[] removeList = remove_columns.split(",");
-                List<String> removeListNew = Arrays.stream(removeList).collect(Collectors.toList());
-                if (nodeType.isEmpty()) {
-                    ReadCsvTestData readCsvTestData = new ReadCsvTestData(dataPath);
+                ArrayList<NodeList2> node_properties_list = null;
+                String[] remove_list = remove_columns.split(",");
+                List<String> remove_list_new = Arrays.stream(remove_list).collect(Collectors.toList());
+                if (label.isEmpty()) {
+                    ReadCsvTestData readCsvTestData = new ReadCsvTestData(data_path);
 //				//ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(data_path,IndexColumn);
-                    nodePropertiesList = readCsvTestData.readCsvFileToMap(dataPath);
+                    node_properties_list = readCsvTestData.readCsvFileToMap(data_path);
                 }
-                org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> nodeData = Neo4jGraphHandler.retrieveNodeList(nodeType, connector.getDriver());
-                nodePropertiesList = nodeData.getLeft();
-//			nodePropertiesList = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(nodeType, connector.getDriver());
+                org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> nodeData = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
+                node_properties_list = nodeData.getLeft();
+//			node_properties_list = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
 
 //            ArrayList<NodeList2> nodePropertiesList_copy = readCsvTestData.readCsvFileToMap(data_path);
-                Double[][] DistanceMatrix = getDistanceMatrixFromNodes(distance_measure, nodePropertiesList, removeListNew);
+                Double[][] distance_matrix = getDistanceMatrixFromNodes(distance_measure, node_properties_list, remove_list_new);
 
-                StringBuilder outputString = new StringBuilder("Graph Data: ");
-                outputString.append("\n\nDistance Matrix:\n").append(doubleToString(DistanceMatrix));
+                StringBuilder output_string = new StringBuilder("Graph Data: ");
+                output_string.append("\n\nDistance Matrix:\n").append(doubleToString(distance_matrix));
 
 
                 if (graph_type.equals("full")) {
-                    Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(DistanceMatrix, parameter);
-                    adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(DistanceMatrix, sigmas);
-                    graphName = graph_type.concat("_" + parameter);
+                    Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(distance_matrix, parameter);
+                    adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(distance_matrix, sigmas);
+                    graph_name = graph_type.concat("_" + parameter);
                 }
                 if (graph_type.equals("eps")) {
-                    Double espilonValue = Double.parseDouble(parameter);
-                    adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(DistanceMatrix, espilonValue);
-                    graphName = graph_type.concat("_" + parameter);
+                    Double epsilon = Double.parseDouble(parameter);
+                    adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(distance_matrix, epsilon);
+                    graph_name = graph_type.concat("_" + parameter);
                 }
                 if (graph_type.equals("knn")) {
-                    Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix, parameter);
-                    adj_mat = ReadCsvTestData.calculateKNNGraph(DistanceMatrix, knn);
-                    graphName = graph_type.concat("_" + parameter);
+                    Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix, parameter);
+                    adj_mat = ReadCsvTestData.calculateKNNGraph(distance_matrix, knn);
+                    graph_name = graph_type.concat("_" + parameter);
                 }
                 if (graph_type.equals("mknn")) {
-                    Double[][] knn = ReadCsvTestData.calculateKNN(DistanceMatrix, parameter);
-                    adj_mat = ReadCsvTestData.calculateMutualKNNGraph(DistanceMatrix, knn);
-                    graphName = graph_type.concat("_" + parameter);
+                    Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix, parameter);
+                    adj_mat = ReadCsvTestData.calculateMutualKNNGraph(distance_matrix, knn);
+                    graph_name = graph_type.concat("_" + parameter);
                 }
 
-                outputString.append("\n\nAdjacency Matrix:\n").append(doubleToString(adj_mat));
+                output_string.append("\n\nAdjacency Matrix:\n").append(doubleToString(adj_mat));
 
-                ArrayList<EdgeList2> edgeList = GraphTransform.calculateEdgeList(nodePropertiesList, adj_mat);
+                ArrayList<EdgeList2> edge_list = GraphTransform.calculateEdgeList(node_properties_list, adj_mat);
 
-                outputString.append("\n\nEdge List:\n");
-                for (EdgeList2 edge : edgeList) {
-                    outputString.append(" | ").append(edge.toString());
+                output_string.append("\n\nEdge List:\n");
+                for (EdgeList2 edge : edge_list) {
+                    output_string.append(" | ").append(edge.toString());
                 }
 
 
-                return outputString.toString() + '\n' + "nodes " + nodePropertiesList;
+                return output_string.toString() + '\n' + "nodes " + node_properties_list;
             }
         }
     }
@@ -1407,27 +1407,27 @@ public class SimKitProcedures implements AutoCloseable {
     }
 
     @UserFunction
-    public String displayFinalResults(@Name("nodeSet") String nodeSet, @Name("numberOfCentroid") String numberOfCentroid, @Name("numberOfInteration") String numberOfInteration, @Name("distanceMeasure") String distanceMeasure, @Name("Seed") Number seed) throws Exception {
+    public String displayFinalResults(@Name("label") String label, @Name("number_of_centroids") String number_of_centroids, @Name("number_of_iterations") String number_of_iterations, @Name("distance_measure") String distance_measure, @Name("seed") Number seed) throws Exception {
 
         predictedNodeLabels.clear();
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
 
-            if (nodeSet == null && distanceMeasure == null) {
+            if (label == null && distance_measure == null) {
                 return "Missing data_path or distance measure type";
             } else {
 
-                StringBuilder outputString = new StringBuilder("The average Silhouette Coefficient value is: ");
+                StringBuilder output_string = new StringBuilder("The average Silhouette Coefficient value is: ");
                 HashMap<String, ArrayList<String>> kmeanAssign = new HashMap<String, ArrayList<String>>();
-                int numberOfCentroidInt = Integer.parseInt(numberOfCentroid);
-                int numberOfInterationInt = Integer.parseInt(numberOfInteration);
+                int numberOfCentroidInt = Integer.parseInt(number_of_centroids);
+                int numberOfInterationInt = Integer.parseInt(number_of_iterations);
                 double centroidNumber = 1.0;
 
                 ArrayList<String> debug = new ArrayList<>();
-                kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distanceMeasure, false, debug, (int) seed);
-                double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distanceMeasure);
-                outputString.append(averageSilhouetteCoefficientValue);
+                kmeanAssign = Unsupervised.KmeanClust(mapNodeList, numberOfCentroidInt, numberOfInterationInt, distance_measure, false, debug, (int) seed);
+                double averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(kmeanAssign, distance_measure);
+                output_string.append(averageSilhouetteCoefficientValue);
 
-                outputString.append("\n\nKmean assign:\n").append(hashMapToString(kmeanAssign));
+                output_string.append("\n\nKmean assign:\n").append(hashMapToString(kmeanAssign));
 
                 for (String centroid : kmeanAssign.keySet()) {
                     ArrayList<String> clusterNode = kmeanAssign.get(centroid);
@@ -1436,14 +1436,14 @@ public class SimKitProcedures implements AutoCloseable {
                         predictedNodeLabels.add(centroidNumber);
 
                         DecimalFormat decimalFormat = new DecimalFormat("#.###");
-                        double distance = Unsupervised.calculateDistance(clusterNode.get(i), centroid, distanceMeasure);
-                        connectNodes(nodeSet, "create relationship in kmean node", centroid, clusterNode.get(i), distance, connector.getDriver());
-//			        connector.connectNodes(nodeSet, "create relationship in kmean node", centroid, clusterNode.get(i), roundedDistance);
+                        double distance = Unsupervised.calculateDistance(clusterNode.get(i), centroid, distance_measure);
+                        connectNodes(label, "create relationship in kmean node", centroid, clusterNode.get(i), distance, connector.getDriver());
+//			        connector.connectNodes(label, "create relationship in kmean node", centroid, clusterNode.get(i), roundedDistance);
                     }
                     centroidNumber = centroidNumber + 1;
                 }
 
-                return outputString + " predicted labels: " + predictedNodeLabels;
+                return output_string + " predicted labels: " + predictedNodeLabels;
             }
         }
     }
