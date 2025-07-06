@@ -302,6 +302,32 @@ public class Neo4jGraphHandler {
             });
         }
     }
+
+    /**
+     * Dynamically updates properties for a list of nodes in Neo4j.
+     *
+     * @param node_label The label of the nodes to update.
+     * @param node_properties_list The list of NodeList2 objects (must contain the identifier value).
+     * @param propertiesPerNode   A list of maps, each containing property names and values for the corresponding node.
+     * @param driver The Neo4j driver.
+     * @param identifier The property name used as unique node identifier.
+     */
+    public static void updateNodeProperties(String node_label, ArrayList<NodeList2> node_properties_list, List<Map<String, Object>> propertiesPerNode, Driver driver, String identifier) {
+        try (Session session = driver.session()) {
+            for (int i = 0; i < node_properties_list.size(); i++) {
+                NodeList2 node = node_properties_list.get(i);
+                Object nodeId = node.getProperties().get(identifier);
+                Map<String, Object> props = propertiesPerNode.get(i);
+
+                Map<String, Object> paramsMap = new HashMap<>();
+                paramsMap.put("id", nodeId);
+                paramsMap.put("props", props);
+
+                String cypher = "MATCH (n:" + node_label + ") WHERE n." + identifier + " = $id SET n += $props";
+                session.run(cypher, paramsMap);
+            }
+        }
+    }
     
     public static void bulkCreateNodes(String graphType, List<NodeList2> nodes, Driver driver, String identifier) {
         // Prepare the list of node data
