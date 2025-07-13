@@ -40,6 +40,13 @@ public class Neo4jGraphHandler {
 	    // Create a new index on the specified identifier
 	    session.run("CREATE INDEX " + indexName + " IF NOT EXISTS FOR (n:" + label + ") ON (n." + identifier + ")");
 	}
+
+    public static void duplicateNodeSet(String originalLabel, String newLabel, Driver driver) {
+        try (Session session = driver.session()) {
+            String query = "MATCH (n:" + originalLabel + ") CREATE (m:" + newLabel + ") SET m = n";
+            session.run(query);
+        }
+    }
 	
 	public static String resolveDynamicIdentifier(Driver driver, String label) {
 	    try (Session session = driver.session()) {

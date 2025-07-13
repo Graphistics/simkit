@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.neo4j.example</groupId>
   <artifactId>SimKit</artifactId>
-  <version>0.1.1</version>
+  <version>0.1.1.1</version>
 
   <packaging>jar</packaging>
   <name>Neo4j Procedure Template</name>

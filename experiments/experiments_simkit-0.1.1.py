@@ -1,25 +1,18 @@
-
 import os
-import subprocess
-import sys
 import threading
 import time
-import psutil
+import math
 import pandas as pd
 from tqdm import tqdm
-import math
+import psutil
 from scipy.spatial.distance import pdist, squareform
 import numpy as np
-
-# Ensure required packages are installed
-required_packages = ["neo4j", "pandas", "psutil", "tqdm", "scikit-learn", "scipy"]
-for package in required_packages:
-    try:
-        __import__(package)
-    except ImportError:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
 from neo4j import GraphDatabase
+
+# For Python experiments
+from sklearn.metrics import silhouette_score, adjusted_rand_score
+from sklearn.cluster import KMeans
+import scipy.sparse as sp
 
 def get_neo4j_usage():
     for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
@@ -33,111 +26,26 @@ def get_neo4j_usage():
             continue
     return None, None
 
-# For Python experiments
-from sklearn.metrics import silhouette_score, adjusted_rand_score
-from sklearn.cluster import KMeans
-from sklearn.neighbors import kneighbors_graph
-from sklearn.metrics.pairwise import euclidean_distances
-from scipy.sparse.csgraph import laplacian as csgraph_laplacian
-from scipy.sparse.linalg import eigsh
-import scipy.sparse as sp
-
 def check_symmetric(matrix, tol=1e-8):
     return np.allclose(matrix, matrix.T, atol=tol)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def spectral_clustering(dataframe, similarity_graph, laplacian, number_of_clusters, n = None , eps=None, k_knn=None, k_mknn=None): ## Check for inputs for all parameters
+def spectral_clustering(dataframe, similarity_graph, laplacian, number_of_clusters, n=None, eps=None, k_knn=None,
+                        k_mknn=None):  ## Check for inputs for all parameters
     # Pairwise distances
-
-
-
-
-
 
     dimension = dataframe.shape[0]
     dist_mat = squareform(pdist(dataframe))
     sample_size = len(dist_mat)
 
     # Set n based on proportional selection, but limit by log scaling for large datasets
-    if(n is None):
+    if (n is None):
         n = min(sample_size // 10, int(math.log(sample_size)))
-
 
     # Fallback values for epsilon and k
     epsilon = eps if eps else np.percentile(dist_mat, 90)
     k_knn = k_knn if k_knn else int(np.sqrt(sample_size))
     k_mknn = k_mknn if k_mknn else int(np.sqrt(sample_size))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     if similarity_graph == "full":
         # calculate local sigma
@@ -145,30 +53,17 @@ def spectral_clustering(dataframe, similarity_graph, laplacian, number_of_cluste
         for i in tqdm(range(len(dist_mat)), desc="Calculating sigmas"):
             sigmas[i] = sorted(dist_mat[i])[n]
 
-
-
-
-
-
-
-
-
-
         adjacency_matrix = np.zeros([dimension, dimension])
         for i in tqdm(range(dimension), desc="Building full affinity"):
-            for j in range(i+1, dimension):
-                d = np.exp(-1 * dist_mat[i, j]**2 / (sigmas[i] * sigmas[j]))
+            for j in range(i + 1, dimension):
+                d = np.exp(-1 * dist_mat[i, j] ** 2 / (sigmas[i] * sigmas[j]))
                 adjacency_matrix[i, j] = d
                 adjacency_matrix[j, i] = d
-
-
-
-
 
     elif similarity_graph == "eps":
         adjacency_matrix = np.zeros([dimension, dimension])
         for i in tqdm(range(dimension), desc="Building eps affinity"):
-            for j in range(i+1, dimension):
+            for j in range(i + 1, dimension):
                 d = 1 if dist_mat[i, j] < epsilon else 0
                 adjacency_matrix[i, j] = d
                 adjacency_matrix[j, i] = d
@@ -176,44 +71,21 @@ def spectral_clustering(dataframe, similarity_graph, laplacian, number_of_cluste
         adjacency_matrix = np.zeros([dimension, dimension])
         for i in tqdm(range(dimension), desc="Building knn affinity"):
             sorted_indices = np.argsort(dist_mat[i])
-            k_nearest_indices = sorted_indices[1:k_knn+1]
+            k_nearest_indices = sorted_indices[1:k_knn + 1]
             adjacency_matrix[i, k_nearest_indices] = 1
     else:
-
-
-
-
         adjacency_matrix = np.zeros([dimension, dimension])
         for i in tqdm(range(dimension), desc="Building mknn affinity"):
             sorted_indices = np.argsort(dist_mat[i])
-            k_nearest_indices = sorted_indices[1:k_mknn+1]
+            k_nearest_indices = sorted_indices[1:k_mknn + 1]
             for neighbor in k_nearest_indices:
                 neighbor_sorted_indices = np.argsort(dist_mat[neighbor])
-                if i in neighbor_sorted_indices[1:k_mknn+1]:
+                if i in neighbor_sorted_indices[1:k_mknn + 1]:
                     adjacency_matrix[i, neighbor] = 1
                     adjacency_matrix[neighbor, i] = 1
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     degrees = np.sum(adjacency_matrix, axis=1)
     degree_matrix = np.diag(degrees)
-
-
-
-
 
     if laplacian == "sym":
         d_inv_sqrt = np.zeros_like(degrees)
@@ -247,115 +119,8 @@ def spectral_clustering(dataframe, similarity_graph, laplacian, number_of_cluste
         current_k = 2
     elif number_of_clusters == "fixed3":
         current_k = 3
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     else:
         current_k = max(optimal_number_of_clusters, 2)
-
-
-
-
-
 
     X = v[:, -current_k:]
     clustering = KMeans(n_clusters=current_k, random_state=42, n_init=100)
@@ -363,12 +128,10 @@ def spectral_clustering(dataframe, similarity_graph, laplacian, number_of_cluste
 
     sil_score = silhouette_score(dataframe, cluster_labels)
 
-
-
-    print(f"🔍 Inside spectral_clustering -> n: {n}, epsilon: {eps}, k_knn: {k_knn}, k_mknn: {k_mknn}, clusters: {current_k}")
+    print(
+        f"🔍 Inside spectral_clustering -> n: {n}, epsilon: {eps}, k_knn: {k_knn}, k_mknn: {k_mknn}, clusters: {current_k}")
 
     return [(current_k, cluster_labels, sil_score)]
-
 
 
 NEO4J_URI = "bolt://localhost:7687"
@@ -377,33 +140,37 @@ NEO4J_PASSWORD = "123412345"
 
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
+
 def ensure_indexes(driver, datasets):
     try:
         with driver.session() as session:
             existing_indexes = session.run("SHOW INDEXES")
             existing_index_names = {record["name"] for record in existing_indexes}
             for dataset, params in datasets.items():
-                node_label = params.get("label") or params.get("node_label")
-                index_id_name = f"{node_label}_id_index"
-                index_label_name = f"{node_label}_label_index"
+                label = params.get("label") or params.get("label")
+                index_id_name = f"{label}_id_index"
+                index_label_name = f"{label}_label_index"
                 if index_id_name not in existing_index_names:
-                    session.run(f"CREATE INDEX {index_id_name} FOR (n:{node_label}) ON (n.id);")
+                    session.run(f"CREATE INDEX {index_id_name} FOR (n:{label}) ON (n.id);")
                 if index_label_name not in existing_index_names:
-                    session.run(f"CREATE INDEX {index_label_name} FOR (n:{node_label}) ON (n.label);")
+                    session.run(f"CREATE INDEX {index_label_name} FOR (n:{label}) ON (n.label);")
         print("✅ Indexes ensured for all datasets.")
     except Exception as e:
         print(f"⚠️ Error creating indexes: {e}")
+
 
 def delete_all_nodes(driver, batch_size=1000):
     try:
         with driver.session() as session:
             while True:
-                result = session.run(f"MATCH (n) WITH n LIMIT {batch_size} DETACH DELETE n RETURN count(n) AS deleted_count")
+                result = session.run(
+                    f"MATCH (n) WITH n LIMIT {batch_size} DETACH DELETE n RETURN count(n) AS deleted_count")
                 deleted_count = result.single()["deleted_count"]
                 if deleted_count == 0:
                     break
     except Exception as e:
         print("Error during node deletion:", e)
+
 
 def delete_all_indexes(driver, batch_size=5):
     try:
@@ -420,17 +187,19 @@ def delete_all_indexes(driver, batch_size=5):
     except Exception as e:
         print("Error during index deletion:", e)
 
+
 def create_feature_nodes(data, driver, label):
     try:
         with driver.session() as session:
             for _, row in data.iterrows():
-                properties = { (f"feature_{key}" if str(key).isdigit() else key): value for key, value in row.items() }
+                properties = {(f"feature_{key}" if str(key).isdigit() else key): value for key, value in row.items()}
                 query = f"CREATE (n:{label} {{" + ', '.join([f"{key}: ${key}" for key in properties.keys()]) + "})"
                 session.run(query, **properties)
     except Exception as e:
         print("Error during node creation:", e)
     finally:
         pass
+
 
 def create_graph_nodes(data, driver, label):
     try:
@@ -446,17 +215,19 @@ def create_graph_nodes(data, driver, label):
     finally:
         pass
 
-def create_edges(data, driver, node_label, edge_label):
+
+def create_edges(data, driver, label, edge_label):
     try:
         edge_data = pd.read_csv(data)
         with driver.session() as session:
             for _, row in edge_data.iterrows():
                 source_id = min(row['source_id'], row['target_id'])
                 target_id = max(row['source_id'], row['target_id'])
-                query = f"MATCH (source:{node_label} {{id: $source_id}}) MATCH (target:{node_label} {{id: $target_id}}) MERGE (source)-[:{edge_label} {{value: 1}}]->(target)"
+                query = f"MATCH (source:{label} {{id: $source_id}}) MATCH (target:{label} {{id: $target_id}}) MERGE (source)-[:{edge_label} {{value: 1}}]->(target)"
                 session.run(query, {"source_id": source_id, "target_id": target_id})
     except Exception as e:
         print("Error during edge creation:", e)
+
 
 def run_query(driver, query, parameters):
     process = psutil.Process(os.getpid())
@@ -476,6 +247,7 @@ def run_query(driver, query, parameters):
     neo4j_cpu, neo4j_mem = get_neo4j_usage()
     return data, duration, memory_used, cpu_used, neo4j_mem, neo4j_cpu
 
+
 def monitor_progress():
     local_driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
     while True:
@@ -491,72 +263,23 @@ def monitor_progress():
                 print(f"Error: {e}, Result: {data}")
         time.sleep(2)
 
+
 monitor_thread = threading.Thread(target=monitor_progress, daemon=True)
 monitor_thread.start()
 
+
 def run_python_experiment_feature(config, file_path):
     # Run Python spectral clustering on feature-based data
-
-
-
-
 
     df = pd.read_csv(file_path)
     cols_to_remove = [col.strip() for col in config["remove_columns"].split(',')]
     features = df.drop(columns=cols_to_remove, errors='ignore')
     true_labels = df[config["target_column"]].values
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     process = psutil.Process(os.getpid())
     start_time = time.time()
     start_cpu = process.cpu_times()
     start_mem = process.memory_info().rss
-
-
-
 
     graph_type = config["graph_type"]
     parameter = float(config["parameter"])
@@ -595,7 +318,8 @@ def run_python_experiment_feature(config, file_path):
 
     laplacian_start = time.time()
     clustering_result = spectral_clustering(features, config["graph_type"], config["laplacian_type"],
-                                            config["number_of_eigenvectors"], n=n_val, eps=eps_val, k_knn=knn_val, k_mknn=mknn_val)
+                                            config["number_of_eigenvectors"], n=n_val, eps=eps_val, k_knn=knn_val,
+                                            k_mknn=mknn_val)
     laplacian_end = time.time()
     laplacian_time = laplacian_end - laplacian_start
 
@@ -616,66 +340,6 @@ def run_python_experiment_feature(config, file_path):
     return {
         "python_silhouette_score": python_silhouette,
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         "python_rand_index": python_rand_index,
         "python_total_time": total_time,
         "python_affinity_time": affinity_time,
@@ -688,9 +352,6 @@ def run_python_experiment_feature(config, file_path):
     }
 
 
-
-
-
 def run_python_experiment_graph(config, node_file_path, edge_file_path):
     # Load node data
     nodes_df = pd.read_csv(node_file_path)
@@ -699,37 +360,6 @@ def run_python_experiment_graph(config, node_file_path, edge_file_path):
 
     if "features" in features.columns:
         features = np.array(features["features"].apply(lambda x: eval(x) if isinstance(x, str) else x).tolist())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     else:
         features = features.values.astype(float)
 
@@ -739,40 +369,6 @@ def run_python_experiment_graph(config, node_file_path, edge_file_path):
     id_to_index = {node_id: idx for idx, node_id in enumerate(node_ids)}
     dim = len(node_ids)
     adjacency_matrix = np.zeros((dim, dim))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     for _, row in edge_df.iterrows():
         src = id_to_index.get(row["source_id"])
@@ -786,24 +382,10 @@ def run_python_experiment_graph(config, node_file_path, edge_file_path):
     start_cpu = process.cpu_times()
     start_mem = process.memory_info().rss
 
-
-
     # Compute Laplacian
     laplacian_start = time.time()
     degrees = np.sum(adjacency_matrix, axis=1)
     degree_matrix = np.diag(degrees)
-
-
-
-
-
-
-
-
-
-
-
-
 
     if config["laplacian_type"] == "sym":
         d_inv_sqrt = np.zeros_like(degrees, dtype=float)
@@ -849,190 +431,20 @@ def run_python_experiment_graph(config, node_file_path, edge_file_path):
     laplacian_end = time.time()
     clustering_end = time.time()
 
-
-
-
-
-
-
-
-
-
-
-
     print(f"🔍 Inside spectral_clustering -> clusters: {current_k}")
-
 
     # Evaluation
     ari_start = time.time()
     python_rand_index = adjusted_rand_score(true_labels, cluster_labels)
     ari_end = time.time()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    #python_silhouette = silhouette_score(adjacency_matrix, cluster_labels, metric='precomputed')
+    # python_silhouette = silhouette_score(adjacency_matrix, cluster_labels, metric='precomputed')
     total_time = ari_end - start_time
     cpu_used = (process.cpu_times().user + process.cpu_times().system) - (start_cpu.user + start_cpu.system)
     memory_used = (process.memory_info().rss - start_mem) / (1024 ** 2)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     return {
         "python_silhouette_score": python_silhouette,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         "python_rand_index": python_rand_index,
         "python_total_time": total_time,
@@ -1046,13 +458,11 @@ def run_python_experiment_graph(config, node_file_path, edge_file_path):
     }
 
 
-
-
 def run_experiments(driver, experiments):
     print("Init")
     try:
         with driver.session() as session:
-            session.run("RETURN simkit.initSimKit('bolt://localhost:7688', 'neo4j', '123412345')")
+            session.run(f"RETURN simkit.initSimKit('{NEO4J_URI}', '{NEO4J_USER}', '{NEO4J_PASSWORD}')")
     except Exception as e:
         print(f"Error initializing SimKit: {e}")
         return
@@ -1061,7 +471,7 @@ def run_experiments(driver, experiments):
     total_experiments = len(experiments)
     for idx, config in enumerate(experiments, 1):
         print(config)
-        query = "WITH simkit.experimentalSpectralClustering({ label: $node_label, is_feature_based: $is_feature_based, distance_measure: 'euclidean', graph_type: $graph_type, parameter: $parameter, remove_columns: $remove_columns, laplacian_type: $laplacian_type, number_of_eigenvectors: $number_of_eigenvectors, number_of_iterations: 100, distance_measure_kmean: 'euclidean', target_column: $target_column, silhouette: $use_kmean_for_silhouette, seed: 42 }) AS result RETURN result.silhouette_score AS silhouette_score, result.rand_index AS rand_index, result.total_time AS total_time, result.affinity_time AS affinity_time, result.laplacian_time AS laplacian_time, result.clustering_time AS clustering_time, result.adjusted_rand_index_time AS adjusted_rand_index_time"
+        query = "WITH simkit.experimentalSpectralClustering({ label: $label, duplicate_node_set: True ,is_feature_based: $is_feature_based, distance_measure: 'euclidean', graph_type: $graph_type, parameter: $parameter, remove_columns: $remove_columns, laplacian_type: $laplacian_type, number_of_eigenvectors: $number_of_eigenvectors, number_of_iterations: 100, distance_measure_kmean: 'euclidean', target_column: $target_column, silhouette: $use_kmean_for_silhouette, seed: 42 }) AS result RETURN result.silhouette_score AS silhouette_score, result.rand_index AS rand_index, result.total_time AS total_time, result.affinity_time AS affinity_time, result.laplacian_time AS laplacian_time, result.clustering_time AS clustering_time, result.adjusted_rand_index_time AS adjusted_rand_index_time"
         data, duration, memory_used, cpu_used, neo4j_mem, neo4j_cpu = run_query(driver, query, config)
         silhouette_val = data['silhouette_score'] if data else None
         rand_index_val = data['rand_index'] if data else None
@@ -1084,16 +494,18 @@ def run_experiments(driver, experiments):
             "neo4j_cpu_used": neo4j_cpu
         }
         if config.get("is_feature_based"):
-            filename = f"{config['node_label'].replace('Node','').lower()}.csv"
+            filename = f"{config['label'].replace('Node', '').lower()}.csv"
             python_result = run_python_experiment_feature(config, os.path.join("datasets", filename))
         else:
-            node_file_path = os.path.join("datasets", f"{config['node_label'].replace('Node','').lower()}_nodes.csv")
-            edge_file_path = os.path.join("datasets", f"{config['node_label'].replace('Node','').lower()}_edges.csv")
+            node_file_path = os.path.join("datasets", f"{config['label'].replace('Node', '').lower()}_nodes.csv")
+            edge_file_path = os.path.join("datasets", f"{config['label'].replace('Node', '').lower()}_edges.csv")
             python_result = run_python_experiment_graph(config, node_file_path, edge_file_path)
         merged_result = {**config, **simkit_result, **python_result}
         results.append(merged_result)
         print(f"Completed experiment {idx}/{total_experiments} with config: {config}")
+        print(simkit_result)
     return results
+
 
 def save_results(results, dataset):
     df = pd.DataFrame(results)
@@ -1102,6 +514,7 @@ def save_results(results, dataset):
         os.makedirs(results_dir)
     df.to_csv(os.path.join(results_dir, f"{dataset}_results.csv"), index=False)
     print(f"Results saved to {dataset}_results.csv")
+
 
 def run_feature_experiment(dataset, label, remove_columns, number_of_eigenvectors, target_column):
     delete_all_nodes(driver)
@@ -1136,20 +549,21 @@ def run_feature_experiment(dataset, label, remove_columns, number_of_eigenvector
     save_results(results, dataset)
     print(f"Feature experiment completed for {dataset}")
 
-def run_graph_experiment(dataset, node_label, edge_label, remove_columns, number_of_eigenvectors, target_column):
+
+def run_graph_experiment(dataset, label, edge_label, remove_columns, number_of_eigenvectors, target_column):
     delete_all_nodes(driver)
     delete_all_indexes(driver)
-    ensure_indexes(driver, {dataset: {"label": node_label}})
+    ensure_indexes(driver, {dataset: {"label": label}})
     node_file_path = os.path.join("datasets", f"{dataset}_nodes.csv")
     edge_file_path = os.path.join("datasets", f"{dataset}_edges.csv")
-    create_graph_nodes(node_file_path, driver, node_label)
-    create_edges(edge_file_path, driver, node_label, edge_label)
+    create_graph_nodes(node_file_path, driver, label)
+    create_edges(edge_file_path, driver, label, edge_label)
     print(f"Graph nodes and edges created for {dataset}")
     experiments = []
     laplacian_types = ["sym", "rw"]
     for laplacian_type in tqdm(laplacian_types, desc="Processing Laplacian types"):
         experiments.append({
-            "label": node_label,
+            "label": label,
             "is_feature_based": False,
             "graph_type": "full",
             "parameter": "3",
@@ -1163,12 +577,17 @@ def run_graph_experiment(dataset, node_label, edge_label, remove_columns, number
     save_results(results, dataset)
     print(f"Graph experiment completed for {dataset}")
 
+
 feature_datasets = {
-    "iris": {"label": "IrisNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"}
+    #"iris": {"label": "IrisNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"},
+    #"madelon": {"label": "MadelonNode", "remove_columns": "Index,target", "number_of_eigenvectors": 2, "target_column": "target"},
+    #"20newsgroups": {"label": "NewsGroupNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"}
 }
 
 graph_datasets = {
-    "citeseer": {"node_label": "CiteSeerNode", "edge_label": "CiteSeerEdge", "remove_columns": "id,label", "number_of_eigenvectors": 6, "target_column": "label"}
+    #"cora": {"label": "CoraNode", "edge_label": "CoraEdge", "remove_columns": "id,label", "number_of_eigenvectors": 7, "target_column": "label"},
+    #"pubmed": {"label": "PubMedNode", "edge_label": "PubMedEdge", "remove_columns": "id,label", "number_of_eigenvectors": 3, "target_column": "label"},
+    "citeseer": {"label": "CiteSeerNode", "edge_label": "CiteSeerEdge", "remove_columns": "id,label", "number_of_eigenvectors": 6, "target_column": "label"}
 }
 
 if __name__ == "__main__":
@@ -1194,7 +613,8 @@ if __name__ == "__main__":
     combined_df = pd.concat(df_list, ignore_index=True)
 
     simkit_avg = combined_df[['total_time', 'cpu_used', 'silhouette_score', 'rand_index']].mean()
-    python_avg = combined_df[['python_total_time', 'python_cpu_used', 'python_silhouette_score', 'python_rand_index']].mean()
+    python_avg = combined_df[
+        ['python_total_time', 'python_cpu_used', 'python_silhouette_score', 'python_rand_index']].mean()
     print("\nAverage Metrics for SimKit:")
     print(simkit_avg)
     print("\nAverage Metrics for Python:")
@@ -1233,11 +653,15 @@ if __name__ == "__main__":
         'Citeseer': 3312,
         'Pubmed': 19717
     }
+
+
     def get_nodes(dataset):
         for key in dataset_dims:
             if key.lower() == dataset.lower():
                 return dataset_dims[key]
         return np.nan
+
+
     combined_df['nodes'] = combined_df['dataset'].apply(get_nodes)
 
     plt.figure(figsize=(6, 6))

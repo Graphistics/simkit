@@ -11,18 +11,17 @@ import graph.ReadCsvTestData;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.ejml.simple.SimpleMatrix;
 import org.neo4j.driver.*;
+import org.neo4j.driver.Record;
 import org.neo4j.driver.exceptions.AuthenticationException;
 import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.util.Pair;
-import org.neo4j.procedure.Context;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.UserFunction;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.sql.Driver;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -79,10 +78,10 @@ public class SimKitProcedures implements AutoCloseable {
         String output;
         try {
             driver = GraphDatabase.driver(uri, AuthTokens.basic(user, pass));
-            // Attempt to establish a connection to verify credentials and availability
+// Attempt to establish a connection to verify credentials and availability
             driver.verifyConnectivity();
             output = "Initialization succesful";
-            // Store credentials if needed
+// Store credentials if needed
             SimKitProcedures.uri = uri;
             SimKitProcedures.username = user;
             SimKitProcedures.password = pass;
@@ -127,9 +126,9 @@ public class SimKitProcedures implements AutoCloseable {
                 String[] remove_list = remove_columns.split(",");
                 List<String> remove_list_new = Arrays.stream(remove_list).collect(Collectors.toList());
                 ReadCsvTestData readCsvTestData = new ReadCsvTestData(data_path);
-//				//ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(data_path,IndexColumn);
+// //ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(data_path,IndexColumn);
                 ArrayList<NodeList2> node_properties_list = readCsvTestData.readCsvFileToMap(data_path);
-//                ArrayList<NodeList2> nodePropertiesList_copy = readCsvTestData.readCsvFileToMap(data_path);
+// ArrayList<NodeList2> nodePropertiesList_copy = readCsvTestData.readCsvFileToMap(data_path);
                 Double[][] distance_matrix = getDistanceMatrixFromNodes(distance_measure, node_properties_list, remove_list_new);
 
                 if (graph_type.equals("full")) {
@@ -182,87 +181,87 @@ public class SimKitProcedures implements AutoCloseable {
      * @return String indicating the success of the graph creation and creates Graph with Nodes and Relationships in Neo4j.
      * @throws Exception If an error occurs while creating the Laplacian graph in Neo4j.
      */
-//	@UserFunction
-//	public String nodePropertyToGraph(@Name("params") Map<String, Object> params) throws Exception {
+// @UserFunction
+// public String nodePropertyToGraph(@Name("params") Map<String, Object> params) throws Exception {
 //
-//	    String label = (String) params.getOrDefault("label", "Iris");
-//	    String distance_measure = (String) params.getOrDefault("distance_measure", "euclidean");
-//	    String graph_type = (String) params.getOrDefault("graph_type", "full");
-//	    String parameter = (String) params.getOrDefault("parameter", "7");
-//	    String remove_columns = (String) params.getOrDefault("remove_column", "index,target");
+// String label = (String) params.getOrDefault("label", "Iris");
+// String distance_measure = (String) params.getOrDefault("distance_measure", "euclidean");
+// String graph_type = (String) params.getOrDefault("graph_type", "full");
+// String parameter = (String) params.getOrDefault("parameter", "7");
+// String remove_columns = (String) params.getOrDefault("remove_column", "index,target");
 //
-//		StringBuilder output_string = new StringBuilder("Graph Data: ");
-//		try ( SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password) )
-//		{
-//
-//
-//			if(label == null && distance_measure == null) {
-//                throw new Exception("Missing data_path or distance measure type");
-//			}else {
-//				String graph_name = "affinity_";
-//				//ArrayList<NodeList2> node_properties_list = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
-//				org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> nodeData = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
-//				ArrayList<NodeList2> node_properties_list = nodeData.getLeft();
-//				//				ArrayList<NodeList2> nodePropertiesList_copy = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
-//				String[] remove_list = remove_columns.split(",");
-//				List<String> remove_list_new = Arrays.stream(remove_list).collect(Collectors.toList());
-////				Double[][] distance_matrix = GraphTransform.euclideanDistance(node_properties_list);
-//				Double[][] distance_matrix = getDistanceMatrixFromNodes(distance_measure,node_properties_list,remove_list_new);
-//				Double[][] adj_mat = null;
-//
-//				if(graph_type.equals("full")) {
-//					Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(distance_matrix,parameter);
-//					adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(distance_matrix,sigmas);
-//					graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
-//				}
-//				else if(graph_type.equals("eps")) {
-//					Double epsilon = Double.parseDouble(parameter);
-//					adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(distance_matrix,epsilon);
-//					graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
-//
-//				}
-//				else if(graph_type.equals("knn")) {
-//					int[][] knn = ReadCsvTestData.calculateKNNIndices(distance_matrix,parameter);
-//					adj_mat = ReadCsvTestData.calculateKNNGraphWithIndices(distance_matrix,knn);
-//					graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
-//
-//				}
-//				else if(graph_type.equals("mknn")) {
-//					Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix,parameter);
-//					adj_mat = ReadCsvTestData.calculateMutualKNNGraph(distance_matrix,knn);
-//					graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
-//				} else {
-//                    throw new Exception("Invalid graph_type specified.");
-//				}
-//
-//				output_string.append("\n\nAdjacency Matrix:\n").append(doubleToString(adj_mat));
-//
-//				ArrayList<EdgeList2> edge_list = GraphTransform.calculateEdgeList(node_properties_list,adj_mat);
-//				graph_name += "_" + label;
-////				Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name, connector.getDriver());
+// StringBuilder output_string = new StringBuilder("Graph Data: ");
+// try ( SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password) )
+// {
 //
 //
-//				//for (edge_list edgeListDetail : edge_list) {
-//				for (NodeList2 node : node_properties_list) {
-//					Neo4jGraphHandler.createNodeGraph(graph_name, "Created nodes succesfully!\n", node, connector.getDriver());
-//				}
+// if(label == null && distance_measure == null) {
+// throw new Exception("Missing data_path or distance measure type");
+// }else {
+// String graph_name = "affinity_";
+// //ArrayList<NodeList2> node_properties_list = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
+// org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> nodeData = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
+// ArrayList<NodeList2> node_properties_list = nodeData.getLeft();
+// // ArrayList<NodeList2> nodePropertiesList_copy = Neo4jGraphHandler.retrieveNodeListFromNeo4j(label, connector.getDriver());
+// String[] remove_list = remove_columns.split(",");
+// List<String> remove_list_new = Arrays.stream(remove_list).collect(Collectors.toList());
+//// Double[][] distance_matrix = GraphTransform.euclideanDistance(node_properties_list);
+// Double[][] distance_matrix = getDistanceMatrixFromNodes(distance_measure,node_properties_list,remove_list_new);
+// Double[][] adj_mat = null;
 //
-//				for (int i = 0; i < edge_list.size(); i++) {
-//					EdgeList2 edgeListDetail = edge_list.get(i);
-//					if(edgeListDetail.getWeight()==0.0){
-//						continue;
-//					}
-//					Neo4jGraphHandler.createRelationshipGraph(graph_name, "Created similarity graph succesfully!\n", edgeListDetail, connector.getDriver());
+// if(graph_type.equals("full")) {
+// Double[] sigmas = ReadCsvTestData.calculateLocalSigmas(distance_matrix,parameter);
+// adj_mat = ReadCsvTestData.calculateAdjacencyMatrix(distance_matrix,sigmas);
+// graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
+// }
+// else if(graph_type.equals("eps")) {
+// Double epsilon = Double.parseDouble(parameter);
+// adj_mat = ReadCsvTestData.calculateEpsilonNeighbourhoodGraph(distance_matrix,epsilon);
+// graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
 //
-//				}
+// }
+// else if(graph_type.equals("knn")) {
+// int[][] knn = ReadCsvTestData.calculateKNNIndices(distance_matrix,parameter);
+// adj_mat = ReadCsvTestData.calculateKNNGraphWithIndices(distance_matrix,knn);
+// graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
 //
-//			}
-//			return "Create fully connected graph successful, " + output_string;
-//		} catch (Exception e) {
-//			throw new RuntimeException(e);
-//		}
+// }
+// else if(graph_type.equals("mknn")) {
+// Double[][] knn = ReadCsvTestData.calculateKNN(distance_matrix,parameter);
+// adj_mat = ReadCsvTestData.calculateMutualKNNGraph(distance_matrix,knn);
+// graph_name = graph_name.concat(graph_type + "_" + parameter.replace(".", "_"));
+// } else {
+// throw new Exception("Invalid graph_type specified.");
+// }
 //
-//	}
+// output_string.append("\n\nAdjacency Matrix:\n").append(doubleToString(adj_mat));
+//
+// ArrayList<EdgeList2> edge_list = GraphTransform.calculateEdgeList(node_properties_list,adj_mat);
+// graph_name += "_" + label;
+//// Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name, connector.getDriver());
+//
+//
+// //for (edge_list edgeListDetail : edge_list) {
+// for (NodeList2 node : node_properties_list) {
+// Neo4jGraphHandler.createNodeGraph(graph_name, "Created nodes succesfully!\n", node, connector.getDriver());
+// }
+//
+// for (int i = 0; i < edge_list.size(); i++) {
+// EdgeList2 edgeListDetail = edge_list.get(i);
+// if(edgeListDetail.getWeight()==0.0){
+// continue;
+// }
+// Neo4jGraphHandler.createRelationshipGraph(graph_name, "Created similarity graph succesfully!\n", edgeListDetail, connector.getDriver());
+//
+// }
+//
+// }
+// return "Create fully connected graph successful, " + output_string;
+// } catch (Exception e) {
+// throw new RuntimeException(e);
+// }
+//
+// }
     public static Double[][] getDistanceMatrixFromNodes(String distance_measure, ArrayList<NodeList2> node_properties_list, List<String> remove_list) {
         Double[][] distance_matrix = null;
 
@@ -350,7 +349,7 @@ public class SimKitProcedures implements AutoCloseable {
                     Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(graph_name, edge_list, connector.getDriver(), identifier);
                     return "Created new graph with nodes and relationships!";
                 } else {
-                    // Only create relationships between existing nodes
+// Only create relationships between existing nodes
                     Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(label, edge_list, connector.getDriver(), identifier);
                     return "Created edges between existing nodes!";
                 }
@@ -364,7 +363,7 @@ public class SimKitProcedures implements AutoCloseable {
     @UserFunction
     public String nodePropertyEigen(@Name("params") Map<String, Object> params) throws Exception {
 
-        String node_label = (String) params.getOrDefault("node_label", "affinity_full_7_Iris");
+        String label = (String) params.getOrDefault("label", "affinity_full_7_Iris");
         String laplacian_type = (String) params.getOrDefault("laplacian_type", "sym");
         Double number_of_eigenvectors = ((Number) params.getOrDefault("number_of_eigenvectors", 3)).doubleValue();
         if (number_of_eigenvectors == null || number_of_eigenvectors <= 0) {
@@ -372,22 +371,22 @@ public class SimKitProcedures implements AutoCloseable {
         }
 
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
-            if (node_label == null) {
-                throw new Exception("No nodes found with the label: " + node_label);
+            if (label == null) {
+                throw new Exception("No nodes found with the label: " + label);
             }
 
-            // Retrieve node and edge list from Neo4j and compute matrices
-            org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(node_label, connector.getDriver());
+// Retrieve node and edge list from Neo4j and compute matrices
+            org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
             ArrayList<NodeList2> node_properties_list = node_data.getLeft();
-            String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(connector.getDriver(), node_label);
+            String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(connector.getDriver(), label);
 
-            ArrayList<EdgeList2> edge_list = Neo4jGraphHandler.retrieveEdgeList(node_label, connector.getDriver());
+            ArrayList<EdgeList2> edge_list = Neo4jGraphHandler.retrieveEdgeList(label, connector.getDriver());
 
             RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list, node_properties_list);
             RealMatrix degree_matrix = MatrixCalculation.calculateDegreeMatrix(adjacency_matrix);
             RealMatrix laplacian_matrix = MatrixCalculation.calculateLaplacianMatrix(degree_matrix, adjacency_matrix, laplacian_type);
 
-            // Calculate eigenvalues and eigenvectors
+// Calculate eigenvalues and eigenvectors
             Object eigen_result_obj;
             try {
                 eigen_result_obj = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
@@ -397,10 +396,10 @@ public class SimKitProcedures implements AutoCloseable {
                 throw new Exception("Error in eigen decomposition: " + e.getMessage());
             }
 
-            // Cast the result to EigenResult
+// Cast the result to EigenResult
             EigenCalculation.EigenResult eigen_result = (EigenCalculation.EigenResult) eigen_result_obj;
 
-            // Prepare a list of property maps for each node
+// Prepare a list of property maps for each node
             List<Map<String, Object>> eigenvectorProperties = new ArrayList<>();
             for (int i = 0; i < node_properties_list.size(); i++) {
                 Map<String, Object> props = new HashMap<>();
@@ -410,31 +409,31 @@ public class SimKitProcedures implements AutoCloseable {
                 eigenvectorProperties.add(props);
             }
 
-            // Update existing nodes with eigenvector properties
+// Update existing nodes with eigenvector properties
             Neo4jGraphHandler.updateNodeProperties(
-                node_label,
-                node_properties_list,
-                eigenvectorProperties,
-                connector.getDriver(),
-                identifier
+                    label,
+                    node_properties_list,
+                    eigenvectorProperties,
+                    connector.getDriver(),
+                    identifier
             );
 
             return "Updated existing nodes with eigenvector properties!";
 
-            // --- BEGIN: Optionally regenerate edges based on eigen decomposition ---
-            // in case the structure should differ from the original. 
-            /*
-            ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_properties_list, eigen_result.X, edge_list);
-            Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(node_label, edge_list_eigen, connector.getDriver(), identifier);
-            // return "Regenerated edges based on eigenvectors!";
-            */
-            // --- END: Optionally regenerate edges based on eigen decomposition ---
+// --- BEGIN: Optionally regenerate edges based on eigen decomposition ---
+// in case the structure should differ from the original.
+/*
+ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_properties_list, eigen_result.X, edge_list);
+Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(label, edge_list_eigen, connector.getDriver(), identifier);
+// return "Regenerated edges based on eigenvectors!";
+*/
+// --- END: Optionally regenerate edges based on eigen decomposition ---
 
-            // // Create a new graph name and remove existing nodes with that label
-            // String graph_name = "eigen_" + laplacian_type + "_" + Math.round(number_of_eigenvectors) + "_" + node_label;
-            // Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name, connector.getDriver(), identifier);
-            // Neo4jGraphHandler.bulkCreateNodesWithEigen(graph_name, node_properties_list, eigen_result.X, connector.getDriver(), identifier);
-            // return "Create eigendecomposed graph successful!";
+// // Create a new graph name and remove existing nodes with that label
+// String graph_name = "eigen_" + laplacian_type + "_" + Math.round(number_of_eigenvectors) + "_" + label;
+// Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name, connector.getDriver(), identifier);
+// Neo4jGraphHandler.bulkCreateNodesWithEigen(graph_name, node_properties_list, eigen_result.X, connector.getDriver(), identifier);
+// return "Create eigendecomposed graph successful!";
 
         } catch (Neo4jException e) {
             throw new Exception("Error creating Eigendecomposed graph: " + e.getMessage());
@@ -458,7 +457,7 @@ public class SimKitProcedures implements AutoCloseable {
                         Value value = node_values.value();
                         String valueOfNode = getNodeValues(value, overlook_array);
                         mapNodeList.add(valueOfNode);
-//	                    list_of_data = list_of_data + valueOfNode + " | ";
+// list_of_data = list_of_data + valueOfNode + " | ";
                         list_of_data = mapNodeList.toString();
                     }
                 }
@@ -472,11 +471,10 @@ public class SimKitProcedures implements AutoCloseable {
      *
      * @param params Type of node
      * @return Cluster result and visualization
-     * @throws Exception
+     * @throws Exception if an error occurs during clustering
      */
     @UserFunction
     @Description("K-means clustering function")
-//	public String kMeans(@Name("params") Map<String, Object> params) throws Exception {
     public double kMeans(@Name("params") Map<String, Object> params) throws Exception {
 
         predictedNodeLabels.clear();
@@ -500,12 +498,8 @@ public class SimKitProcedures implements AutoCloseable {
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
             int numCentroids = Integer.parseInt(number_of_centroids);
             int numIterations = Integer.parseInt(number_of_iterations);
-            double centroidNumber = 1.0;
-            //Clear Existing node Labels
-            // String nodeLabel = "Clustering_" + label;
 
-            // Neo4jGraphHandler.deleteExistingNodeLabels(nodeLabel, connector.getDriver());
-
+            // This list preserves the original order of nodes from the database query
             ArrayList<String> mapNodeList = parseNodeValues(label, overlook.split(","));
             if (mapNodeList == null || mapNodeList.isEmpty()) {
                 throw new Exception("No nodes found with the label: " + label);
@@ -516,12 +510,39 @@ public class SimKitProcedures implements AutoCloseable {
                     mapNodeList, numCentroids, numIterations, distance_measure, false, new ArrayList<>(), seed
             );
 
-
             HashMap<String, ArrayList<String>> cleanedKmeanAssign = Unsupervised.removeIndexAndId(kmeanAssign);
+
+            // ========================= START: CORRECTED LOGIC =========================
+            // This section ensures predictedNodeLabels is populated in the correct order, fixing the ARI bug.
+
+            // 1. Create a reverse map from a cleaned node's string representation to its cluster ID.
+            Map<String, Double> nodeToClusterIdMap = new HashMap<>();
+            double clusterId = 1.0; // Start cluster numbering from 1
+            for (ArrayList<String> nodesInCluster : cleanedKmeanAssign.values()) {
+                for (String cleanedNodeValue : nodesInCluster) {
+                    nodeToClusterIdMap.put(cleanedNodeValue, clusterId);
+                }
+                clusterId++;
+            }
+
+            // 2. Populate the global predictedNodeLabels list.
+            // Iterate over the original, ordered node list. For each node, clean it
+            // and find its corresponding cluster ID from the map.
+            predictedNodeLabels.clear(); // Ensure list is empty before populating
+            for (String originalNodeStr : mapNodeList) {
+                String cleanedNodeStr = Unsupervised.removeIndexAndIdFromString(originalNodeStr);
+
+                if (nodeToClusterIdMap.containsKey(cleanedNodeStr)) {
+                    predictedNodeLabels.add(nodeToClusterIdMap.get(cleanedNodeStr));
+                } else {
+                    // This case handles nodes that might not have been clustered, which is unlikely in k-means.
+                    predictedNodeLabels.add(-1.0); // Use -1 as a marker for unassigned nodes.
+                }
+            }
+            // ========================== END: CORRECTED LOGIC ==========================
 
             double averageSilhouetteCoefficientValue;
             if (silhouette) {
-                // Remove index and id from kmeanAssign
                 averageSilhouetteCoefficientValue = Unsupervised.averageSilhouetteCoefficient(cleanedKmeanAssign, distance_measure);
             } else {
                 HashMap<String, ArrayList<String>> mappedNodes = Unsupervised.replaceValuesWithOriginalSet(kmeanAssign, mapNodeOriginalList);
@@ -529,49 +550,33 @@ public class SimKitProcedures implements AutoCloseable {
             }
 
             if (create_new_graph) {
-                // --- Alternative: Create new graph based on clusters
-                processClusters(connector, label, cleanedKmeanAssign, centroidNumber, distance_measure);
+                processClusters(connector, label, cleanedKmeanAssign, distance_measure);
             } else {
-                // --- Default: Add new node properties to the existing graph ---
-                // Prepare a map from node identifier to cluster assignment
-                Map<String, Integer> nodeToCluster = new HashMap<>();
-                int clusterIdx = 0;
-                for (String centroid : cleanedKmeanAssign.keySet()) {
-                    for (String nodeValue : cleanedKmeanAssign.get(centroid)) {
-                        nodeToCluster.put(nodeValue, clusterIdx);
-                    }
-                    clusterIdx++;
-                }
-
-                // Retrieve node list and identifier
+                // Add cluster property to existing nodes
                 org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
                 ArrayList<NodeList2> node_properties_list = node_data.getLeft();
                 String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(connector.getDriver(), label);
 
-                // Prepare property maps for each node
                 List<Map<String, Object>> clusterProperties = new ArrayList<>();
-                for (NodeList2 node : node_properties_list) {
+                for (int i = 0; i < node_properties_list.size(); i++) {
                     Map<String, Object> props = new HashMap<>();
-                    String nodeKey = node.toString();
-                    if (nodeToCluster.containsKey(nodeKey)) {
-                        props.put("kmeans_cluster", nodeToCluster.get(nodeKey));
-                    }
+                    // Use the correctly ordered predicted labels list
+                    props.put("kmeans_cluster", predictedNodeLabels.get(i).intValue());
                     clusterProperties.add(props);
                 }
 
-                // Update existing nodes with cluster assignment property
                 Neo4jGraphHandler.updateNodeProperties(
-                    label,
-                    node_properties_list,
-                    clusterProperties,
-                    connector.getDriver(),
-                    identifier
+                        label,
+                        node_properties_list,
+                        clusterProperties,
+                        connector.getDriver(),
+                        identifier
                 );
             }
-//	        return "The average Silhouette Coefficient value is: " + averageSilhouetteCoefficientValue + " predicted labels: " + predictedNodeLabels;
             return averageSilhouetteCoefficientValue;
         }
     }
+
 
     /**
      * Parses node values from the dataset based on overlook fields.
@@ -588,32 +593,31 @@ public class SimKitProcedures implements AutoCloseable {
                 }
             }
         }
-        System.out.println("parsed node_list: " + node_list);
         return node_list;
     }
 
     /**
      * Processes clusters and connects nodes based on the k-means result.
+     * This method no longer populates the predictedNodeLabels list.
      */
     private void processClusters(SimKitProcedures connector, String label,
                                  HashMap<String, ArrayList<String>> kmeanAssign,
-                                 double centroidNumber, String distance_measure) throws Exception {
+                                 String distance_measure) throws Exception {
         DecimalFormat decimalFormat = new DecimalFormat("#.###");
         for (String centroid : kmeanAssign.keySet()) {
             ArrayList<String> clusterNodes = kmeanAssign.get(centroid);
 
             for (String clusterNode : clusterNodes) {
-                predictedNodeLabels.add(centroidNumber);
-
+                // The predictedNodeLabels list is now populated correctly in the main kMeans method.
+                // This method is now only for graph visualization purposes.
                 double distance = Unsupervised.calculateDistance(clusterNode, centroid, distance_measure);
                 String formattedDistance = decimalFormat.format(distance);
 
-
                 connectNodes(label, "create relationship in kmean node", centroid, clusterNode, Double.parseDouble(formattedDistance), getDriver());
             }
-            centroidNumber += 1.0;
         }
     }
+
 
     /**
      * Procedure for calculating adjusted rand index
@@ -623,14 +627,16 @@ public class SimKitProcedures implements AutoCloseable {
      * @throws Exception
      */
     @UserFunction
-//	public String adjustedRandIndex(@Name("params") Map<String, Object> params) throws Exception {
+// public String adjustedRandIndex(@Name("params") Map<String, Object> params) throws Exception {
     public Map<String, Object> adjustedRandIndex(@Name("params") Map<String, Object> params) throws Exception {
 
         String label = (String) params.getOrDefault("label", "Iris");
         String true_labels = (String) params.getOrDefault("true_labels", "target");
 
         if (predictedNodeLabels.size() == 0) {
-            throw new Exception(" predicted Labels is null, please run kmean clustering to add the predicted labels");
+            throw new Exception("Predicted Labels is null or empty. " +
+                    "Details: predictedNodeLabels=" + predictedNodeLabels.toString() + ", " +
+                    "label=" + label + ", true_labels=" + true_labels + ", params=" + params.toString());
         } else {
             String list_of_data = "";
             Double adjustedRandIndexValue = 0.0;
@@ -650,7 +656,7 @@ public class SimKitProcedures implements AutoCloseable {
                                         double num = Double.parseDouble(String.valueOf(value.get(nodeKey)));
                                         trueNodeLabels.add(num);
                                         list_of_data = list_of_data + num;
-                                        //	                	            	nodeLabel.append(getStringValue(nodeLabel)).append(nodeKey).append(":").append(value.get(nodeKey));
+// nodeLabel.append(getStringValue(nodeLabel)).append(nodeKey).append(":").append(value.get(nodeKey));
                                     } catch (NumberFormatException e) {
                                         System.out.println(value.get(nodeKey) + " is not a number.");
                                         stringTrueNodeLabelsList.add(String.valueOf(value.get(nodeKey)));
@@ -665,7 +671,7 @@ public class SimKitProcedures implements AutoCloseable {
                 }
 
                 if (trueNodeLabels.size() != predictedNodeLabels.size()) {
-                    throw new Exception("true labels size: " + trueNodeLabels + " and predicted labels:" + predictedNodeLabels + " does not have the same size");
+                    throw new Exception("true labels size: " + trueNodeLabels.size() + " and predicted labels:" + predictedNodeLabels.size() + " does not have the same size");
                 } else {
                     adjustedRandIndexValue = calculateAdjustedRandIndex(trueNodeLabels, predictedNodeLabels);
                 }
@@ -678,9 +684,9 @@ public class SimKitProcedures implements AutoCloseable {
 
             return result;
 
-//		    return adjustedRandIndexValue;
-//		    return "ajusted rand index of " + label + " is: " + adjustedRandIndexValue ;
-//		    return "true labels: " + trueNodeLabels + " -- predicted labels: " + predictedNodeLabels + " -- adjustedRandIndexValue: " + adjustedRandIndexValue;
+// return adjustedRandIndexValue;
+// return "ajusted rand index of " + label + " is: " + adjustedRandIndexValue ;
+// return "true labels: " + trueNodeLabels + " -- predicted labels: " + predictedNodeLabels + " -- adjustedRandIndexValue: " + adjustedRandIndexValue;
         }
     }
 
@@ -698,7 +704,7 @@ public class SimKitProcedures implements AutoCloseable {
             return null;
         }
 
-        // ✅ Validate distance_measure early
+// ✅ Validate distance_measure early
         List<String> allowedMeasures = Arrays.asList("manhattan", "cosine", "bray-curtis", "euclidean");
         if (!allowedMeasures.contains(distance_measure.toLowerCase())) {
             throw new IllegalArgumentException("Unsupported distance measure: " + distance_measure);
@@ -735,45 +741,44 @@ public class SimKitProcedures implements AutoCloseable {
         }
     }
 
-//	public void connectNodes(final String label, final String message, final String nodeCentroid, final String nodeCluster, final double distance) throws Exception
-//    {
-//    	final String name = "kmean";
-//    	try ( Session session = getDriver().session() )
-//	        {
+// public void connectNodes(final String label, final String message, final String nodeCentroid, final String nodeCluster, final double distance) throws Exception
+// {
+// final String name = "kmean";
+// try ( Session session = getDriver().session() )
+// {
 //
-//    		log.info("kmeans connection starts....");
-//        	String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(getDriver(), label);
-//            String greeting = session.writeTransaction( new TransactionWork<String>()
-//            {
-//                @Override
-//                public String execute( Transaction tx )
-//                {
-//					// First, find and delete the existing node if it exists
-//					String deleteQuery = "MATCH (a:Clustering_" + label + " {" + nodeCentroid + "}) " +
-//										 "DETACH DELETE a";
-//					//tx.run(deleteQuery);
-//					// Then create the new nodes and relationship
-//					String createQuery = "MERGE (a:Clustering_" + label + " {" + nodeCentroid + "}) " +
-//										 "MERGE (b:Clustering_" + label + " {" + nodeCluster + "}) " +
-//										 "MERGE (a)-[r:link]->(b) " +
-//										 "SET r.distance = " + distance + " " +
-//										 "RETURN a.message";
+// log.info("kmeans connection starts....");
+// String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(getDriver(), label);
+// String greeting = session.writeTransaction( new TransactionWork<String>()
+// {
+// @Override
+// public String execute( Transaction tx )
+// {
+// // First, find and delete the existing node if it exists
+// String deleteQuery = "MATCH (a:Clustering_" + label + " {" + nodeCentroid + "}) " +
+// "DETACH DELETE a";
+// //tx.run(deleteQuery);
+// // Then create the new nodes and relationship
+// String createQuery = "MERGE (a:Clustering_" + label + " {" + nodeCentroid + "}) " +
+// "MERGE (b:Clustering_" + label + " {" + nodeCluster + "}) " +
+// "MERGE (a)-[r:link]->(b) " +
+// "SET r.distance = " + distance + " " +
+// "RETURN a.message";
 //
-////					String createQuery = "MERGE (a:Clustering_" + label + " {" + identifier + ": '" + nodeCentroid + "'}) " +
-////		                     "MERGE (b:Clustering_" + label + " {" + identifier + ": '" + nodeCluster + "'}) " +
-////		                     "MERGE (a)-[r:link]->(b) " +
-////		                     "SET r.distance = " + distance + " " +
-////		                     "RETURN a";
-//
-//
-//					Result result = tx.run(createQuery);
-//					return result.single().get(0).asString();
-//                }
-//            } );
-//		}
-//	}
 
-
+    /// / String createQuery = "MERGE (a:Clustering_" + label + " {" + identifier + ": '" + nodeCentroid + "'}) " +
+    /// / "MERGE (b:Clustering_" + label + " {" + identifier + ": '" + nodeCluster + "'}) " +
+    /// / "MERGE (a)-[r:link]->(b) " +
+    /// / "SET r.distance = " + distance + " " +
+    /// / "RETURN a";
+//
+//
+// Result result = tx.run(createQuery);
+// return result.single().get(0).asString();
+// }
+// } );
+// }
+// }
     public void connectNodes(final String label, final String message, final String nodeCentroid, final String nodeCluster, final double distance, Driver driver) throws Exception {
         final String name = "kmean";
         try (Session session = driver.session()) {
@@ -783,15 +788,15 @@ public class SimKitProcedures implements AutoCloseable {
                 @Override
                 public String execute(Transaction tx) {
 
-                    // Resolve identifier for dynamic node matching
+// Resolve identifier for dynamic node matching
                     String identifier = Neo4jGraphHandler.resolveDynamicIdentifier(getDriver(), label);
 
 
-                    // First, find and delete the existing node if it exists
+// First, find and delete the existing node if it exists
                     String deleteQuery = "MATCH (a:Clustering_" + label + " {" + nodeCentroid + "}) " +
                             "DETACH DELETE a";
-                    //tx.run(deleteQuery);
-                    // Then create the new nodes and relationship
+//tx.run(deleteQuery);
+// Then create the new nodes and relationship
                     String createQuery = "MERGE (a:Clustering_" + label + " {" + nodeCentroid + "}) " +
                             "MERGE (b:Clustering_" + label + " {" + nodeCluster + "}) " +
                             "MERGE (a)-[r:link]->(b) " +
@@ -854,7 +859,7 @@ public class SimKitProcedures implements AutoCloseable {
         Map<Double, Double> trueLabelCounts = new HashMap<>();
         Map<Double, Double> predictedLabelCounts = new HashMap<>();
 
-        // Build the contingency table and label counts
+// Build the contingency table and label counts
         for (int i = 0; i < n; i++) {
             double trueLabel = trueLabels.get(i);
             double predictedLabel = predictedLabels.get(i);
@@ -922,13 +927,13 @@ public class SimKitProcedures implements AutoCloseable {
                 throw new Exception("Missing node label");
             }
 
-            // String graph_name = "affinity_" + graph_type + "_" + parameter.replace(".", "_") + "_" + label;
+// String graph_name = "affinity_" + graph_type + "_" + parameter.replace(".", "_") + "_" + label;
             ArrayList<NodeList2> node_properties_list;
             String property_names = "";
             String identifier = "";
             ArrayList<EdgeList2> edge_list_2;
 
-            // Step 1: Create affinity graph
+// Step 1: Create affinity graph
             if (is_feature_based) {
                 org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
                 node_properties_list = node_data.getLeft();
@@ -957,9 +962,9 @@ public class SimKitProcedures implements AutoCloseable {
                 }
                 ArrayList<EdgeList2> edge_list = GraphTransform.calculateEdgeList(node_properties_list, adj_mat);
                 edge_list_2 = edge_list;
-                // Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name, connector.getDriver(), identifier);
-                // Neo4jGraphHandler.bulkCreateNodes(graph_name, node_properties_list, connector.getDriver(), identifier);
-                // Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(graph_name, edge_list, connector.getDriver(), identifier);
+// Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name, connector.getDriver(), identifier);
+// Neo4jGraphHandler.bulkCreateNodes(graph_name, node_properties_list, connector.getDriver(), identifier);
+// Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(graph_name, edge_list, connector.getDriver(), identifier);
 
             } else {
                 org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
@@ -973,7 +978,7 @@ public class SimKitProcedures implements AutoCloseable {
                 edge_list_2 = Neo4jGraphHandler.retrieveEdgeList(label, connector.getDriver());
             }
 
-            // Step 2: Compute Laplacian matrix
+// Step 2: Compute Laplacian matrix
             RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list_2, node_properties_list);
             RealMatrix degree_matrix = MatrixCalculation.calculateDegreeMatrix(adjacency_matrix);
             RealMatrix laplacian_matrix = MatrixCalculation.calculateLaplacianMatrix(degree_matrix, adjacency_matrix, laplacian_type);
@@ -986,13 +991,13 @@ public class SimKitProcedures implements AutoCloseable {
 
             ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_properties_list, eigen_result.X, edge_list_2);
 
-            // String graph_name_eigen = "eigen_" + laplacian_type + "_" + Math.round(number_of_eigenvectors) + "_" + graph_name;
+// String graph_name_eigen = "eigen_" + laplacian_type + "_" + Math.round(number_of_eigenvectors) + "_" + graph_name;
 
-            // Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name_eigen, connector.getDriver(), identifier);
-            // Neo4jGraphHandler.bulkCreateNodesWithEigen(graph_name_eigen, node_properties_list, eigen_result.X, connector.getDriver(), identifier);
-            // Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(graph_name_eigen, edge_list_eigen, connector.getDriver(), identifier);
+// Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name_eigen, connector.getDriver(), identifier);
+// Neo4jGraphHandler.bulkCreateNodesWithEigen(graph_name_eigen, node_properties_list, eigen_result.X, connector.getDriver(), identifier);
+// Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(graph_name_eigen, edge_list_eigen, connector.getDriver(), identifier);
 
-            // --- Only update existing nodes with eigenvector properties ---
+// --- Only update existing nodes with eigenvector properties ---
             List<Map<String, Object>> eigenvectorProperties = new ArrayList<>();
             for (int i = 0; i < node_properties_list.size(); i++) {
                 Map<String, Object> props = new HashMap<>();
@@ -1002,23 +1007,23 @@ public class SimKitProcedures implements AutoCloseable {
                 eigenvectorProperties.add(props);
             }
             Neo4jGraphHandler.updateNodeProperties(
-                label,
-                node_properties_list,
-                eigenvectorProperties,
-                connector.getDriver(),
-                identifier
+                    label,
+                    node_properties_list,
+                    eigenvectorProperties,
+                    connector.getDriver(),
+                    identifier
             );
 
-            // --- BEGIN: Optionally regenerate edges based on eigen decomposition ---
-            // in case the edges tructure should differ from the original. 
-            /*
-            ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_properties_list, eigen_result.X, edge_list);
-            Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(node_label, edge_list_eigen, connector.getDriver(), identifier);
-            // return "Regenerated edges based on eigenvectors!";
-            */
-            // --- END: Optionally regenerate edges based on eigen decomposition ---
+// --- BEGIN: Optionally regenerate edges based on eigen decomposition ---
+// in case the edges tructure should differ from the original.
+/*
+ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_properties_list, eigen_result.X, edge_list);
+Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(label, edge_list_eigen, connector.getDriver(), identifier);
+// return "Regenerated edges based on eigenvectors!";
+*/
+// --- END: Optionally regenerate edges based on eigen decomposition ---
 
-            // Step 3: Perform clustering
+// Step 3: Perform clustering
             String number_of_clusters = Integer.toString(number_of_eigenvectors.intValue());
             String[] properties_array = property_names.split(",");
             StringBuilder filtered_properties = new StringBuilder();
@@ -1031,7 +1036,7 @@ public class SimKitProcedures implements AutoCloseable {
                 }
             }
 
-            // System.out.println("filtered_properties: " + filtered_properties);
+// System.out.println("filtered_properties: " + filtered_properties);
             double kmean_result = kMeans(Map.of(
                     "label", label,
                     "number_of_centroids", number_of_clusters,
@@ -1043,9 +1048,9 @@ public class SimKitProcedures implements AutoCloseable {
                     "silhouette", silhouette,
                     "seed", seed,
                     "create_new_graph", create_new_graph
-                ));
+            ));
 
-            // Return metrics
+// Return metrics
             return kmean_result;
         }
     }
@@ -1060,6 +1065,7 @@ public class SimKitProcedures implements AutoCloseable {
     @UserFunction
     public Map<String, Object> experimentalSpectralClustering(@Name("params") Map<String, Object> params) throws Exception {
         String label = (String) params.getOrDefault("label", "Iris");
+        boolean duplicate_node_set = (boolean) params.getOrDefault("duplicate_node_set", false);
         Boolean is_feature_based = (Boolean) params.getOrDefault("is_feature_based", true);
         String distance_measure = (String) params.getOrDefault("distance_measure", "euclidean");
         String graph_type = (String) params.getOrDefault("graph_type", "full");
@@ -1087,6 +1093,9 @@ public class SimKitProcedures implements AutoCloseable {
             if (!(params.getOrDefault("silhouette", false) instanceof Boolean)) {
                 throw new IllegalArgumentException("Invalid type for parameter: silhouette. Expected a boolean.");
             }
+            if (!(params.getOrDefault("duplicate_node_set", false) instanceof Boolean)) {
+                throw new IllegalArgumentException("Invalid type for parameter: duplicate_node_set. Expected a boolean.");
+            }
         } catch (ClassCastException e) {
             throw new IllegalArgumentException("Parameter casting error: " + e.getMessage());
         }
@@ -1096,28 +1105,38 @@ public class SimKitProcedures implements AutoCloseable {
         long totalStartTime = System.nanoTime();
         long affinityTime = 0, laplacianTime = 0, clusteringTime = 0, adjustedRandIndexTime = 0;
 
-		// StringBuilder output_string = new StringBuilder("Debug Data: ");
+// StringBuilder output_string = new StringBuilder("Debug Data: ");
 
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
             if (label == null) {
                 throw new Exception("Missing node label");
             }
 
-            // String graph_name = "affinity_" + graph_type + "_" + parameter.replace(".", "_") + "_" + label;
+            String originalLabel = label; // Keep track of the original label
+
+            // Optional: Duplicate node set for the experiment
+            if (duplicate_node_set) {
+                String newLabel = originalLabel + "_" + graph_type + "_" + parameter.replace(".", "_")
+                                + "_" + laplacian_type + "_" + Math.round(number_of_eigenvectors);
+                Neo4jGraphHandler.duplicateNodeSet(originalLabel, newLabel, connector.getDriver());
+                label = newLabel; // Override the label to use the new duplicated set
+            }
+
+// String graph_name = "affinity_" + graph_type + "_" + parameter.replace(".", "_") + "_" + label;
             ArrayList<NodeList2> node_properties_list;
             String property_names = "";
             String identifier = "";
             Map<String, Object> results;
             ArrayList<EdgeList2> edge_list_2;
             try (Session sessions = connector.getDriver().session()) {
-                // Step 1: Create affinity graph
+// Step 1: Create affinity graph
                 updateProgress(sessions, "🔄 Step 1: Creating Affinity Graph...");
                 long startAffinityTime = System.nanoTime();
 
                 if (is_feature_based) {
                     updateProgress(sessions, "🔄 Creating Affinity Graph - Feature Based...");
 
-                    // Retrieve node data
+// Retrieve node data
                     updateProgress(sessions, "📥 Retrieving node list...");
                     org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
                     node_properties_list = node_data.getLeft();
@@ -1125,18 +1144,18 @@ public class SimKitProcedures implements AutoCloseable {
                     property_names = node_data.getRight();
                     updateProgress(sessions, "✅ Node list retrieved.");
 
-                    // Process remove columns
+// Process remove columns
                     updateProgress(sessions, "🗑️ Processing remove columns...");
                     String[] remove_list = remove_columns.split(",");
                     List<String> remove_list_new = Arrays.stream(remove_list).collect(Collectors.toList());
                     updateProgress(sessions, "✅ Remove columns processed.");
 
-                    // Compute distance matrix
+// Compute distance matrix
                     updateProgress(sessions, "📏 Calculating distance matrix...");
                     Double[][] distance_matrix = getDistanceMatrixFromNodes(distance_measure, node_properties_list, remove_list_new);
                     updateProgress(sessions, "✅ Distance matrix computed.");
 
-                    // Compute adjacency matrix
+// Compute adjacency matrix
                     updateProgress(sessions, "🔗 Calculating adjacency matrix...");
                     Double[][] adj_mat;
                     if (graph_type.equals("full")) {
@@ -1160,31 +1179,31 @@ public class SimKitProcedures implements AutoCloseable {
                     }
                     updateProgress(sessions, "✅ Adjacency matrix computed.");
 
-                    // Compute edge list
+// Compute edge list
                     updateProgress(sessions, "🔗 Creating edge list...");
                     ArrayList<EdgeList2> edge_list = GraphTransform.calculateEdgeList(node_properties_list, adj_mat);
                     edge_list_2 = edge_list;
                     updateProgress(sessions, "✅ Edge list created.");
 
-                    // // Delete existing graph nodes
-                    // updateProgress(sessions, "🗑️ Deleting existing graph nodes...");
-                    // Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name, connector.getDriver(), identifier);
-                    // updateProgress(sessions, "✅ Existing nodes deleted.");
+// // Delete existing graph nodes
+// updateProgress(sessions, "🗑️ Deleting existing graph nodes...");
+// Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name, connector.getDriver(), identifier);
+// updateProgress(sessions, "✅ Existing nodes deleted.");
 
-                    // // Create new graph nodes
-                    // updateProgress(sessions, "🆕 Creating new graph nodes...");
-                    // Neo4jGraphHandler.bulkCreateNodes(graph_name, node_properties_list, connector.getDriver(), identifier);
-                    // updateProgress(sessions, "✅ New graph nodes created.");
+// // Create new graph nodes
+// updateProgress(sessions, "🆕 Creating new graph nodes...");
+// Neo4jGraphHandler.bulkCreateNodes(graph_name, node_properties_list, connector.getDriver(), identifier);
+// updateProgress(sessions, "✅ New graph nodes created.");
 
-                    // // Create new relationships
-                    // updateProgress(sessions, "🔗 Creating new relationships...");
-                    // Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(graph_name, edge_list, connector.getDriver(), identifier);
-                    // updateProgress(sessions, "✅ New relationships created.");
+// // Create new relationships
+// updateProgress(sessions, "🔗 Creating new relationships...");
+// Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(graph_name, edge_list, connector.getDriver(), identifier);
+// updateProgress(sessions, "✅ New relationships created.");
 
                 } else {
                     updateProgress(sessions, "🔄 Creating Affinity Graph - Non-Feature Based...");
 
-                    // Retrieve existing node list
+// Retrieve existing node list
                     updateProgress(sessions, "📥 Retrieving node list for non-feature based graph...");
                     org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
                     node_properties_list = node_data.getLeft();
@@ -1196,7 +1215,7 @@ public class SimKitProcedures implements AutoCloseable {
                     updateProgress(sessions, "✅ Node list retrieved for non-feature based graph.");
 
 
-                    // Retrieve Edge List
+// Retrieve Edge List
                     updateProgress(sessions, "📥 Retrieving edge list...");
                     edge_list_2 = Neo4jGraphHandler.retrieveEdgeList(label, connector.getDriver());
                     updateProgress(sessions, "✅ Edge list retrieved. Total edges: " + edge_list_2.size());
@@ -1205,26 +1224,26 @@ public class SimKitProcedures implements AutoCloseable {
                 affinityTime = System.nanoTime() - startAffinityTime;
                 updateProgress(sessions, "✅ Step 1 Completed: Affinity Graph Created. Took " + (affinityTime / 1e6) + " ms.");
 
-                // Step 2: Compute Laplacian matrix
+// Step 2: Compute Laplacian matrix
                 updateProgress(sessions, "🔄 Step 2: Computing Laplacian Matrix...");
                 long startLaplacianTime = System.nanoTime();
 
-                // Convert to Adjacency Matrix
+// Convert to Adjacency Matrix
                 updateProgress(sessions, "🔗 Converting edge list to adjacency matrix...");
                 RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list_2, node_properties_list);
                 updateProgress(sessions, "✅ Adjacency matrix computed.");
 
-                // Compute Degree Matrix
+// Compute Degree Matrix
                 updateProgress(sessions, "📊 Computing degree matrix...");
                 RealMatrix degree_matrix = MatrixCalculation.calculateDegreeMatrix(adjacency_matrix);
                 updateProgress(sessions, "✅ Degree matrix computed.");
 
-                // Compute Laplacian Matrix
+// Compute Laplacian Matrix
                 updateProgress(sessions, "📉 Computing Laplacian matrix (Type: " + laplacian_type + ")...");
                 RealMatrix laplacian_matrix = MatrixCalculation.calculateLaplacianMatrix(degree_matrix, adjacency_matrix, laplacian_type);
                 updateProgress(sessions, "✅ Laplacian matrix computed.");
 
-                // Compute Eigenvalues & Eigenvectors
+// Compute Eigenvalues & Eigenvectors
                 updateProgress(sessions, "🧠 Computing eigenvalues and eigenvectors...");
                 Object eigen_result_obj = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
 
@@ -1234,31 +1253,31 @@ public class SimKitProcedures implements AutoCloseable {
                 EigenCalculation.EigenResult eigen_result = (EigenCalculation.EigenResult) eigen_result_obj;
                 updateProgress(sessions, "✅ Eigenvalues and eigenvectors computed.");
 
-                // // Create Edge List for Eigenvectors
-                // updateProgress(sessions, "🔗 Creating edge list from eigenvectors...");
-                // ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_properties_list, eigen_result.X, edge_list_2);
-                // updateProgress(sessions, "✅ Edge list from eigenvectors created.");
+// // Create Edge List for Eigenvectors
+// updateProgress(sessions, "🔗 Creating edge list from eigenvectors...");
+// ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_properties_list, eigen_result.X, edge_list_2);
+// updateProgress(sessions, "✅ Edge list from eigenvectors created.");
 
-                // // Define Eigen Graph Name
-                // String graph_name_eigen = "eigen_" + laplacian_type + "_" + Math.round(number_of_eigenvectors) + "_" + graph_name;
-                // updateProgress(sessions, "📌 Created new graph name: " + graph_name_eigen);
+// // Define Eigen Graph Name
+// String graph_name_eigen = "eigen_" + laplacian_type + "_" + Math.round(number_of_eigenvectors) + "_" + graph_name;
+// updateProgress(sessions, "📌 Created new graph name: " + graph_name_eigen);
 
-                // // Delete Existing Eigen Nodes
-                // updateProgress(sessions, "🗑️ Deleting existing nodes for eigen graph...");
-                // Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name_eigen, connector.getDriver(), identifier);
-                // updateProgress(sessions, "✅ Existing eigen graph nodes deleted.");
+// // Delete Existing Eigen Nodes
+// updateProgress(sessions, "🗑️ Deleting existing nodes for eigen graph...");
+// Neo4jGraphHandler.bulkDeleteNodesWithBatching(graph_name_eigen, connector.getDriver(), identifier);
+// updateProgress(sessions, "✅ Existing eigen graph nodes deleted.");
 
-                // // Create New Eigen Nodes
-                // updateProgress(sessions, "🆕 Creating new eigen nodes...");
-                // Neo4jGraphHandler.bulkCreateNodesWithEigen(graph_name_eigen, node_properties_list, eigen_result.X, connector.getDriver(), identifier);
-                // updateProgress(sessions, "✅ New eigen nodes created.");
+// // Create New Eigen Nodes
+// updateProgress(sessions, "🆕 Creating new eigen nodes...");
+// Neo4jGraphHandler.bulkCreateNodesWithEigen(graph_name_eigen, node_properties_list, eigen_result.X, connector.getDriver(), identifier);
+// updateProgress(sessions, "✅ New eigen nodes created.");
 
-                // // Create New Relationships for Eigen Graph
-                // updateProgress(sessions, "🔗 Creating relationships for eigen graph...");
-                // Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(graph_name_eigen, edge_list_eigen, connector.getDriver(), identifier);
-                // updateProgress(sessions, "✅ Relationships for eigen graph created.");
+// // Create New Relationships for Eigen Graph
+// updateProgress(sessions, "🔗 Creating relationships for eigen graph...");
+// Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(graph_name_eigen, edge_list_eigen, connector.getDriver(), identifier);
+// updateProgress(sessions, "✅ Relationships for eigen graph created.");
 
-                // --- Only update existing nodes with eigenvector properties and optionally regenerate edges ---
+// --- Only update existing nodes with eigenvector properties and optionally regenerate edges ---
                 updateProgress(sessions, "🔗 Updating node properties with calculated eigenvectors ...");
                 List<Map<String, Object>> eigenvectorProperties = new ArrayList<>();
                 for (int i = 0; i < node_properties_list.size(); i++) {
@@ -1269,39 +1288,39 @@ public class SimKitProcedures implements AutoCloseable {
                     eigenvectorProperties.add(props);
                 }
                 Neo4jGraphHandler.updateNodeProperties(
-                    label,
-                    node_properties_list,
-                    eigenvectorProperties,
-                    connector.getDriver(),
-                    identifier
+                        label,
+                        node_properties_list,
+                        eigenvectorProperties,
+                        connector.getDriver(),
+                        identifier
                 );
                 updateProgress(sessions, "✅ Node properties with eigenvectors updated.");
 
-                // updateProgress(sessions, "🔗 Regenerating new edges based on eigen calculations ...");
-                // --- BEGIN: Optionally regenerate edges based on eigen decomposition ---
-                // in case the edges structure should differ from the original. 
-                /*
-                ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_properties_list, eigen_result.X, edge_list);
-                Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(node_label, edge_list_eigen, connector.getDriver(), identifier);
-                // return "Regenerated edges based on eigenvectors!";
-                */
-                // --- END: Optionally regenerate edges based on eigen decomposition ---
-                // updateProgress(sessions, "✅ Regenerated edges based on eigenvectors.");
+// updateProgress(sessions, "🔗 Regenerating new edges based on eigen calculations ...");
+// --- BEGIN: Optionally regenerate edges based on eigen decomposition ---
+// in case the edges structure should differ from the original.
+/*
+ArrayList<EdgeList2> edge_list_eigen = EigenCalculation.createEdgeList(node_properties_list, eigen_result.X, edge_list);
+Neo4jGraphHandler.bulkCreateRelationshipsWithBatching(label, edge_list_eigen, connector.getDriver(), identifier);
+// return "Regenerated edges based on eigenvectors!";
+*/
+// --- END: Optionally regenerate edges based on eigen decomposition ---
+// updateProgress(sessions, "✅ Regenerated edges based on eigenvectors.");
 
-				// Record total Laplacian computation time
+// Record total Laplacian computation time
                 laplacianTime = System.nanoTime() - startLaplacianTime;
                 updateProgress(sessions, "✅ Step 2 Completed: Laplacian Matrix and Eigendecomposition Computed. Took " + (laplacianTime / 1e6) + " ms.");
 
-                // Step 3: Perform Clustering
+// Step 3: Perform Clustering
                 updateProgress(sessions, "🔄 Step 3: Performing Clustering...");
                 long startClusteringTime = System.nanoTime();
 
-                // Determine Number of Clusters
+// Determine Number of Clusters
                 updateProgress(sessions, "📊 Determining number of clusters...");
                 String number_of_clusters = Integer.toString(number_of_eigenvectors.intValue());
                 updateProgress(sessions, "✅ Number of clusters: " + number_of_clusters);
 
-                // Filter Properties
+// Filter Properties
                 updateProgress(sessions, "🔍 Filtering properties for clustering...");
                 String[] properties_array = property_names.split(",");
                 StringBuilder filtered_properties = new StringBuilder();
@@ -1316,17 +1335,17 @@ public class SimKitProcedures implements AutoCloseable {
                 }
                 updateProgress(sessions, "✅ Filtered properties: " + filtered_properties);
 
-                // Print filtered properties for debugging
+// Print filtered properties for debugging
                 System.out.println("filtered_properties: " + filtered_properties);
 
-                // Execute k-Means Clustering
+// Execute k-Means Clustering
                 updateProgress(sessions, "⚡ Running k-Means clustering...");
                 double kmean_result = kMeans(Map.of(
                         "label", label,
                         "number_of_centroids", number_of_clusters,
                         "number_of_iterations", number_of_iterations,
                         "distance_measure", distance_measure_kmean,
-                        "original_set", label,
+                        "original_set", originalLabel, // Use original label for fetching true labels
                         "overlook", target_column + "," + filtered_properties.toString(),
                         "overlook_original", target_column,
                         "silhouette", silhouette,
@@ -1336,22 +1355,22 @@ public class SimKitProcedures implements AutoCloseable {
                 updateProgress(sessions, "✅ k-Means clustering completed. Silhouette Score: " + kmean_result);
 
 
-				// Record total clustering computation time
+// Record total clustering computation time
                 clusteringTime = System.nanoTime() - startClusteringTime;
                 updateProgress(sessions, "✅ Step 3 Completed: Clustering Done. Took " + (clusteringTime / 1e6) + " ms.");
 
-                // Step 4: Compute Adjusted Rand Index
+// Step 4: Compute Adjusted Rand Index
                 updateProgress(sessions, "🔄 Step 4: Computing Adjusted Rand Index...");
                 long startAdjustedRandIndexTime = System.nanoTime();
 
-                // Start computation
+// Start computation
                 updateProgress(sessions, "📊 Running adjusted Rand Index calculation...");
                 Map<String, Object> adjustedRandIndexResult = adjustedRandIndex(Map.of(
-                        "label", label,
+                        "label", originalLabel,
                         "true_labels", target_column
                 ));
 
-                // Extract Results
+// Extract Results
                 updateProgress(sessions, "📥 Extracting adjusted Rand Index results...");
                 double adjustedRandIndexValue = (double) adjustedRandIndexResult.get("adjustedRandIndex");
                 List<Integer> true_labels = (List<Integer>) adjustedRandIndexResult.get("true_labels");
@@ -1362,15 +1381,15 @@ public class SimKitProcedures implements AutoCloseable {
                 updateProgress(sessions, "📋 Predicted Labels Count: " + predictedLabels.size());
 
 
-				// Record computation time
+// Record computation time
                 adjustedRandIndexTime = System.nanoTime() - startAdjustedRandIndexTime;
                 updateProgress(sessions, "✅ Step 4 Completed: Adjusted Rand Index Computation Done. Took " + (adjustedRandIndexTime / 1e6) + " ms.");
 
-				// Compute Total Execution Time
+// Compute Total Execution Time
                 long totalTime = System.nanoTime() - totalStartTime;
                 updateProgress(sessions, "🕒 Total Execution Time: " + (totalTime / 1e6) + " ms.");
 
-                // Return metrics
+// Return metrics
                 results = new HashMap<>();
                 results.put("silhouette_score", kmean_result);
                 results.put("rand_index", adjustedRandIndexValue);
@@ -1383,6 +1402,19 @@ public class SimKitProcedures implements AutoCloseable {
             return results;
         }
     }
+
+    // Helper method to update progress in Neo4j
+    // private void updateProgress(Session session, String step) {
+    //     String progressQuery = "MERGE (p:Progress {id: 'current'}) SET p.step = $step, p.timestamp = datetime()";
+    //     session.run(progressQuery, Values.parameters("step", step));
+//
+    //     try {
+    //         Thread.sleep(2000); // Delay of 2 seconds
+    //     } catch (InterruptedException e) {
+    //         Thread.currentThread().interrupt(); // Restore interrupt status
+    //         System.err.println("Thread was interrupted during sleep.");
+    //     }
+    // }
 
     // Helper method to update progress in Neo4j
     private void updateProgress(Session session, String step) {
@@ -1406,7 +1438,7 @@ public class SimKitProcedures implements AutoCloseable {
                 return "Missing data_path or distance measure type";
             } else {
 
-                // Display edge list
+// Display edge list
 
 
                 String graph_name = "affinity_";
@@ -1416,14 +1448,14 @@ public class SimKitProcedures implements AutoCloseable {
                 List<String> remove_list_new = Arrays.stream(remove_list).collect(Collectors.toList());
                 if (label.isEmpty()) {
                     ReadCsvTestData readCsvTestData = new ReadCsvTestData(data_path);
-//				//ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(data_path,IndexColumn);
+// //ArrayList<ArrayList<String>> testData = readCsvTestData.readCsvFileNew(data_path,IndexColumn);
                     node_properties_list = readCsvTestData.readCsvFileToMap(data_path);
                 }
                 org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> nodeData = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
                 node_properties_list = nodeData.getLeft();
-//			node_properties_list = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
+// node_properties_list = Neo4jGraphHandler.retrieveNodeListFromNeo4jSimilarityGraph(label, connector.getDriver());
 
-//            ArrayList<NodeList2> nodePropertiesList_copy = readCsvTestData.readCsvFileToMap(data_path);
+// ArrayList<NodeList2> nodePropertiesList_copy = readCsvTestData.readCsvFileToMap(data_path);
                 Double[][] distance_matrix = getDistanceMatrixFromNodes(distance_measure, node_properties_list, remove_list_new);
 
                 StringBuilder output_string = new StringBuilder("Graph Data: ");
@@ -1470,7 +1502,7 @@ public class SimKitProcedures implements AutoCloseable {
      * Displays information about a graph based on the specified node label and desired number of eigenvectors.
      * The Laplacian matrix is set based on the specified laplacian_type.
      *
-     * @param node_label             The label of the nodes in the graph.
+     * @param label                  The label of the nodes in the graph.
      * @param number_of_eigenvectors The number of desired eigenvectors to compute during eigen decomposition.
      * @param laplacian_type         The type of Laplacian matrix to be used.
      * @return String containing information about the graph, including edge list, adjacency matrix, degree matrix,
@@ -1478,22 +1510,22 @@ public class SimKitProcedures implements AutoCloseable {
      * @throws Exception If an error occurs during the process.
      */
     @UserFunction
-    public String displayGraphList(@Name("node_label") String node_label,
+    public String displayGraphList(@Name("label") String label,
                                    @Name("number_of_eigenvectors") Double number_of_eigenvectors,
                                    @Name("laplacian_type") String laplacian_type) throws Exception {
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
-            if (node_label == null) {
+            if (label == null) {
                 return "Error: Missing node label.";
             }
 
             StringBuilder output_string = new StringBuilder("Edge List Data: ");
-            ArrayList<EdgeList2> edge_list = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(node_label, connector.getDriver());
+            ArrayList<EdgeList2> edge_list = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(label, connector.getDriver());
             for (EdgeList2 edge : edge_list) {
                 output_string.append(" | ").append(edge.toString());
             }
-            org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(node_label, connector.getDriver());
+            org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
             ArrayList<NodeList2> node_list = node_data.getLeft();
-            // Calculate matrices
+// Calculate matrices
             RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list, node_list);
             output_string.append("\n\nAdjacency Matrix:\n").append(matrixToString(adjacency_matrix));
 
@@ -1503,15 +1535,15 @@ public class SimKitProcedures implements AutoCloseable {
             RealMatrix laplacian_matrix = MatrixCalculation.calculateLaplacianMatrix(degree_matrix, adjacency_matrix, laplacian_type);
             output_string.append("\n\nLaplacian Matrix:\n").append(matrixToString(laplacian_matrix));
 
-            // Attempt to calculate eigen decomposition
+// Attempt to calculate eigen decomposition
             Object eigen_result_obj = EigenCalculation.calculateEigen(laplacian_matrix, number_of_eigenvectors);
 
-            // Check if the result is an error message
+// Check if the result is an error message
             if (eigen_result_obj instanceof String) {
-                return (String) eigen_result_obj;  // Return the error message directly
+                return (String) eigen_result_obj; // Return the error message directly
             }
 
-            // Cast the result to EigenResult and output eigenvalues, eigenvectors, and X matrix
+// Cast the result to EigenResult and output eigenvalues, eigenvectors, and X matrix
             EigenCalculation.EigenResult eigen_result = (EigenCalculation.EigenResult) eigen_result_obj;
 
             output_string.append("\n\nEigenvalues:\n").append(Arrays.toString(eigen_result.eigenvalues));
@@ -1550,13 +1582,13 @@ public class SimKitProcedures implements AutoCloseable {
                 for (String centroid : kmeanAssign.keySet()) {
                     ArrayList<String> clusterNode = kmeanAssign.get(centroid);
                     for (int i = 0; i < clusterNode.size(); i++) {
-                        //Add predict labels
+//Add predict labels
                         predictedNodeLabels.add(centroidNumber);
 
                         DecimalFormat decimalFormat = new DecimalFormat("#.###");
                         double distance = Unsupervised.calculateDistance(clusterNode.get(i), centroid, distance_measure);
                         connectNodes(label, "create relationship in kmean node", centroid, clusterNode.get(i), distance, connector.getDriver());
-//			        connector.connectNodes(label, "create relationship in kmean node", centroid, clusterNode.get(i), roundedDistance);
+// connector.connectNodes(label, "create relationship in kmean node", centroid, clusterNode.get(i), roundedDistance);
                     }
                     centroidNumber = centroidNumber + 1;
                 }
@@ -1569,37 +1601,37 @@ public class SimKitProcedures implements AutoCloseable {
     /**
      * Retrieves and saves a specified matrix (adjacency or X matrix) from the graph in Neo4j.
      *
-     * @param node_label  The label of the nodes in the graph.
+     * @param label       The label of the nodes in the graph.
      * @param matrix_type The type of matrix to retrieve ("adjacency" or "x_matrix").
      * @param save_path   The path where the matrix CSV file should be saved.
      * @return String indicating the success of the operation.
      * @throws Exception If an error occurs during the process.
      */
     @UserFunction
-    public String getMatrix(@Name("node_label") String node_label,
+    public String getMatrix(@Name("label") String label,
                             @Name("matrix_type") String matrix_type,
                             @Name("save_path") String save_path) throws Exception {
         try (SimKitProcedures connector = new SimKitProcedures(SimKitProcedures.uri, SimKitProcedures.username, SimKitProcedures.password)) {
-            if (node_label == null) {
+            if (label == null) {
                 return "Missing node label";
             } else {
                 StringBuilder output_string = new StringBuilder();
                 if ("adjacency".equals(matrix_type)) {
-                    ArrayList<EdgeList2> edge_list = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(node_label, connector.getDriver());
-                    org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(node_label, connector.getDriver());
+                    ArrayList<EdgeList2> edge_list = Neo4jGraphHandler.retrieveEdgeListFromNeo4j(label, connector.getDriver());
+                    org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> node_data = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
                     ArrayList<NodeList2> node_list = node_data.getLeft();
                     RealMatrix adjacency_matrix = MatrixCalculation.convertToAdjacencyMatrix(edge_list, node_list);
                     output_string.append("Adjacency matrix:\n").append(matrixToString(adjacency_matrix));
 
-                    // Save adjacency matrix to CSV at user-defined or default path
-                    saveMatrixToCSV(adjacency_matrix, node_label + "_adjacency_matrix.csv", save_path);
+// Save adjacency matrix to CSV at user-defined or default path
+                    saveMatrixToCSV(adjacency_matrix, label + "_adjacency_matrix.csv", save_path);
                 } else if ("x_matrix".equals(matrix_type)) {
-                    org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> nodes = Neo4jGraphHandler.retrieveNodeList(node_label, connector.getDriver());
+                    org.apache.commons.lang3.tuple.Pair<ArrayList<NodeList2>, String> nodes = Neo4jGraphHandler.retrieveNodeList(label, connector.getDriver());
                     RealMatrix x_matrix = MatrixCalculation.convertToXMatrix(nodes.getLeft());
                     output_string.append("X matrix with eigenvectors:\n").append(matrixToString(x_matrix));
 
-                    // Save X matrix to CSV at user-defined or default path
-                    saveMatrixToCSV(x_matrix, node_label + "_x_matrix.csv", save_path);
+// Save X matrix to CSV at user-defined or default path
+                    saveMatrixToCSV(x_matrix, label + "_x_matrix.csv", save_path);
                 } else {
                     return "Invalid matrix type specified";
                 }
@@ -1619,10 +1651,10 @@ public class SimKitProcedures implements AutoCloseable {
      * @throws IOException If an error occurs during file writing.
      */
     public void saveMatrixToCSV(RealMatrix matrix, String filename, String save_path) throws IOException {
-        // Determine the file path based on user input or default to the current directory
+// Determine the file path based on user input or default to the current directory
         String file_path = (save_path == null || save_path.isEmpty()) ? "./" + filename : save_path + "/" + filename;
 
-        // Write the matrix data to the CSV file
+// Write the matrix data to the CSV file
         try (FileWriter csv_writer = new FileWriter(file_path)) {
             for (int i = 0; i < matrix.getRowDimension(); i++) {
                 for (int j = 0; j < matrix.getColumnDimension(); j++) {
@@ -1678,17 +1710,17 @@ public class SimKitProcedures implements AutoCloseable {
     public String hashMapToString(HashMap<String, ArrayList<String>> kmeanAssign) {
         StringBuilder sb = new StringBuilder();
 
-        // Iterate through the entries of the HashMap
+// Iterate through the entries of the HashMap
         for (HashMap.Entry<String, ArrayList<String>> entry : kmeanAssign.entrySet()) {
             String key = entry.getKey();
             ArrayList<String> values = entry.getValue();
 
             sb.append(key).append(": ");
 
-            // Append the values in the ArrayList to the StringBuilder
+// Append the values in the ArrayList to the StringBuilder
             sb.append(values.toString());
 
-            // Add a newline after each key-value pair
+// Add a newline after each key-value pair
             sb.append("\n");
         }
 
