@@ -1,127 +1,122 @@
 package global;
 
-import static org.neo4j.driver.Values.parameters;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.ejml.data.DMatrixRMaj;
-import org.ejml.simple.SimpleMatrix;
-import org.neo4j.driver.Driver;
-import org.neo4j.driver.Record;
-import org.neo4j.driver.Result;
-import org.neo4j.driver.Session;
-import org.neo4j.driver.Transaction;
-import org.neo4j.driver.TransactionWork;
-import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.Neo4jException;
-import org.neo4j.driver.types.Node;
-import org.neo4j.driver.types.Relationship;
-import java.util.stream.Collectors;
-
 import definition.EdgeList2;
 import definition.NodeList2;
+import org.apache.commons.lang3.tuple.Pair;
+import org.ejml.simple.SimpleMatrix;
+import org.neo4j.driver.*;
+import org.neo4j.driver.Record;
+import org.neo4j.driver.exceptions.Neo4jException;
+import org.neo4j.driver.types.Relationship;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static org.neo4j.driver.Values.parameters;
 
 public class Neo4jGraphHandler {
 
-	/**
-	 * Drop any existing index on (label.id) and re-create it
-	 */
-	private static void dropAndCreateIndexOnId(Session session, Driver driver, String label, String identifier) {
-	    String indexName = label + "_" + identifier + "_idx";
-	    
-	    // Drop the index if it exists
-	    session.run("DROP INDEX " + indexName + " IF EXISTS");
-	    
-	    // Create a new index on the specified identifier
-	    session.run("CREATE INDEX " + indexName + " IF NOT EXISTS FOR (n:" + label + ") ON (n." + identifier + ")");
-	}
-	
-	public static String resolveDynamicIdentifier(Driver driver, String label) {
-	    try (Session session = driver.session()) {
-	        String cypherQuery = "MATCH (n:" + label + ") RETURN keys(n) AS keys LIMIT 1";
-	        Result result = session.run(cypherQuery);
+    /**
+     * Drop any existing index on (label.id) and re-create it
+     */
+    private static void dropAndCreateIndexOnId(Session session, Driver driver, String label, String identifier) {
+        String indexName = label + "_" + identifier + "_idx";
 
-	        if (result.hasNext()) {
-	            List<String> keys = result.next().get("keys").asList(Value::asString);
-	            for (String key : Arrays.asList("id", "index", "Id", "ID", "Index","INDEX")) {
-	                if (keys.contains(key)) {
-	                    return key; // Return the first matching identifier
-	                }
-	            }
-	        }
-	    }
-	    throw new RuntimeException("No valid identifier found for nodes with label: " + label);
-	}
+        // Drop the index if it exists
+        session.run("DROP INDEX " + indexName + " IF EXISTS");
+
+        // Create a new index on the specified identifier
+        session.run("CREATE INDEX " + indexName + " IF NOT EXISTS FOR (n:" + label + ") ON (n." + identifier + ")");
+    }
+
+    public static void duplicateNodeSet(String originalLabel, String newLabel, Driver driver) {
+        try (Session session = driver.session()) {
+            String query = "MATCH (n:" + originalLabel + ") CREATE (m:" + newLabel + ") SET m = n";
+            session.run(query);
+        }
+    }
+
+    public static String resolveDynamicIdentifier(Driver driver, String label) {
+        try (Session session = driver.session()) {
+            String cypherQuery = "MATCH (n:" + label + ") RETURN keys(n) AS keys LIMIT 1";
+            Result result = session.run(cypherQuery);
+
+            if (result.hasNext()) {
+                List<String> keys = result.next().get("keys").asList(Value::asString);
+                for (String key : Arrays.asList("id", "index", "Id", "ID", "Index", "INDEX")) {
+                    if (keys.contains(key)) {
+                        return key; // Return the first matching identifier
+                    }
+                }
+            }
+        }
+        throw new RuntimeException("No valid identifier found for nodes with label: " + label);
+    }
 
 
-	public static Pair<ArrayList<NodeList2>, String> retrieveNodeList(final String nodeType, Driver driver) {
-	    ArrayList<NodeList2> nodeList = new ArrayList<>();
-	    String propertyKeys = "";
+    public static Pair<ArrayList<NodeList2>, String> retrieveNodeList(final String nodeType, Driver driver) {
+        ArrayList<NodeList2> nodeList = new ArrayList<>();
+        String propertyKeys = "";
 
-	    try (Session session = driver.session()) {
-	        // Dynamically resolve the identifier for nodes of this type
-	        String identifier = resolveDynamicIdentifier(driver, nodeType);
+        try (Session session = driver.session()) {
+            // Dynamically resolve the identifier for nodes of this type
+            String identifier = resolveDynamicIdentifier(driver, nodeType);
 
-	        // Query to retrieve all node properties
-	        String cypherQuery = "MATCH (n:" + nodeType + ") RETURN properties(n) AS nodeProperties";
-	        Result result = session.run(cypherQuery);
+            // Query to retrieve all node properties
+            String cypherQuery = "MATCH (n:" + nodeType + ") RETURN properties(n) AS nodeProperties";
+            Result result = session.run(cypherQuery);
 
-	        boolean isFirstNode = true; // Flag for the first node
-	        while (result.hasNext()) {
-	            Record record = result.next();
-	            Map<String, Object> originalProperties = record.get("nodeProperties").asMap();
+            boolean isFirstNode = true; // Flag for the first node
+            while (result.hasNext()) {
+                Record record = result.next();
+                Map<String, Object> originalProperties = record.get("nodeProperties").asMap();
 
-	            // Create a mutable copy of the properties map
-	            Map<String, Object> nodeProperties = new HashMap<>(originalProperties);
+                // Create a mutable copy of the properties map
+                Map<String, Object> nodeProperties = new HashMap<>(originalProperties);
 
-	            // Extract the identifier value
-	            if (!nodeProperties.containsKey(identifier)) {
-	                throw new RuntimeException("Identifier '" + identifier + "' not found in node properties: " + nodeProperties + ". Possible identifiers are id, index, Id, ID, Index, INDEX as Integer.");
-	            }
+                // Extract the identifier value
+                if (!nodeProperties.containsKey(identifier)) {
+                    throw new RuntimeException("Identifier '" + identifier + "' not found in node properties: " + nodeProperties + ". Possible identifiers are id, index, Id, ID, Index, INDEX as Integer.");
+                }
 
-	            Object identifierValue = nodeProperties.get(identifier);
-	            float id = ((Number) identifierValue).floatValue();
+                Object identifierValue = nodeProperties.get(identifier);
+                float id = ((Number) identifierValue).floatValue();
 
-	            // Collect property keys only once, for the first node
-	            if (isFirstNode) {
-	                propertyKeys = String.join(",", nodeProperties.keySet());
-	                if (!propertyKeys.contains(identifier)) {
-	                    propertyKeys += "," + identifier; // Add identifier to property keys
-	                }
-	                isFirstNode = false; // Reset the flag
-	            }
+                // Collect property keys only once, for the first node
+                if (isFirstNode) {
+                    propertyKeys = String.join(",", nodeProperties.keySet());
+                    if (!propertyKeys.contains(identifier)) {
+                        propertyKeys += "," + identifier; // Add identifier to property keys
+                    }
+                    isFirstNode = false; // Reset the flag
+                }
 
-	            // Add the identifier back to properties for future graph creation
-	            nodeProperties.put(identifier, id);
+                // Add the identifier back to properties for future graph creation
+                nodeProperties.put(identifier, id);
 
-	            // Create the NodeList2 object
-	            NodeList2 nodeObject = new NodeList2(id, nodeProperties);
-	            nodeList.add(nodeObject);
-	        }
-	    } catch (Neo4jException e) {
-	        throw new RuntimeException("Error retrieving node data from Neo4j for label: " + nodeType + ", Error: " + e.getMessage());
-	    }
-	    return Pair.of(nodeList, propertyKeys);
-	}
+                // Create the NodeList2 object
+                NodeList2 nodeObject = new NodeList2(id, nodeProperties);
+                nodeList.add(nodeObject);
+            }
+        } catch (Neo4jException e) {
+            throw new RuntimeException("Error retrieving node data from Neo4j for label: " + nodeType + ", Error: " + e.getMessage());
+        }
+        return Pair.of(nodeList, propertyKeys);
+    }
 
-	
+
     /**
      * Retrieves the edge list from Neo4j for a specified node type.
      *
      * @param node_label The label of the nodes in the graph.
-     * @param driver   The Neo4j Driver instance.
+     * @param driver     The Neo4j Driver instance.
      * @return ArrayList of EdgeList2 representing the edges in the graph.
      */
     public static ArrayList<EdgeList2> retrieveEdgeListFromNeo4j(final String node_label, Driver driver) {
         ArrayList<EdgeList2> edge_list = new ArrayList<>();
 
         try (Session session = driver.session()) {
-        	String cypher_query = "MATCH (n:" + node_label + ")-[r]->(m:" + node_label + ") WHERE r.value IS NOT NULL RETURN n, m, r, n.id AS source, m.id AS target, r.value AS weight, id(r) AS index ORDER BY index ASC";
+            String cypher_query = "MATCH (n:" + node_label + ")-[r]->(m:" + node_label + ") WHERE r.value IS NOT NULL RETURN n, m, r, n.id AS source, m.id AS target, r.value AS weight, id(r) AS index ORDER BY index ASC";
             Result result = session.run(cypher_query);
 
             while (result.hasNext()) {
@@ -132,7 +127,7 @@ public class Neo4jGraphHandler {
 
                 int source = record.get("source").asInt();
                 int target = record.get("target").asInt();
-                double weight = record.get("weight").asDouble(); 
+                double weight = record.get("weight").asDouble();
                 long index = record.get("index").asLong();
 
                 Map<String, Object> relationship_properties = extractPropertiesFromRelationship(relationship);
@@ -145,7 +140,7 @@ public class Neo4jGraphHandler {
         }
         return edge_list;
     }
-    
+
     public static ArrayList<EdgeList2> retrieveEdgeList(final String node_label, Driver driver) {
         long startTime = System.nanoTime();  // Start timing
 
@@ -156,10 +151,10 @@ public class Neo4jGraphHandler {
 
         // Optimized Cypher query using parameterized query instead of string concatenation
         String cypher_query = String.format(
-            "MATCH (n:%s)-[r]->(m:%s) " +
-            "WHERE r.value IS NOT NULL " +
-            "RETURN n.%s AS source, m.%s AS target, r.value AS weight, id(r) AS edgeId",
-            node_label, node_label, identifier, identifier
+                "MATCH (n:%s)-[r]->(m:%s) " +
+                        "WHERE r.value IS NOT NULL " +
+                        "RETURN n.%s AS source, m.%s AS target, r.value AS weight, id(r) AS edgeId",
+                node_label, node_label, identifier, identifier
         );
 
         try (Session session = driver.session()) {
@@ -169,11 +164,11 @@ public class Neo4jGraphHandler {
             edge_list = result.stream()
                     .parallel()  // Enable parallel processing
                     .map(record -> new EdgeList2(
-                        record.get("source").asInt(),
-                        record.get("target").asInt(),
-                        record.get("weight").asDouble(),
-                        record.get("edgeId").asLong(),
-                        null
+                            record.get("source").asInt(),
+                            record.get("target").asInt(),
+                            record.get("weight").asDouble(),
+                            record.get("edgeId").asLong(),
+                            null
                     ))
                     .collect(Collectors.toCollection(ArrayList::new));
 
@@ -186,7 +181,7 @@ public class Neo4jGraphHandler {
 
         return edge_list;
     }
-    
+
 //    public static Pair<ArrayList<NodeList2>, String> retrieveNodeListFromNeo4jSimilarityGraph(final String nodeType, Driver driver) {
 //        ArrayList<NodeList2> nodeList = new ArrayList<>();
 //        String propertyKeys = "";
@@ -242,14 +237,13 @@ public class Neo4jGraphHandler {
 //        }
 //        return nodeList;
 //    }
-    
-    
+
 
     /**
      * Retrieves the node list from Neo4j for a specified node type.
      *
      * @param node_label The label of the nodes in the graph.
-     * @param driver   The Neo4j Driver instance.
+     * @param driver     The Neo4j Driver instance.
      * @return ArrayList of NodeList2 representing the nodes in the graph.
      */
 //    public static ArrayList<NodeList2> retrieveNodeListFromNeo4j(final String node_label, Driver driver) {
@@ -275,7 +269,6 @@ public class Neo4jGraphHandler {
 //        }
 //        return nodeList;
 //    }
-    
     public static void createNodeGraph(String graphType, String message, NodeList2 nodeDetail, Driver driver) {
         final float id = nodeDetail.getIndex();
         final Map<String, Object> properties = nodeDetail.getProperties();
@@ -302,7 +295,33 @@ public class Neo4jGraphHandler {
             });
         }
     }
-    
+
+    /**
+     * Dynamically updates properties for a list of nodes in Neo4j.
+     *
+     * @param node_label           The label of the nodes to update.
+     * @param node_properties_list The list of NodeList2 objects (must contain the identifier value).
+     * @param propertiesPerNode    A list of maps, each containing property names and values for the corresponding node.
+     * @param driver               The Neo4j driver.
+     * @param identifier           The property name used as unique node identifier.
+     */
+    public static void updateNodeProperties(String node_label, ArrayList<NodeList2> node_properties_list, List<Map<String, Object>> propertiesPerNode, Driver driver, String identifier) {
+        try (Session session = driver.session()) {
+            for (int i = 0; i < node_properties_list.size(); i++) {
+                NodeList2 node = node_properties_list.get(i);
+                Object nodeId = node.getProperties().get(identifier);
+                Map<String, Object> props = propertiesPerNode.get(i);
+
+                Map<String, Object> paramsMap = new HashMap<>();
+                paramsMap.put("id", nodeId);
+                paramsMap.put("props", props);
+
+                String cypher = "MATCH (n:" + node_label + ") WHERE n." + identifier + " = $id SET n += $props";
+                session.run(cypher, paramsMap);
+            }
+        }
+    }
+
     public static void bulkCreateNodes(String graphType, List<NodeList2> nodes, Driver driver, String identifier) {
         // Prepare the list of node data
         List<Map<String, Object>> nodeData = new ArrayList<>();
@@ -315,8 +334,8 @@ public class Neo4jGraphHandler {
 
         // Define the Cypher query using UNWIND for bulk insertion
         String cypher = "UNWIND $nodes AS node " +
-                        "CREATE (n:" + graphType + ") " +
-                        "SET n = node";
+                "CREATE (n:" + graphType + ") " +
+                "SET n = node";
 
         // Execute the bulk insertion
         try (Session session = driver.session()) {
@@ -333,13 +352,13 @@ public class Neo4jGraphHandler {
     /**
      * Creates nodes in Neo4j for the transformed graph after Laplacian Eigen Transform.
      *
-     * @param graph_type   The type of the transformed graph.
-     * @param message     A message indicating the operation.
-     * @param nodeDetail  Details of the node to be created.
-     * @param X           The X matrix obtained from eigen decomposition.
-     * @param driver      The Neo4j Driver instance.
+     * @param graph_type The type of the transformed graph.
+     * @param message    A message indicating the operation.
+     * @param nodeDetail Details of the node to be created.
+     * @param X          The X matrix obtained from eigen decomposition.
+     * @param driver     The Neo4j Driver instance.
      */
-    
+
     public static void bulkCreateNodesWithEigen(String graphType, List<NodeList2> nodes, SimpleMatrix X, Driver driver, String identifier) {
         // Determine if the indices are 1-based or 0-based
         float minIndex = Integer.MAX_VALUE;
@@ -358,7 +377,7 @@ public class Neo4jGraphHandler {
         // Validate matrix dimensions
         if (X.getNumRows() != nodes.size()) {
             throw new IllegalArgumentException("Mismatch between eigenvector matrix rows and node list size: " +
-                "Eigenvector Rows = " + X.getNumRows() + ", Node List Size = " + nodes.size());
+                    "Eigenvector Rows = " + X.getNumRows() + ", Node List Size = " + nodes.size());
         }
 
         // Prepare the list of node data with eigenvector properties
@@ -374,8 +393,8 @@ public class Neo4jGraphHandler {
 
             // Validate node index
             if (nodeIndex < 0 || nodeIndex >= X.getNumRows()) {
-                throw new IllegalArgumentException("Invalid node index: " + nodeIndex + 
-                    ". Eigenvector matrix has rows = " + X.getNumRows());
+                throw new IllegalArgumentException("Invalid node index: " + nodeIndex +
+                        ". Eigenvector matrix has rows = " + X.getNumRows());
             }
 
             Map<String, Object> properties = new HashMap<>(node.getProperties());
@@ -389,12 +408,12 @@ public class Neo4jGraphHandler {
             // Add the modified properties to the node data list
             nodeData.add(properties);
         }
-        
+
         // Define the Cypher query using UNWIND for bulk insertion
         String cypher = "UNWIND $nodes AS node " +
-                        "CREATE (n:" + graphType + ") " +
-                        "SET n = node";
-        
+                "CREATE (n:" + graphType + ") " +
+                "SET n = node";
+
         // Execute the bulk insertion
         try (Session session = driver.session()) {
             session.writeTransaction(tx -> {
@@ -405,13 +424,13 @@ public class Neo4jGraphHandler {
             throw new RuntimeException("Error bulk creating eigen nodes: " + e.getMessage());
         }
     }
-    
+
     /**
      * Creates relationships in Neo4j for the transformed graph after Laplacian Eigen Transform.
      *
-     * @param graph_type        The type of the transformed graph.
+     * @param graph_type       The type of the transformed graph.
      * @param message          A message indicating the operation.
-     * @param edge_list_detail   Details of the edge to be created.
+     * @param edge_list_detail Details of the edge to be created.
      * @param driver           The Neo4j Driver instance.
      */
     public static void createRelationshipGraph(String graph_type, String message, EdgeList2 edge_list_detail, Driver driver) {
@@ -419,7 +438,7 @@ public class Neo4jGraphHandler {
         final float target = edge_list_detail.getTarget();
 //        double weightValue = (double) Math.round(edge_list_detail.getWeight() * 10000000d) / 10000000d;
         double weightValue = edge_list_detail.getWeight();
-        
+
         try (Session session = driver.session()) {
             session.writeTransaction(new TransactionWork<Void>() {
                 @Override
@@ -439,7 +458,7 @@ public class Neo4jGraphHandler {
             throw new RuntimeException("Error creating relationship in Neo4j: " + e.getMessage());
         }
     }
-    
+
     public static void bulkCreateRelationshipsWithBatching(String label, List<EdgeList2> edges, Driver driver, String identifier) {
         final int BATCH_SIZE = 100000;
         int total = edges.size();
@@ -465,9 +484,9 @@ public class Neo4jGraphHandler {
 
                 // Optimized Cypher query with explicit transactions
                 String cypher = "UNWIND $relationships AS rel " +
-                                "MATCH (n:" + label + " {" + identifier + ": rel.source}), " +
-                                "(m:" + label + " {" + identifier + ": rel.target}) " +
-                                "CREATE (n)-[:`link` {value: rel.distance}]->(m)";
+                        "MATCH (n:" + label + " {" + identifier + ": rel.source}), " +
+                        "(m:" + label + " {" + identifier + ": rel.target}) " +
+                        "CREATE (n)-[:`link` {value: rel.distance}]->(m)";
 
                 session.writeTransaction(tx -> {
                     tx.run(cypher, parameters("relationships", relationshipData));
@@ -482,8 +501,8 @@ public class Neo4jGraphHandler {
     /**
      * Creates relationships in Neo4j for the transformed graph after Laplacian Eigen Transform.
      *
-     * @param name        Node Label name.
-     * @param driver      The Neo4j Driver instance.
+     * @param name   Node Label name.
+     * @param driver The Neo4j Driver instance.
      */
     public static void deleteExistingNodeLabels(String name, Driver driver) {
         try (Session session = driver.session()) {
@@ -524,9 +543,9 @@ public class Neo4jGraphHandler {
                 List<Integer> batch = nodeIds.subList(i, end);
 
                 String deleteCypher = "UNWIND $ids AS id " +
-                                      "MATCH (n:" + label + ") " +
-                                      "WHERE n." + identifier + " = id " +
-                                      "DETACH DELETE n";
+                        "MATCH (n:" + label + ") " +
+                        "WHERE n." + identifier + " = id " +
+                        "DETACH DELETE n";
 
                 session.writeTransaction(tx -> {
                     tx.run(deleteCypher, parameters("ids", batch));
@@ -552,7 +571,7 @@ public class Neo4jGraphHandler {
 //
 //        return properties;
 //    }
-    
+
     private static Map<String, Object> extractPropertiesFromRelationship(Relationship relationship) {
         Map<String, Object> properties = new HashMap<>();
 

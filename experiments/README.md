@@ -13,10 +13,10 @@ This repository demonstrates how to run spectral clustering experiments using bo
 ## Contents
 - Dockerfile and docker-compose.yml: Builds and runs a Neo4j instance with the SimKit plugin.
 - requirements.txt: Python dependencies.
-- SimKit-0.1.1.jar: SimKit plugin (must be compatible with the Neo4j version used).
+- SimKit-0.1.2.jar: SimKit plugin (must be compatible with the Neo4j version used).
 - Python scripts:
   - experiment_gds.py: Runs k-means clustering using Neo4j GDS.
-  - experiments_simkit-0.1.1.py: Runs and times clustering using SimKit and scikit-learn.
+  - experiments_simkit-0.1.2.py: Runs and times clustering using SimKit and scikit-learn.
 
 ## Prerequisites
 - Docker installed on your system.
@@ -53,7 +53,7 @@ This repository demonstrates how to run spectral clustering experiments using bo
 
    - Run SimKit and scikit-learn timing experiments:
     ```bash
-    python experiments_simkit-0.1.1.py
+    python experiments_simkit-0.1.2.py
     ```
 
 ## Notes
