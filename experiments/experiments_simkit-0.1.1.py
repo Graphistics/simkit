@@ -495,6 +495,8 @@ def run_experiments(driver, experiments):
         }
         if config.get("is_feature_based"):
             filename = f"{config['label'].replace('Node', '').lower()}.csv"
+            if "news" in filename:
+                filename = "20newsgroups.csv"
             python_result = run_python_experiment_feature(config, os.path.join("datasets", filename))
         else:
             node_file_path = os.path.join("datasets", f"{config['label'].replace('Node', '').lower()}_nodes.csv")
@@ -579,103 +581,102 @@ def run_graph_experiment(dataset, label, edge_label, remove_columns, number_of_e
 
 
 feature_datasets = {
-    #"iris": {"label": "IrisNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"},
-    #"madelon": {"label": "MadelonNode", "remove_columns": "Index,target", "number_of_eigenvectors": 2, "target_column": "target"},
-    #"20newsgroups": {"label": "NewsGroupNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"}
+    "iris": {"label": "IrisNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"},
+    "madelon": {"label": "MadelonNode", "remove_columns": "Index,target", "number_of_eigenvectors": 2, "target_column": "target"},
+    "20newsgroups": {"label": "NewsGroupNode", "remove_columns": "Index,target", "number_of_eigenvectors": 3, "target_column": "target"}
 }
 
 graph_datasets = {
-    #"cora": {"label": "CoraNode", "edge_label": "CoraEdge", "remove_columns": "id,label", "number_of_eigenvectors": 7, "target_column": "label"},
-    #"pubmed": {"label": "PubMedNode", "edge_label": "PubMedEdge", "remove_columns": "id,label", "number_of_eigenvectors": 3, "target_column": "label"},
+    "cora": {"label": "CoraNode", "edge_label": "CoraEdge", "remove_columns": "id,label", "number_of_eigenvectors": 7, "target_column": "label"},
+    "pubmed": {"label": "PubMedNode", "edge_label": "PubMedEdge", "remove_columns": "id,label", "number_of_eigenvectors": 3, "target_column": "label"},
     "citeseer": {"label": "CiteSeerNode", "edge_label": "CiteSeerEdge", "remove_columns": "id,label", "number_of_eigenvectors": 6, "target_column": "label"}
 }
 
-if __name__ == "__main__":
-    try:
-        for dataset, params in feature_datasets.items():
-            run_feature_experiment(dataset, **params)
-        for dataset, params in graph_datasets.items():
-            run_graph_experiment(dataset, **params)
-    finally:
-        driver.close()
+try:
+    for dataset, params in feature_datasets.items():
+        run_feature_experiment(dataset, **params)
+    for dataset, params in graph_datasets.items():
+        run_graph_experiment(dataset, **params)
+finally:
+    driver.close()
 
-    import glob
-    import matplotlib.pyplot as plt
-    import seaborn as sns
+import glob
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-    result_files = glob.glob(os.path.join("results", "*_results.csv"))
-    df_list = []
-    for file in result_files:
-        temp = pd.read_csv(file)
-        dataset_name = os.path.basename(file).split("_results.csv")[0]
-        temp['dataset'] = dataset_name.capitalize()
-        df_list.append(temp)
-    combined_df = pd.concat(df_list, ignore_index=True)
+result_files = glob.glob(os.path.join("results", "*_results.csv"))
+df_list = []
+for file in result_files:
+    temp = pd.read_csv(file)
+    dataset_name = os.path.basename(file).split("_results.csv")[0]
+    temp['dataset'] = dataset_name.capitalize()
+    df_list.append(temp)
+combined_df = pd.concat(df_list, ignore_index=True)
 
-    simkit_avg = combined_df[['total_time', 'cpu_used', 'silhouette_score', 'rand_index']].mean()
-    python_avg = combined_df[
-        ['python_total_time', 'python_cpu_used', 'python_silhouette_score', 'python_rand_index']].mean()
-    print("\nAverage Metrics for SimKit:")
-    print(simkit_avg)
-    print("\nAverage Metrics for Python:")
-    print(python_avg)
+simkit_avg = combined_df[['total_time', 'cpu_used', 'silhouette_score', 'rand_index']].mean()
+python_avg = combined_df[
+    ['python_total_time', 'python_cpu_used', 'python_silhouette_score', 'python_rand_index']].mean()
+print("\nAverage Metrics for SimKit:")
+print(simkit_avg)
+print("\nAverage Metrics for Python:")
+print(python_avg)
 
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
-    sns.boxplot(data=combined_df[['affinity_time', 'laplacian_time', 'clustering_time']])
-    plt.title("SimKit Times")
-    plt.ylabel("Time (s)")
+plt.figure(figsize=(12, 6))
+plt.subplot(1, 2, 1)
+sns.boxplot(data=combined_df[['affinity_time', 'laplacian_time', 'clustering_time']])
+plt.title("SimKit Times")
+plt.ylabel("Time (s)")
 
-    plt.subplot(1, 2, 2)
-    sns.boxplot(data=combined_df[['python_affinity_time', 'python_laplacian_time', 'python_clustering_time']])
-    plt.title("Python Times")
-    plt.ylabel("Time (s)")
-    plt.tight_layout()
-    plt.savefig("boxplot_separate.pdf", bbox_inches="tight")
-    plt.show()
+plt.subplot(1, 2, 2)
+sns.boxplot(data=combined_df[['python_affinity_time', 'python_laplacian_time', 'python_clustering_time']])
+plt.title("Python Times")
+plt.ylabel("Time (s)")
+plt.tight_layout()
+plt.savefig("boxplot_separate.pdf", bbox_inches="tight")
+plt.show()
 
-    combined_box = pd.DataFrame({
-        'SimKit Total Time': combined_df['total_time'],
-        'Python Total Time': combined_df['python_total_time']
-    })
-    plt.figure(figsize=(6, 6))
-    sns.boxplot(data=combined_box)
-    plt.title("Total Time Comparison: SimKit vs. Python")
-    plt.ylabel("Time (s)")
-    plt.savefig("boxplot_combined.pdf", bbox_inches="tight")
-    plt.show()
+combined_box = pd.DataFrame({
+    'SimKit Total Time': combined_df['total_time'],
+    'Python Total Time': combined_df['python_total_time']
+})
+plt.figure(figsize=(6, 6))
+sns.boxplot(data=combined_box)
+plt.title("Total Time Comparison: SimKit vs. Python")
+plt.ylabel("Time (s)")
+plt.savefig("boxplot_combined.pdf", bbox_inches="tight")
+plt.show()
 
-    dataset_dims = {
-        'Iris': 150,
-        'Madelon': 2600,
-        '20newsgroups': 3387,
-        'Cora': 2708,
-        'Citeseer': 3312,
-        'Pubmed': 19717
-    }
-
-
-    def get_nodes(dataset):
-        for key in dataset_dims:
-            if key.lower() == dataset.lower():
-                return dataset_dims[key]
-        return np.nan
+dataset_dims = {
+    'Iris': 150,
+    'Madelon': 2600,
+    '20newsgroups': 3387,
+    'Cora': 2708,
+    'Citeseer': 3312,
+    'Pubmed': 19717
+}
 
 
-    combined_df['nodes'] = combined_df['dataset'].apply(get_nodes)
+def get_nodes(dataset):
+    for key in dataset_dims:
+        if key.lower() == dataset.lower():
+            return dataset_dims[key]
+    return np.nan
 
-    plt.figure(figsize=(6, 6))
-    sns.regplot(x='nodes', y='total_time', data=combined_df, scatter_kws={'s': 50})
-    plt.title("SimKit Scalability: Total Time vs. Nodes")
-    plt.xlabel("Number of Nodes")
-    plt.ylabel("Total Time (s)")
-    plt.savefig("scalability_simkit.pdf", bbox_inches="tight")
-    plt.show()
 
-    plt.figure(figsize=(6, 6))
-    sns.regplot(x='nodes', y='python_total_time', data=combined_df, scatter_kws={'s': 50})
-    plt.title("Python Scalability: Total Time vs. Nodes")
-    plt.xlabel("Number of Nodes")
-    plt.ylabel("Total Time (s)")
-    plt.savefig("scalability_python.pdf", bbox_inches="tight")
-    plt.show()
+combined_df['nodes'] = combined_df['dataset'].apply(get_nodes)
+
+plt.figure(figsize=(6, 6))
+sns.regplot(x='nodes', y='total_time', data=combined_df, scatter_kws={'s': 50})
+plt.title("SimKit Scalability: Total Time vs. Nodes")
+plt.xlabel("Number of Nodes")
+plt.ylabel("Total Time (s)")
+plt.savefig("scalability_simkit.pdf", bbox_inches="tight")
+plt.show()
+
+plt.figure(figsize=(6, 6))
+sns.regplot(x='nodes', y='python_total_time', data=combined_df, scatter_kws={'s': 50})
+plt.title("Python Scalability: Total Time vs. Nodes")
+plt.xlabel("Number of Nodes")
+plt.ylabel("Total Time (s)")
+plt.savefig("scalability_python.pdf", bbox_inches="tight")
+plt.show()

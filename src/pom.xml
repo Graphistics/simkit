@@ -2,13 +2,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.neo4j.example</groupId>
+  <groupId>de.graphistics.simkit</groupId>
   <artifactId>SimKit</artifactId>
-  <version>0.1.1.1</version>
+  <version>0.1.2</version>
 
   <packaging>jar</packaging>
-  <name>Neo4j Procedure Template</name>
-  <description>A template project for building a Neo4j Procedure</description>
+  <name>Simkit</name>
+  <description>Plug-in for Neo4j containing user-defined procedures to perform Spectral Clustering through a single procedure or as individual procedures (Similarity Graph, Laplacian Eigendecomposed Graph, KMeans). Additional procedures available for evaluation with Average Silhouette Score and Adjusted Rand Index, visualization of matrices into String and saving them to CSV.</description>
 
   <properties>
     <java.version>11</java.version>
